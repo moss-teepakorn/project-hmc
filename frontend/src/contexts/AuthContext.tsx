@@ -91,8 +91,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
+    const normalizedEmail = email.trim().toLowerCase();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+
+    if (error) {
+      const msg = String(error.message || '').toLowerCase();
+      if (msg.includes('invalid login credentials')) {
+        throw new Error('Email หรือ Password ไม่ถูกต้อง หรือบัญชียังไม่ยืนยันอีเมล');
+      }
+      if (msg.includes('email not confirmed')) {
+        throw new Error('บัญชียังไม่ยืนยันอีเมล กรุณาเปิดอีเมลแล้วกดยืนยันก่อนเข้าสู่ระบบ');
+      }
+      throw new Error(error.message);
+    }
   };
 
   const signUp = async (email: string, password: string, fullName: string, role: UserRole = 'member') => {
