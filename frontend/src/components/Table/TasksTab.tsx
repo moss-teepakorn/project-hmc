@@ -189,7 +189,7 @@ export default function TasksTab({ projectId }: Props) {
     // Header band
     doc.setFillColor(79,70,229); doc.rect(0,0,W,18,'F');
     doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
-    doc.text(`${proj?.name ?? projectId} — Task Plan + Gantt`, 10, 11);
+    doc.text(`${proj?.name ?? projectId} - Task Plan + Gantt`, 10, 11);
     doc.setFontSize(7); doc.setFont('helvetica','normal');
     doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, W-10, 11, { align:'right' });
     doc.setTextColor(0);
@@ -198,13 +198,39 @@ export default function TasksTab({ projectId }: Props) {
     const tableW = 160; // wider task table for readable task name
     const ganttX = tableW + 12; // start of gantt area
     const ganttW = W - ganttX - 6;
-    const rowH   = 5.2; // mm per row
+    const baseRowH = 5.2; // mm per row (minimum)
     const headerH = 7;
+    const taskTextX = 20;
+    const taskTextW = 90;
 
     // Flatten all tasks for display (with indentation in name)
     const allVisible = [...projectTasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
-    const rowsPerPage = Math.max(1, Math.floor((H - startY - 10 - headerH) / rowH));
-    const totalPages = Math.max(1, Math.ceil(allVisible.length / rowsPerPage));
+    const getRowHeight = (task: Task): number => {
+      const indent = task.level * 2.5;
+      doc.setFont('helvetica', hasChildren(projectTasks, task.id) ? 'bold' : 'normal');
+      doc.setFontSize(5.4);
+      const lines = doc.splitTextToSize(task.taskName || '', Math.max(8, taskTextW - indent));
+      const lineCount = Math.max(1, (Array.isArray(lines) ? lines.length : 1));
+      return Math.max(baseRowH, 2.6 + Math.min(4, lineCount) * 2.0);
+    };
+
+    const maxBodyH = H - startY - headerH - 10;
+    const pageTaskRows: Task[][] = [];
+    let currentPageRows: Task[] = [];
+    let usedHeight = 0;
+    allVisible.forEach((task) => {
+      const h = getRowHeight(task);
+      if (currentPageRows.length > 0 && usedHeight + h > maxBodyH) {
+        pageTaskRows.push(currentPageRows);
+        currentPageRows = [task];
+        usedHeight = h;
+      } else {
+        currentPageRows.push(task);
+        usedHeight += h;
+      }
+    });
+    if (currentPageRows.length > 0 || pageTaskRows.length === 0) pageTaskRows.push(currentPageRows);
+    const totalPages = pageTaskRows.length;
 
     const validTasks = allVisible.filter(t => t.startDate && t.endDate);
     const allDates = validTasks.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
@@ -216,13 +242,11 @@ export default function TasksTab({ projectId }: Props) {
     for (let page = 0; page < totalPages; page += 1) {
       if (page > 0) doc.addPage('a4', 'landscape');
 
-      const pageRows = allVisible.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+      const pageRows = pageTaskRows[page] || [];
 
       doc.setFillColor(79,70,229);
       doc.rect(6, startY, tableW, headerH, 'F');
       doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
-      const taskTextX = 20;
-      const taskTextW = 90;
       const cols = [
         { label: 'WBS',   x: 8 },
         { label: 'Task',  x: taskTextX },
@@ -257,8 +281,10 @@ export default function TasksTab({ projectId }: Props) {
       const todayX = ganttX + todayOff * dayPx;
 
       doc.setFont('helvetica','normal');
+      let yCursor = startY + headerH;
       pageRows.forEach((task, i) => {
-        const ry = startY + headerH + i * rowH;
+        const ry = yCursor;
+        const rowH = getRowHeight(task);
 
         if (i % 2 === 0) { doc.setFillColor(248,250,252); doc.rect(6, ry, tableW, rowH, 'F'); }
         doc.setDrawColor(226,232,240); doc.setLineWidth(0.15);
@@ -268,24 +294,26 @@ export default function TasksTab({ projectId }: Props) {
         const indent = task.level * 2.5;
 
         doc.setFontSize(5.8); doc.setTextColor(90);
-        doc.text(task.wbs || '', 8, ry + rowH - 1.3);
+        doc.text(task.wbs || '', 8, ry + Math.min(rowH - 1.2, 4.6));
 
         doc.setFont('helvetica', isPar ? 'bold' : 'normal');
         doc.setTextColor(isPar ? 65 : 30, isPar ? 65 : 30, isPar ? 155 : 30);
         doc.setFontSize(5.4);
-        doc.text(task.taskName, taskTextX + indent, ry + rowH - 1.3, { maxWidth: Math.max(8, taskTextW - indent) });
+        const nameLines = doc.splitTextToSize(task.taskName || '', Math.max(8, taskTextW - indent));
+        doc.text(nameLines, taskTextX + indent, ry + 2.9, { maxWidth: Math.max(8, taskTextW - indent) });
 
         doc.setFont('helvetica','normal'); doc.setTextColor(80); doc.setFontSize(5.1);
-        doc.text(task.startDate ? fmtDate(task.startDate) : '', 110, ry + rowH - 1.3);
-        doc.text(task.endDate ? fmtDate(task.endDate) : '', 128, ry + rowH - 1.3);
+        const ym = ry + rowH / 2 + 0.6;
+        doc.text(task.startDate ? fmtDate(task.startDate) : '', 110, ym);
+        doc.text(task.endDate ? fmtDate(task.endDate) : '', 128, ym);
 
         const pct = task.percentComplete;
         const [pr,pg,pb] = pct >= 100 ? [16,185,129] : pct >= 60 ? [59,130,246] : [79,70,229];
         doc.setFont('helvetica','bold'); doc.setTextColor(pr,pg,pb); doc.setFontSize(5.2);
-        doc.text(`${pct}%`, 145, ry + rowH - 1.3);
+        doc.text(`${pct}%`, 145, ym);
 
         doc.setFont('helvetica','normal'); doc.setTextColor(80);
-        doc.text(`${task.duration}d`, 154, ry + rowH - 1.3);
+        doc.text(`${task.duration}d`, 154, ym);
 
         // Gantt bar
         doc.setDrawColor(226,232,240); doc.setLineWidth(0.1);
@@ -307,15 +335,17 @@ export default function TasksTab({ projectId }: Props) {
             doc.roundedRect(bx, by, fw, bh, 0.4, 0.4, 'F');
           }
         }
+
+        yCursor += rowH;
       });
 
       if (todayOff >= 0 && todayOff <= totalDays) {
         doc.setDrawColor(239,68,68); doc.setLineWidth(0.3);
-        doc.line(todayX, startY + headerH, todayX, startY + headerH + pageRows.length * rowH);
+        doc.line(todayX, startY + headerH, todayX, yCursor);
       }
 
       doc.setDrawColor(79,70,229); doc.setLineWidth(0.3);
-      doc.line(ganttX - 3, startY, ganttX - 3, startY + headerH + pageRows.length * rowH);
+      doc.line(ganttX - 3, startY, ganttX - 3, yCursor);
 
       doc.setFontSize(6); doc.setTextColor(160);
       doc.text('ProjectMS - Task Plan + Gantt', 10, H - 4);
@@ -509,6 +539,12 @@ function TaskModal({ tasks, onClose, onSave }: { tasks:Task[]; onClose:()=>void;
     parentId:'',
     relatedTask:''
   });
+  const formatDmyInput = (raw: string): string => {
+    const digits = String(raw || '').replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
   const up = (k:string,v:string) => setForm(p=>({...p,[k]:v}));
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
   const startIso = dmyToIso(String(form.startDate || ''));
@@ -522,8 +558,8 @@ function TaskModal({ tasks, onClose, onSave }: { tasks:Task[]; onClose:()=>void;
           onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border} />
       </FormRow>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <FormRow label="Start Date (dd/mm/yyyy)"><input value={form.startDate??''} onChange={e=>up('startDate',e.target.value)} placeholder="dd/mm/yyyy" inputMode="numeric" style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
-        <FormRow label="End Date (dd/mm/yyyy)"><input value={form.endDate??''} onChange={e=>up('endDate',e.target.value)} placeholder="dd/mm/yyyy" inputMode="numeric" style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
+        <FormRow label="Start Date (dd/mm/yyyy)"><input value={form.startDate??''} onChange={e=>up('startDate',formatDmyInput(e.target.value))} placeholder="dd/mm/yyyy" inputMode="numeric" maxLength={10} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
+        <FormRow label="End Date (dd/mm/yyyy)"><input value={form.endDate??''} onChange={e=>up('endDate',formatDmyInput(e.target.value))} placeholder="dd/mm/yyyy" inputMode="numeric" maxLength={10} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
       </div>
       {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
       <FormRow label="Resource">
