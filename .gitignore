@@ -1,6 +1,17 @@
+<<<<<<< HEAD
 node_modules/
 dist/
 .env.local
 .env
 .DS_Store
 *.log
+=======
+node_modules
+dist
+.env
+.env.local
+.DS_Store
+*.log
+.vercel
+.env*.local
+>>>>>>> fbdbe30cb826a7a75357f341a6cabfcd5b9e3ec2

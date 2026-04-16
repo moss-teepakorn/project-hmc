@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Village Management System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <script type="module" crossorigin src="/assets/index-DPg_uSS-.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BRc11pBz.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      try {
+        const villageName = localStorage.getItem('vms-setup-village-name') || 'The Greenfield'
+        document.title = villageName + ' — Village Management System'
+      } catch (_) {}
+
+      // Ignore known runtime noise from browser extensions injected as webextension.js.
+      // This also covers common message-port errors produced by extension content scripts.
+      const isExtensionNoise = (message, source) => {
+        const msg = String(message || '')
+        const src = String(source || '')
+        const normalized = msg.toLowerCase()
+        return src.includes('webextension.js')
+          || normalized.includes('could not establish connection. receiving end does not exist.')
+          || normalized.includes('the message port closed before a response was received')
+          || (msg.includes("Cannot read properties of null (reading '1')") && (src.includes('extension') || src.includes('webextension')))
+      }
+
+      const previousOnError = window.onerror
+      window.onerror = function (message, source, lineno, colno, error) {
+        if (isExtensionNoise(message, source)) return true
+        if (typeof previousOnError === 'function') return previousOnError(message, source, lineno, colno, error)
+        return false
+      }
+
+      window.addEventListener('error', (event) => {
+        if (!isExtensionNoise(event?.message, event?.filename)) return
+        if (typeof event.preventDefault === 'function') event.preventDefault()
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation()
+      }, true)
+
+      window.addEventListener('unhandledrejection', (event) => {
+        const reasonText = String(event?.reason?.message || event?.reason || '')
+        if (!isExtensionNoise(reasonText, 'webextension.js')) return
+        if (typeof event.preventDefault === 'function') event.preventDefault()
+      })
+    </script>
+  </body>
+</html>

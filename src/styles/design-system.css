@@ -1,0 +1,174 @@
+/*
+  Global Design System v1
+  - Semantic tokens (colors, spacing, radii, shadows)
+  - Theme bridge from existing VMS variables
+  - Shared primitives used across admin/resident/login
+*/
+
+:root {
+  --ds-font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --ds-radius-xs: 6px;
+  --ds-radius-sm: 8px;
+  --ds-radius-md: 10px;
+  --ds-radius-lg: 12px;
+  --ds-radius-xl: 16px;
+
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+
+  --ds-surface-page: #f5f6f7;
+  --ds-surface-muted: #ecf0f1;
+  --ds-surface-card: #ffffff;
+
+  --ds-text-primary: #2c3e50;
+  --ds-text-secondary: #6b7280;
+  --ds-text-inverse: #ffffff;
+
+  --ds-border-subtle: #d6dde3;
+  --ds-border-strong: #bdc3c7;
+
+  --ds-brand: #1b4f72;
+  --ds-brand-strong: #1e40af;
+  --ds-brand-soft: #e8f4f8;
+
+  --ds-success: #16a34a;
+  --ds-success-strong: #15803d;
+  --ds-danger: #ef4444;
+  --ds-danger-strong: #dc2626;
+  --ds-warning: #b45309;
+  --ds-warning-strong: #92400e;
+  --ds-neutral: #334155;
+  --ds-neutral-strong: #1e293b;
+  --ds-accent: #0f766e;
+  --ds-accent-strong: #115e59;
+
+  --ds-focus-ring: rgba(37, 99, 235, 0.28);
+  --ds-shadow-card: 0 1px 8px rgba(15, 23, 42, 0.08);
+  --ds-shadow-elevated: 0 6px 20px rgba(15, 23, 42, 0.16);
+  --ds-gradient-header: linear-gradient(135deg, #1b4f72 0%, #1e40af 100%);
+}
+
+[data-theme] {
+  --ds-surface-page: var(--bg);
+  --ds-surface-muted: var(--bg2);
+  --ds-surface-card: var(--card);
+
+  --ds-text-primary: var(--tx);
+  --ds-text-secondary: var(--mu);
+
+  --ds-border-strong: var(--bo);
+  --ds-brand: var(--pr);
+  --ds-brand-soft: var(--prl);
+  --ds-success: var(--ac);
+  --ds-success-strong: var(--acb);
+  --ds-danger: var(--dg);
+  --ds-danger-strong: var(--dgb);
+  --ds-warning: var(--wn);
+  --ds-warning-strong: var(--wnb);
+
+  --ds-gradient-header: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--pr) 84%, #0f172a 16%) 0%,
+    color-mix(in srgb, var(--prb) 74%, #1e3a8a 26%) 100%
+  );
+}
+
+html,
+body {
+  font-family: var(--ds-font-family);
+  background: var(--ds-surface-page);
+  color: var(--ds-text-primary);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: var(--ds-font-family);
+}
+
+:where(button, input, select, textarea):focus-visible {
+  outline: 3px solid var(--ds-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Shared field primitive */
+.ds-field,
+.houses-filter-input,
+.houses-filter-select,
+.setup-input {
+  border: 1px solid var(--ds-border-strong);
+  background: var(--ds-surface-card);
+  color: var(--ds-text-primary);
+  border-radius: var(--ds-radius-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.ds-field::placeholder,
+.houses-filter-input::placeholder,
+.setup-input::placeholder {
+  color: var(--ds-text-secondary);
+}
+
+.ds-field:focus,
+.houses-filter-input:focus,
+.houses-filter-select:focus,
+.setup-input:focus {
+  border-color: color-mix(in srgb, var(--ds-brand) 72%, #ffffff 28%);
+  box-shadow: 0 0 0 3px var(--ds-focus-ring);
+  outline: none;
+}
+
+/* Shared login primitives */
+.vms-login-input {
+  width: 100%;
+  border-radius: var(--ds-radius-lg);
+  border: 1px solid var(--ds-border-strong);
+  padding: 11px 16px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ds-text-primary);
+  background: var(--ds-surface-card);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vms-login-input::placeholder {
+  color: color-mix(in srgb, var(--ds-text-secondary) 85%, #ffffff 15%);
+}
+
+.vms-login-input:focus {
+  border-color: color-mix(in srgb, var(--ds-brand) 68%, #ffffff 32%);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-brand-soft) 70%, #ffffff 30%);
+  outline: none;
+}
+
+.vms-login-submit {
+  width: 100%;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(63, 99, 189, 0.35);
+  transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+}
+
+.vms-login-submit:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.vms-login-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.vms-login-link {
+  font-weight: 600;
+  transition: color 0.15s ease;
+}

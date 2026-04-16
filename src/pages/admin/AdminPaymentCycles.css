@@ -1,0 +1,51 @@
+.payment-cycles-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.payment-cycles-filter-row {
+  display: grid;
+  grid-template-columns: 150px minmax(220px, 1fr) repeat(3, auto);
+  gap: 10px;
+  align-items: center;
+}
+
+.payment-cycles-year {
+  height: 36px;
+}
+
+.payment-cycles-frequency {
+  width: 100%;
+  min-width: 0;
+}
+
+.payment-cycles-table-wrap .fi,
+.payment-cycles-table-wrap .cars-ss-input {
+  min-height: 34px;
+}
+
+.payment-cycles-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tx);
+}
+
+@media (max-width: 1024px) {
+  .payment-cycles-filter-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .payment-cycles-filter-row .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .payment-cycles-filter-row {
+    grid-template-columns: 1fr;
+  }
+}

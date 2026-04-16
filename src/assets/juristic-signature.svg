@@ -1,0 +1,5 @@
+<svg width="420" height="120" viewBox="0 0 420 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M18 78C30 60 38 98 56 78C69 64 72 45 86 76C94 93 104 97 114 72C124 47 125 49 135 78C143 100 151 93 164 70C174 53 180 50 188 74C196 98 207 98 219 72C230 48 238 49 248 73C256 93 266 93 278 70C289 49 299 47 309 74C317 94 329 95 342 72C352 55 360 50 371 69C378 80 386 84 402 72" stroke="#1F2937" stroke-width="4" stroke-linecap="round"/>
+  <path d="M20 96H400" stroke="#9CA3AF" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <text x="210" y="112" text-anchor="middle" fill="#4B5563" font-family="Arial, Helvetica, sans-serif" font-size="14">Authorized Signature</text>
+</svg>
