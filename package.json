@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "start": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build && rm -rf dist && cp -R frontend/dist dist",
     "preview": "npm --prefix frontend run preview",
     "lint:modal-size": "node scripts/check-modal-size.mjs",
     "migrate:local": "bash scripts/run_migrations.sh",
