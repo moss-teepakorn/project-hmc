@@ -17,7 +17,22 @@ interface Props { project: Project; }
 export default function ProjectDetail({ project }: Props) {
   const [activeTab, setActiveTab]   = useState('tasks');
   const [showReport, setShowReport] = useState(false);
-  const { tasks, members, milestones, efforts, changeRequests, issues, risks } = useStore();
+  const {
+    tasks,
+    members,
+    milestones,
+    efforts,
+    changeRequests,
+    issues,
+    risks,
+    fetchTasks,
+    fetchMembers,
+    fetchMilestones,
+    fetchEfforts,
+    fetchCRs,
+    fetchIssues,
+    fetchRisks,
+  } = useStore();
 
   const s = PROJECT_STATUS[project.status] ?? PROJECT_STATUS['Planning'];
 
@@ -31,6 +46,30 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'risks',   label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
     { id: 'report',  label: 'Report',     icon: '📊' },
   ];
+
+  React.useEffect(() => {
+    if (!project?.id) return;
+
+    // Preload all project datasets so Executive Report and all tabs are complete immediately.
+    Promise.allSettled([
+      fetchTasks(project.id),
+      fetchMembers(project.id),
+      fetchMilestones(project.id),
+      fetchEfforts(project.id),
+      fetchCRs(project.id),
+      fetchIssues(project.id),
+      fetchRisks(project.id),
+    ]);
+  }, [
+    project?.id,
+    fetchTasks,
+    fetchMembers,
+    fetchMilestones,
+    fetchEfforts,
+    fetchCRs,
+    fetchIssues,
+    fetchRisks,
+  ]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>

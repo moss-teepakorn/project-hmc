@@ -36,6 +36,7 @@ export default function ProjectReport({ project, onClose }: Props) {
   const rks = risks.filter(r => r.projectId === project.id);
 
   const roots    = pt.filter(t => !t.parentId);
+  const tasksForReport = [...pt].sort((a, b) => String(a.wbs || '').localeCompare(String(b.wbs || '')));
   const prog     = roots.length ? Math.round(roots.reduce((s,t)=>s+t.percentComplete,0)/roots.length) : 0;
   const done     = pt.filter(t=>t.percentComplete===100).length;
   const inProg   = pt.filter(t=>t.percentComplete>0&&t.percentComplete<100).length;
@@ -102,7 +103,7 @@ export default function ProjectReport({ project, onClose }: Props) {
     const cw = (W-28-3)/2;
 
     // Tasks
-    const taskRows = roots.slice(0,12).map(t=>[
+    const summaryTaskRows = tasksForReport.slice(0,12).map(t=>[
       t.wbs, t.taskName.substring(0,36),
       fmtDate(t.startDate), fmtDate(t.endDate),
       t.actualFinish ? fmtDate(t.actualFinish) : '—',
@@ -111,7 +112,7 @@ export default function ProjectReport({ project, onClose }: Props) {
     autoTable(doc,{
       startY:y, tableWidth:cw, margin:{left:12, right:W-12-cw},
       head:[['WBS','Task','Start','Finish','Actual','%']],
-      body:taskRows.length?taskRows:[['','No tasks','','','','']],
+      body:summaryTaskRows.length?summaryTaskRows:[['','No tasks','','','','']],
       styles:{fontSize:7,cellPadding:1.5},
       headStyles:{fillColor:[79,70,229],textColor:255,fontSize:7},
       alternateRowStyles:{fillColor:[248,250,252]},
@@ -171,6 +172,69 @@ export default function ProjectReport({ project, onClose }: Props) {
     doc.setFontSize(6.5); doc.setTextColor(160);
     doc.text('ProjectMS Enterprise — Executive Report', 12, H-4);
     doc.text('Page 1 of 1  ·  Confidential', W-12, H-4, {align:'right'});
+
+    // Full Task appendix (all tasks)
+    if (tasksForReport.length > 0) {
+      doc.addPage('a4', 'landscape');
+      const W2 = doc.internal.pageSize.getWidth();
+      const H2 = doc.internal.pageSize.getHeight();
+
+      doc.setFillColor(79,70,229); doc.rect(0,0,W2,20,'F');
+      doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+      doc.text(`${project.name} — Task Details`, 12, 12);
+      doc.setFontSize(8); doc.setFont('helvetica','normal');
+      doc.text(`${project.code}  ·  ${project.client}`, 12, 17);
+      doc.setTextColor(0);
+
+      const allTaskRows = tasksForReport.map(t => {
+        const wbs = String(t.wbs || '');
+        const depth = Math.max(0, wbs.split('.').length - 1);
+        const indent = '  '.repeat(Math.min(depth, 6));
+        return [
+          wbs,
+          `${indent}${t.taskName}`,
+          fmtDate(t.startDate),
+          fmtDate(t.endDate),
+          t.actualFinish ? fmtDate(t.actualFinish) : '—',
+          String(t.duration ?? ''),
+          `${t.percentComplete}%`,
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 25,
+        margin: { left: 10, right: 10, bottom: 10 },
+        head: [['WBS', 'Task', 'Start', 'Finish', 'Actual', 'Days', '%']],
+        body: allTaskRows,
+        styles: { fontSize: 7, cellPadding: 1.6 },
+        headStyles: { fillColor: [79,70,229], textColor: 255, fontSize: 7 },
+        alternateRowStyles: { fillColor: [248,250,252] },
+        columnStyles: {
+          0: { cellWidth: 18 },
+          1: { cellWidth: W2 - 90 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 12 },
+          6: { cellWidth: 10 },
+        },
+        didParseCell(d) {
+          if (d.column.index === 6 && d.section === 'body') {
+            const p = parseInt(String(d.cell.raw).replace('%', ''), 10) || 0;
+            d.cell.styles.textColor = p >= 100 ? [16,185,129] : p >= 60 ? [59,130,246] : [79,70,229];
+            d.cell.styles.fontStyle = 'bold';
+          }
+        },
+        didDrawPage() {
+          doc.setFontSize(6.5);
+          doc.setTextColor(160);
+          doc.text('ProjectMS Enterprise — Task Details', 10, H2 - 4);
+          const pageNo = doc.getNumberOfPages();
+          doc.text(`Page ${pageNo}  ·  Confidential`, W2 - 10, H2 - 4, { align: 'right' });
+          doc.setTextColor(0);
+        },
+      });
+    }
 
     doc.save(`report-${project.code}-${new Date().toISOString().split('T')[0]}.pdf`);
     toast.success('PDF exported');
@@ -241,7 +305,7 @@ export default function ProjectReport({ project, onClose }: Props) {
                     ))}
                   </tr></thead>
                   <tbody>
-                    {roots.slice(0,10).map((t,i)=>(
+                    {tasksForReport.map((t,i)=>(
                       <tr key={t.id} style={{ background:i%2===0?C.white:C.bg }}>
                         <td style={{ padding:'5px 8px', fontSize:10, color:C.text3 }}>{t.wbs}</td>
                         <td style={{ padding:'5px 8px', fontWeight:500 }}>{t.taskName}</td>
@@ -251,7 +315,7 @@ export default function ProjectReport({ project, onClose }: Props) {
                         <td style={{ padding:'5px 8px', fontWeight:700, color:t.percentComplete>=100?C.green:t.percentComplete>=60?C.blue:C.primary }}>{t.percentComplete}%</td>
                       </tr>
                     ))}
-                    {roots.length===0&&<tr><td colSpan={6} style={{ padding:16, textAlign:'center', color:C.text3 }}>No tasks</td></tr>}
+                    {tasksForReport.length===0&&<tr><td colSpan={6} style={{ padding:16, textAlign:'center', color:C.text3 }}>No tasks</td></tr>}
                   </tbody>
                 </table>
               </div>
