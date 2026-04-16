@@ -243,17 +243,17 @@ export default function ProjectReport({ project, onClose }: Props) {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:400, background:'rgba(15,23,42,0.6)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-start', justifyContent:'center', overflowY:'auto', padding:'20px 16px' }}>
-      <div style={{ background:C.white, borderRadius:16, width:'100%', maxWidth:1020, boxShadow:'0 32px 80px rgba(0,0,0,0.25)' }}>
+      <div style={{ background:C.white, borderRadius:16, width:'100%', maxWidth:1020, boxShadow:'0 32px 80px rgba(0,0,0,0.25)', fontFamily:'Poppins, sans-serif', fontSize:9 }}>
         {/* Toolbar */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 18px', borderBottom:`1px solid ${C.border}` }}>
-          <span style={{ fontSize:13, fontWeight:700, color:C.text }}>Executive Report - {project.name}</span>
+          <span style={{ fontSize:9, fontWeight:700, color:C.text }}>Executive Report - {project.name}</span>
           <div style={{ display:'flex', gap:10 }}>
             <button onClick={exportPDF}
-              style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 14px', background:C.primary, border:'none', borderRadius:8, color:'#fff', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
+              style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 14px', background:C.primary, border:'none', borderRadius:8, color:'#fff', fontSize:9, fontWeight:600, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
               <Printer size={14}/> Export PDF
             </button>
             <button onClick={onClose}
-              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, color:C.text2, fontSize:9, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
               <X size={14}/> Close
             </button>
           </div>

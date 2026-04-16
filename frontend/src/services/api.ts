@@ -106,10 +106,11 @@ export const taskApi = {
       .single();
     if (error) throw new Error(error.message);
     const created = rowToObj<Task>(data);
-    // Fetch all tasks and recalc parent dates/percent
+    // Fetch all tasks and recalc full structure + parent dates/percent
     const all = await taskApi.getByProject(created.projectId);
-    const allTasks = recalcParents(all.data);
-    await persistParentChanges(all.data, allTasks);
+    const structured = recalcStructure(all.data);
+    const allTasks = recalcParents(structured);
+    await persistTaskChanges(all.data, allTasks);
     return { data: created, allTasks };
   },
 
@@ -125,10 +126,11 @@ export const taskApi = {
       .single();
     if (error) throw new Error(error.message);
     const updated = rowToObj<Task>(data);
-    // Fetch all tasks and recalc parent dates/percent
+    // Fetch all tasks and recalc full structure + parent dates/percent
     const all = await taskApi.getByProject(updated.projectId);
-    const allTasks = recalcParents(all.data);
-    await persistParentChanges(all.data, allTasks);
+    const structured = recalcStructure(all.data);
+    const allTasks = recalcParents(structured);
+    await persistTaskChanges(all.data, allTasks);
     return { data: updated, allTasks };
   },
 
@@ -141,10 +143,11 @@ export const taskApi = {
       .single();
     if (error) throw new Error(error.message);
     const task = rowToObj<Task>(data);
-    // Recalculate parent percentages and dates on client side
+    // Recalculate full structure + parent percentages and dates on client side
     const all = await taskApi.getByProject(task.projectId);
-    const allTasks = recalcParents(all.data);
-    await persistParentChanges(all.data, allTasks);
+    const structured = recalcStructure(all.data);
+    const allTasks = recalcParents(structured);
+    await persistTaskChanges(all.data, allTasks);
     return { allTasks };
   },
 
@@ -160,8 +163,9 @@ export const taskApi = {
     await deleteTaskAndChildren(id);
     if (projectId) {
       const all = await taskApi.getByProject(projectId);
-      const allTasks = recalcParents(all.data);
-      await persistParentChanges(all.data, allTasks);
+      const structured = recalcStructure(all.data);
+      const allTasks = recalcParents(structured);
+      await persistTaskChanges(all.data, allTasks);
       return { allTasks };
     }
     return { allTasks: [] };
@@ -182,11 +186,15 @@ async function deleteTaskAndChildren(taskId: string): Promise<void> {
   await supabase.from('tasks').delete().eq('id', taskId);
 }
 
-async function persistParentChanges(origTasks: Task[], newTasks: Task[]): Promise<void> {
+async function persistTaskChanges(origTasks: Task[], newTasks: Task[]): Promise<void> {
   for (const t of newTasks) {
     const orig = origTasks.find((o) => o.id === t.id);
     if (!orig) continue;
     const updates: Record<string, unknown> = {};
+    if (orig.wbs !== t.wbs) updates.wbs = t.wbs;
+    if (orig.level !== t.level) updates.level = t.level;
+    if (orig.order !== t.order) updates.order = t.order;
+    if ((orig.parentId || '') !== (t.parentId || '')) updates.parent_id = t.parentId || null;
     if (orig.percentComplete !== t.percentComplete) updates.percent_complete = t.percentComplete;
     if (orig.startDate !== t.startDate) updates.start_date = t.startDate;
     if (orig.endDate !== t.endDate) updates.end_date = t.endDate;
@@ -195,6 +203,45 @@ async function persistParentChanges(origTasks: Task[], newTasks: Task[]): Promis
       await supabase.from('tasks').update(updates).eq('id', t.id);
     }
   }
+}
+
+function recalcStructure(tasks: Task[]): Task[] {
+  const result = tasks.map((t) => ({ ...t }));
+  const byParent = new Map<string, Task[]>();
+
+  const pushChild = (parentId: string, task: Task) => {
+    const list = byParent.get(parentId) || [];
+    list.push(task);
+    byParent.set(parentId, list);
+  };
+
+  for (const t of result) {
+    const pid = t.parentId || '';
+    pushChild(pid, t);
+  }
+
+  const sortSiblings = (items: Task[]) =>
+    [...items].sort((a, b) => {
+      const ao = Number(a.order || 0);
+      const bo = Number(b.order || 0);
+      if (ao !== bo) return ao - bo;
+      return String(a.id).localeCompare(String(b.id));
+    });
+
+  let runningOrder = 1;
+  const walk = (parentId: string, level: number, prefix: string) => {
+    const siblings = sortSiblings(byParent.get(parentId) || []);
+    siblings.forEach((task, idx) => {
+      const wbs = prefix ? `${prefix}.${idx + 1}` : `${idx + 1}`;
+      task.wbs = wbs;
+      task.level = level;
+      task.order = runningOrder++;
+      walk(task.id, level + 1, wbs);
+    });
+  };
+
+  walk('', 0, '');
+  return result;
 }
 
 function recalcParents(tasks: Task[]): Task[] {

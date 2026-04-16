@@ -10,7 +10,7 @@ import ProjectModal from './ProjectModal';
 const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care'];
 
 export default function Dashboard() {
-  const { projects, tasks, issues, risks, changeRequests, setActiveProject, deleteProject, updateProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers } = useStore();
+  const { projects, tasks, issues, risks, changeRequests, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers } = useStore();
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [selected,   setSelected]   = useState<Project | null>(null);
@@ -48,11 +48,6 @@ export default function Dashboard() {
     setDeleting(null);
   };
 
-  const handleStatusChange = async (p: Project, status: string) => {
-    try { await updateProject(p.id, { status: status as Project['status'] }); toast.success('Status updated'); }
-    catch { toast.error('Failed to update status'); }
-  };
-
   const renderProjectCard = (p: Project, compact = false) => {
     const s    = PROJECT_STATUS[p.status] ?? PROJECT_STATUS['Planning'];
     const prog = getProgress(p.id);
@@ -63,25 +58,15 @@ export default function Dashboard() {
         style={{ background: isSel ? C.primaryBg : C.white, borderRadius: 10, border: `1px solid ${isSel ? C.primary : C.border}`, padding: '12px 14px', cursor: 'pointer', transition: 'all 0.15s', marginBottom: 8, borderLeft: `4px solid ${p.color || C.primary}` }}
         onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = '#F8FAFF'; }}
         onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = C.white; }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-            <div style={{ fontSize: 10, color: C.text3, marginTop: 1 }}>{p.code} · {p.client}</div>
+            <div style={{ fontSize: 9, color: C.text3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Project ID</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, fontFamily: 'monospace', marginTop: 1 }}>{p.code || p.id}</div>
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            {/* Inline status selector */}
-            <select
-              value={p.status}
-              onChange={e => { e.stopPropagation(); handleStatusChange(p, e.target.value); }}
-              onClick={e => e.stopPropagation()}
-              style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 12, border: `1px solid ${s.bg}`, background: s.bg, color: s.color, cursor: 'pointer', fontFamily: 'Poppins, sans-serif', outline: 'none' }}>
-              <option value="Planning">Planning</option>
-              <option value="Req & Design">Req & Design</option>
-              <option value="Setup">Setup</option>
-              <option value="Testing">Testing</option>
-              <option value="Go Live">Go Live</option>
-              <option value="Hyper Care">Hyper Care</option>
-            </select>
             <button onClick={e => { e.stopPropagation(); setEditing(p); }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
               onMouseEnter={e => e.currentTarget.style.color = C.primary}
@@ -96,9 +81,29 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
-        <div style={{ marginTop: 8 }}>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div>
+            <div style={{ fontSize: 9, color: C.text3, textTransform: 'uppercase' }}>Project Name</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: C.text3, textTransform: 'uppercase' }}>Client Name</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.client || '-'}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: C.text3, textTransform: 'uppercase' }}>Start Date</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 1 }}>{fmtDate(p.startDate)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: C.text3, textTransform: 'uppercase' }}>End Date</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 1 }}>{fmtDate(p.endDate)}</div>
+          </div>
+        </div>
+
+        <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.text2, marginBottom: 4 }}>
-            <span>{fmtDate(p.startDate)} – {fmtDate(p.endDate)}</span>
+            <span>% Progress</span>
             <span style={{ fontWeight: 700, color: prog >= 100 ? C.green : C.primary }}>{prog}%</span>
           </div>
           <ProgressBar value={prog} height={4} color={prog >= 100 ? C.green : p.color || C.primary} />

@@ -522,13 +522,20 @@ export default function TasksTab({ projectId }: Props) {
         )}
       </div>
 
-      {addModal  && <TaskModal    tasks={projectTasks} onClose={()=>setAddModal(false)} onSave={handleCreate} />}
+      {addModal  && (
+        <TaskModal
+          tasks={projectTasks}
+          selectedTask={projectTasks.find(t => t.id === selected) ?? null}
+          onClose={()=>setAddModal(false)}
+          onSave={handleCreate}
+        />
+      )}
       {editModal && <TaskEditModal task={editModal} tasks={projectTasks} onClose={()=>setEditModal(null)} onSave={handleEditSave} />}
     </div>
   );
 }
 
-function TaskModal({ tasks, onClose, onSave }: { tasks:Task[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
+function TaskModal({ tasks, selectedTask, onClose, onSave }: { tasks:Task[]; selectedTask: Task | null; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
   const todayIso    = new Date().toISOString().split('T')[0];
   const nextWeekIso = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
   const [form, setForm] = useState<Partial<Task>>({
@@ -539,6 +546,7 @@ function TaskModal({ tasks, onClose, onSave }: { tasks:Task[]; onClose:()=>void;
     parentId:'',
     relatedTask:''
   });
+  const [insertType, setInsertType] = useState<'main' | 'sub'>(selectedTask ? 'sub' : 'main');
   const formatDmyInput = (raw: string): string => {
     const digits = String(raw || '').replace(/\D/g, '').slice(0, 8);
     if (digits.length <= 2) return digits;
@@ -557,6 +565,24 @@ function TaskModal({ tasks, onClose, onSave }: { tasks:Task[]; onClose:()=>void;
           style={{ fontFamily:'Poppins, sans-serif', fontSize:13, padding:'8px 12px', border:`1.5px solid ${C.border}`, borderRadius:8, outline:'none', width:'100%', boxSizing:'border-box' }}
           onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border} />
       </FormRow>
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:8 }}>
+        <FormRow label="Insert Type">
+          <Select
+            value={insertType}
+            onChange={v => setInsertType(v as 'main' | 'sub')}
+            options={[
+              { value: 'main', label: 'Main Task' },
+              { value: 'sub', label: 'Sub Task' },
+            ]}
+          />
+        </FormRow>
+        <FormRow label="Insert Anchor">
+          <div style={{ fontSize: 12, color: C.text2, paddingTop: 8 }}>
+            {selectedTask ? `${selectedTask.wbs} ${selectedTask.taskName}` : 'No selected task (append at end)'}
+          </div>
+        </FormRow>
+      </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <FormRow label="Start Date (dd/mm/yyyy)"><input value={form.startDate??''} onChange={e=>up('startDate',formatDmyInput(e.target.value))} placeholder="dd/mm/yyyy" inputMode="numeric" maxLength={10} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
         <FormRow label="End Date (dd/mm/yyyy)"><input value={form.endDate??''} onChange={e=>up('endDate',formatDmyInput(e.target.value))} placeholder="dd/mm/yyyy" inputMode="numeric" maxLength={10} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
@@ -585,7 +611,30 @@ function TaskModal({ tasks, onClose, onSave }: { tasks:Task[]; onClose:()=>void;
             toast.error('Start/End Date ต้องอยู่ในรูปแบบ dd/mm/yyyy');
             return;
           }
-          onSave({ ...form, startDate, endDate });
+
+          let parentId = '';
+          let order: number | undefined;
+
+          if (insertType === 'main') {
+            parentId = '';
+            if (selectedTask && !selectedTask.parentId) order = Number(selectedTask.order || 0) + 0.5;
+            else {
+              const roots = tasks.filter(t => !t.parentId);
+              const maxOrder = roots.reduce((m, t) => Math.max(m, Number(t.order || 0)), 0);
+              order = maxOrder + 1;
+            }
+          } else {
+            parentId = (form.parentId as string) || selectedTask?.id || '';
+            if (!parentId) {
+              toast.error('Sub Task ต้องมี Parent Task');
+              return;
+            }
+            const siblings = tasks.filter(t => (t.parentId || '') === parentId);
+            const maxOrder = siblings.reduce((m, t) => Math.max(m, Number(t.order || 0)), 0);
+            order = maxOrder > 0 ? maxOrder + 0.5 : Number(selectedTask?.order || 0) + 0.5;
+          }
+
+          onSave({ ...form, parentId, order, startDate, endDate });
         }}>Create Task</Btn>
       </div>
     </Modal>
