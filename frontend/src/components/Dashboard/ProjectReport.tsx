@@ -181,10 +181,18 @@ export default function ProjectReport({ project, onClose }: Props) {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:400, background:'rgba(15,23,42,0.6)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-start', justifyContent:'center', overflowY:'auto', padding:'20px 16px' }}>
-      <div style={{ background:C.white, borderRadius:16, width:'100%', maxWidth:1020, boxShadow:'0 32px 80px rgba(0,0,0,0.25)', fontFamily:'Poppins, sans-serif', fontSize:9 }}>
+      <div className="executive-report-modal" style={{ background:C.white, borderRadius:16, width:'100%', maxWidth:1020, boxShadow:'0 32px 80px rgba(0,0,0,0.25)', fontFamily:'Poppins, sans-serif', fontSize:9 }}>
+        <style>{`
+          .executive-report-modal table td,
+          .executive-report-modal table th,
+          .executive-report-modal .report-list-row div,
+          .executive-report-modal .report-list-row span {
+            font-size: 8px !important;
+          }
+        `}</style>
         {/* Toolbar */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 18px', borderBottom:`1px solid ${C.border}` }}>
-          <span style={{ fontSize:9, fontWeight:700, color:C.text }}>Executive Report - {project.name}</span>
+          <span style={{ fontSize:20, fontWeight:700, color:C.text }}>Executive Report - {project.name}</span>
           <div style={{ display:'flex', gap:10 }}>
             <button onClick={exportPDF}
               style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 14px', background:C.primary, border:'none', borderRadius:8, color:'#fff', fontSize:9, fontWeight:600, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
@@ -294,7 +302,7 @@ export default function ProjectReport({ project, onClose }: Props) {
               <div style={{ background:C.bg, borderRadius:10, overflow:'hidden' }}>
                 {crs.length===0&&<div style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No CRs</div>}
                 {crs.map((c,i)=>{const ss=PROCESS_STATUS_STYLE[c.status]??PROCESS_STATUS_STYLE['N/A'];return(
-                  <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
+                  <div key={c.id} className="report-list-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
                     <div>
                       <div style={{ fontSize:8, fontWeight:600, color:C.primary }}>{c.crId}</div>
                       <div style={{ fontSize:8, color:C.text2 }}>{c.title.substring(0,28)} · {c.totalManday}MD</div>
@@ -310,7 +318,7 @@ export default function ProjectReport({ project, onClose }: Props) {
               <div style={{ background:C.bg, borderRadius:10, overflow:'hidden' }}>
                 {iss.length===0&&<div style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No issues</div>}
                 {iss.map((issue,i)=>{const ss=PROCESS_STATUS_STYLE[issue.status]??PROCESS_STATUS_STYLE['N/A'];return(
-                  <div key={issue.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
+                  <div key={issue.id} className="report-list-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
                     <div>
                       <div style={{ fontSize:8, fontWeight:600, color:C.text }}>{issue.title.substring(0,28)}</div>
                       <div style={{ fontSize:8, color:C.text2 }}>{fmtDate(issue.issueDate)} · {issue.assignedTo||'—'}</div>
@@ -329,7 +337,7 @@ export default function ProjectReport({ project, onClose }: Props) {
                   const rc=RISK_LEVEL_COLOR[r.impact]||C.text2;
                   const sc=r.status==='Monitoring'?C.red:r.status==='Mitigating'?C.amber:C.green;
                   return(
-                  <div key={r.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
+                  <div key={r.id} className="report-list-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
                     <div>
                       <div style={{ fontSize:8, fontWeight:600, color:C.text }}>{r.title.substring(0,28)}</div>
                       <div style={{ fontSize:8 }}>
