@@ -126,6 +126,7 @@ export default function ProjectReport({ project, onClose }: Props) {
         }
       },
     });
+    const tasksTableEndY: number = ((doc as any).lastAutoTable?.finalY ?? (y + 35));
 
     // Milestones
     const msRows = ms.map(m=>[m.phase,m.name.substring(0,26),money2(m.amount),fmtDate(m.dueDate),m.status.toUpperCase()]);
@@ -144,9 +145,9 @@ export default function ProjectReport({ project, onClose }: Props) {
         }
       },
     });
+    const milestonesTableEndY: number = ((doc as any).lastAutoTable?.finalY ?? (y + 35));
 
-    // @ts-ignore
-    const midY: number = Math.max((doc as any).lastAutoTable?.finalY??y+35, y+35)+4;
+    const midY: number = Math.max(tasksTableEndY, milestonesTableEndY, y + 35) + 4;
 
     // CR | Issues | Risks (3 columns)
     const sw = (W-28-6)/3;
