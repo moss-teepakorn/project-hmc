@@ -170,6 +170,60 @@ export const taskApi = {
     }
     return { allTasks: [] };
   },
+
+  copyFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Task[] }> => {
+    const src = await taskApi.getByProject(sourceProjectId);
+    const sourceTasks = [...src.data].sort((a, b) => {
+      const al = Number(a.level || 0);
+      const bl = Number(b.level || 0);
+      if (al !== bl) return al - bl;
+      return Number(a.order || 0) - Number(b.order || 0);
+    });
+
+    const idMap = new Map<string, string>();
+    const createdByOld = new Map<string, Task>();
+
+    for (const srcTask of sourceTasks) {
+      const row = objToRow({
+        ...srcTask,
+        projectId: targetProjectId,
+        parentId: srcTask.parentId ? (idMap.get(srcTask.parentId) || null) : null,
+        relatedTask: null,
+      } as Record<string, unknown>);
+      delete row.id;
+      delete row.created_at;
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert(row)
+        .select()
+        .single();
+
+      if (error) throw new Error(error.message);
+      const created = rowToObj<Task>(data);
+      idMap.set(srcTask.id, created.id);
+      createdByOld.set(srcTask.id, created);
+    }
+
+    // Remap predecessor links after all ids are known.
+    for (const srcTask of sourceTasks) {
+      if (!srcTask.relatedTask) continue;
+      const newTask = createdByOld.get(srcTask.id);
+      const mappedPred = idMap.get(srcTask.relatedTask);
+      if (!newTask || !mappedPred) continue;
+      await supabase
+        .from('tasks')
+        .update({ related_task: mappedPred })
+        .eq('id', newTask.id);
+    }
+
+    const all = await taskApi.getByProject(targetProjectId);
+    const structured = recalcStructure(all.data);
+    const allTasks = recalcParents(structured);
+    await persistTaskChanges(all.data, allTasks);
+
+    return { data: allTasks };
+  },
 };
 
 async function deleteTaskAndChildren(taskId: string): Promise<void> {

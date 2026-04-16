@@ -58,14 +58,13 @@ export default function Dashboard() {
         style={{ background: isSel ? C.primaryBg : C.white, borderRadius: 10, border: `1px solid ${isSel ? C.primary : C.border}`, padding: '12px 14px', cursor: 'pointer', transition: 'all 0.15s', marginBottom: 8, borderLeft: `4px solid ${p.color || C.primary}` }}
         onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = '#F8FAFF'; }}
         onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = C.white; }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 9, color: C.text3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Project ID</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, fontFamily: 'monospace', marginTop: 1 }}>{p.code || p.id}</div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.35, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+            <span style={{ color: C.text2 }}>Project ID : </span>
+            <span style={{ color: C.primary, fontFamily: 'monospace' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
           </div>
-          <div style={{ flexShrink: 0 }}>
-            <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
-          </div>
+          <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             <button onClick={e => { e.stopPropagation(); setEditing(p); }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
@@ -82,23 +81,18 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-          <div>
-            <div style={{ fontSize: 9, color: C.text3, textTransform: 'uppercase' }}>Project Name</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 9, color: C.text3, textTransform: 'uppercase' }}>Client Name</div>
-            <div style={{ fontSize: 11, color: C.text2, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.client || '-'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 9, color: C.text3, textTransform: 'uppercase' }}>Start Date</div>
-            <div style={{ fontSize: 11, color: C.text2, marginTop: 1 }}>{fmtDate(p.startDate)}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 9, color: C.text3, textTransform: 'uppercase' }}>End Date</div>
-            <div style={{ fontSize: 11, color: C.text2, marginTop: 1 }}>{fmtDate(p.endDate)}</div>
-          </div>
+        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.35, marginBottom: 4, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          <span style={{ color: C.text2 }}>Project Name : </span>
+          <span style={{ fontWeight: 700 }}>{p.name || '-'}</span>
+        </div>
+
+        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.35, marginBottom: 5, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          <span style={{ color: C.text2 }}>Client : </span>
+          <span>{p.client || '-'}</span>
+        </div>
+
+        <div style={{ fontSize: 12, color: C.text2, marginBottom: 6, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          {fmtDate(p.startDate)} - {fmtDate(p.endDate)}
         </div>
 
         <div>
