@@ -171,9 +171,13 @@ export const taskApi = {
     return { allTasks: [] };
   },
 
-  copyFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Task[] }> => {
+  copyFromProject: async (sourceProjectId: string, targetProjectId: string, scope: 'all' | 'main' = 'all'): Promise<{ data: Task[] }> => {
     const src = await taskApi.getByProject(sourceProjectId);
-    const sourceTasks = [...src.data].sort((a, b) => {
+    const selectedSource = scope === 'main'
+      ? src.data.filter((t) => !t.parentId)
+      : src.data;
+
+    const sourceTasks = [...selectedSource].sort((a, b) => {
       const al = Number(a.level || 0);
       const bl = Number(b.level || 0);
       if (al !== bl) return al - bl;

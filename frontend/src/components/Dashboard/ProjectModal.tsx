@@ -13,6 +13,7 @@ export default function ProjectModal({ project, onClose }: Props) {
   const { createProject, updateProject, projects } = useStore();
   const [saving, setSaving] = useState(false);
   const [copyFromProjectId, setCopyFromProjectId] = useState('');
+  const [copyScope, setCopyScope] = useState<'all' | 'main'>('all');
   const [form, setForm] = useState({
     name:        project?.name        ?? '',
     code:        project?.code        ?? '',
@@ -34,8 +35,8 @@ export default function ProjectModal({ project, onClose }: Props) {
       else {
         const created = await createProject(form);
         if (copyFromProjectId) {
-          await taskApi.copyFromProject(copyFromProjectId, created.id);
-          toast.success('Project created with copied tasks');
+          await taskApi.copyFromProject(copyFromProjectId, created.id, copyScope);
+          toast.success(copyScope === 'main' ? 'Project created with copied main tasks' : 'Project created with copied tasks');
         } else {
           toast.success('Project created');
         }
@@ -77,17 +78,31 @@ export default function ProjectModal({ project, onClose }: Props) {
         <Textarea value={form.description} onChange={v => up('description', v)} rows={2} placeholder="Brief project description…" />
       </FormRow>
       {!project && (
-        <FormRow label="Copy Tasks From Previous Project">
-          <Select
-            value={copyFromProjectId}
-            onChange={setCopyFromProjectId}
-            options={[
-              { value: '', label: '— Do not copy —' },
-              ...projects
-                .map(p => ({ value: p.id, label: `${p.code || p.id} - ${p.name}` })),
-            ]}
-          />
-        </FormRow>
+        <>
+          <FormRow label="Copy Tasks From Previous Project">
+            <Select
+              value={copyFromProjectId}
+              onChange={setCopyFromProjectId}
+              options={[
+                { value: '', label: '— Do not copy —' },
+                ...projects
+                  .map(p => ({ value: p.id, label: `${p.code || p.id} - ${p.name}` })),
+              ]}
+            />
+          </FormRow>
+          {copyFromProjectId && (
+            <FormRow label="Copy Scope">
+              <Select
+                value={copyScope}
+                onChange={(v) => setCopyScope(v as 'all' | 'main')}
+                options={[
+                  { value: 'all', label: 'Copy All Tasks (Main + Sub)' },
+                  { value: 'main', label: 'Copy Main Tasks Only' },
+                ]}
+              />
+            </FormRow>
+          )}
+        </>
       )}
       <FormRow label="Color">
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

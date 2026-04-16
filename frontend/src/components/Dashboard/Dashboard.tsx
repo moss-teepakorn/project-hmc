@@ -189,6 +189,50 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
   const reqDesign  = projects.filter(p => p.status === 'Req & Design');
   const goLive     = projects.filter(p => p.status === 'Go Live');
 
+  const renderOverviewProjectCard = (p: Project, fallbackColor = C.primary) => {
+    const roots = tasks.filter(t => t.projectId === p.id && !t.parentId);
+    const prog  = roots.length ? Math.round(roots.reduce((s: number, t: any) => s + t.percentComplete, 0) / roots.length) : 0;
+    const s     = PROJECT_STATUS[p.status] ?? PROJECT_STATUS['Planning'];
+
+    return (
+      <div key={p.id}
+        onClick={() => onOpen(p)}
+        style={{ background: C.white, borderRadius: 10, border: `1px solid ${C.border}`, padding: '12px 14px', cursor: 'pointer', transition: 'all 0.15s', borderLeft: `4px solid ${p.color || fallbackColor}` }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFF'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = C.white; }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.35, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+            <span style={{ color: C.text2 }}>Project ID : </span>
+            <span style={{ color: C.primary, fontFamily: 'monospace' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
+          </div>
+          <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
+        </div>
+
+        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.35, marginBottom: 4, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          <span style={{ color: C.text2 }}>Project Name : </span>
+          <span style={{ fontWeight: 700 }}>{p.name || '-'}</span>
+        </div>
+
+        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.35, marginBottom: 5, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          <span style={{ color: C.text2 }}>Client : </span>
+          <span>{p.client || '-'}</span>
+        </div>
+
+        <div style={{ fontSize: 12, color: C.text2, marginBottom: 6, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          {fmtDate(p.startDate)} - {fmtDate(p.endDate)}
+        </div>
+
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.text2, marginBottom: 4 }}>
+            <span>% Progress</span>
+            <span style={{ fontWeight: 700, color: prog >= 100 ? C.green : C.primary }}>{prog}%</span>
+          </div>
+          <ProgressBar value={prog} height={4} color={prog >= 100 ? C.green : p.color || fallbackColor} />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ padding: '28px 32px', maxWidth: 900, margin: '0 auto' }}>
       <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 6 }}>Portfolio Overview</h2>
@@ -210,35 +254,7 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: 14 }}>
-        {normalProjects.map(p => {
-          const roots = tasks.filter(t => t.projectId === p.id && !t.parentId);
-          const prog  = roots.length ? Math.round(roots.reduce((s: number, t: any) => s + t.percentComplete, 0) / roots.length) : 0;
-          const s     = PROJECT_STATUS[p.status] ?? PROJECT_STATUS['Planning'];
-          return (
-            <Card key={p.id} style={{ overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s' }}
-              onClick={() => onOpen(p)}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = ''; (e.currentTarget as HTMLElement).style.transform = ''; }}>
-              <div style={{ height: 4, background: p.color || C.primary }} />
-              <div style={{ padding: '14px 16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{p.name}</div>
-                    <div style={{ fontSize: 10, color: C.text3 }}>{p.code} · {p.client}</div>
-                  </div>
-                  <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.text2, marginBottom: 6 }}>
-                  <span>Progress</span><span style={{ fontWeight: 700, color: C.primary }}>{prog}%</span>
-                </div>
-                <ProgressBar value={prog} height={5} color={p.color || C.primary} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.text3, marginTop: 8 }}>
-                  <span>📅 {fmtDate(p.startDate)}</span><span>🏁 {fmtDate(p.endDate)}</span>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
+        {normalProjects.map(p => renderOverviewProjectCard(p, C.primary))}
       </div>
 
       {/* Hypercare section — collapsible, hidden by default */}
@@ -252,35 +268,7 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
           </button>
           {showHC && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: 14, marginTop: 12 }}>
-              {hypercareProjects.map(p => {
-                const roots = tasks.filter(t => t.projectId === p.id && !t.parentId);
-                const prog  = roots.length ? Math.round(roots.reduce((s: number, t: any) => s + t.percentComplete, 0) / roots.length) : 0;
-                const st    = PROJECT_STATUS[p.status] ?? PROJECT_STATUS['Planning'];
-                return (
-                  <Card key={p.id} style={{ overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s' }}
-                    onClick={() => onOpen(p)}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = ''; (e.currentTarget as HTMLElement).style.transform = ''; }}>
-                    <div style={{ height: 4, background: p.color || C.amber }} />
-                    <div style={{ padding: '14px 16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{p.name}</div>
-                          <div style={{ fontSize: 10, color: C.text3 }}>{p.code} · {p.client}</div>
-                        </div>
-                        <Badge bg={st.bg} color={st.color}>{st.label}</Badge>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.text2, marginBottom: 6 }}>
-                        <span>Progress</span><span style={{ fontWeight: 700, color: C.primary }}>{prog}%</span>
-                      </div>
-                      <ProgressBar value={prog} height={5} color={p.color || C.amber} />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.text3, marginTop: 8 }}>
-                        <span>📅 {fmtDate(p.startDate)}</span><span>🏁 {fmtDate(p.endDate)}</span>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
+              {hypercareProjects.map(p => renderOverviewProjectCard(p, C.amber))}
             </div>
           )}
         </div>
