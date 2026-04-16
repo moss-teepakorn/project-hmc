@@ -42,7 +42,10 @@ export default function ProjectModal({ project, onClose }: Props) {
         }
       }
       onClose();
-    } catch { toast.error('Failed to save project'); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to save project';
+      toast.error(msg || 'Failed to save project');
+    }
     setSaving(false);
   };
 

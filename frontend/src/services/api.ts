@@ -177,6 +177,11 @@ export const taskApi = {
       ? src.data.filter((t) => !t.parentId)
       : src.data;
 
+    const usesEmptyStringRelations = selectedSource.some(
+      (t) => t.parentId === '' || t.relatedTask === ''
+    );
+    const emptyRelationValue: string | null = usesEmptyStringRelations ? '' : null;
+
     const sourceTasks = [...selectedSource].sort((a, b) => {
       const al = Number(a.level || 0);
       const bl = Number(b.level || 0);
@@ -191,8 +196,8 @@ export const taskApi = {
       const row = objToRow({
         ...srcTask,
         projectId: targetProjectId,
-        parentId: srcTask.parentId ? (idMap.get(srcTask.parentId) || null) : null,
-        relatedTask: null,
+        parentId: srcTask.parentId ? (idMap.get(srcTask.parentId) || srcTask.parentId) : emptyRelationValue,
+        relatedTask: emptyRelationValue,
       } as Record<string, unknown>);
       delete row.id;
       delete row.created_at;
