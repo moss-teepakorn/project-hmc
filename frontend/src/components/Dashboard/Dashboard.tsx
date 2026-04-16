@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Menu, X }
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, PROJECT_STATUS, MILESTONE_STATUS } from '../Common';
-import { fmtDate, fmtMoney } from '../../utils';
+import { fmtDate, fmtMoney, compareWbs } from '../../utils';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
 
@@ -303,6 +303,7 @@ function ProjectSummaryPanel({ project, onOpen }: { project: Project; onOpen: ()
   const rks  = risks.filter(r => r.projectId === project.id);
 
   const roots   = pt.filter(t => !t.parentId);
+  const rootTasksSorted = [...roots].sort((a, b) => compareWbs(a.wbs, b.wbs));
   const prog    = roots.length ? Math.round(roots.reduce((s, t) => s + t.percentComplete, 0) / roots.length) : 0;
   const doneTasks = pt.filter(t => t.percentComplete === 100).length;
 
@@ -365,16 +366,16 @@ function ProjectSummaryPanel({ project, onOpen }: { project: Project; onOpen: ()
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Root tasks */}
         <Card style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 700, color: C.text }}>📋 Tasks ({pt.length})</div>
-          <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-            {roots.slice(0, 8).map(t => (
+          <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 700, color: C.text }}>📋 Main Tasks ({rootTasksSorted.length})</div>
+          <div>
+            {rootTasksSorted.map(t => (
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', padding: '7px 14px', borderBottom: `1px solid ${C.border}`, gap: 10 }}>
                 <div style={{ flex: 1, fontSize: 12, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.wbs} {t.taskName}</div>
                 <div style={{ width: 60, flexShrink: 0 }}><ProgressBar value={t.percentComplete} height={4} /></div>
                 <span style={{ fontSize: 11, fontWeight: 700, color: t.percentComplete >= 100 ? C.green : C.primary, minWidth: 32, textAlign: 'right' }}>{t.percentComplete}%</span>
               </div>
             ))}
-            {roots.length === 0 && <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: C.text3 }}>No tasks yet</div>}
+            {rootTasksSorted.length === 0 && <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: C.text3 }}>No tasks yet</div>}
           </div>
         </Card>
 

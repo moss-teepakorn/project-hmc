@@ -85,6 +85,49 @@ export const flattenTree = (tasks: Task[], expandedIds: Set<string>): Task[] => 
 
 export const hasChildren = (tasks: Task[], id: string) => tasks.some(t => t.parentId === id);
 
+// ── WBS helpers ──────────────────────────────────────────────────────────────
+const parseWbs = (wbs: string): number[] =>
+  String(wbs || '')
+    .split('.')
+    .map(x => Number.parseInt(x, 10))
+    .map(x => (Number.isFinite(x) ? x : 0));
+
+export const compareWbs = (a: string, b: string): number => {
+  const aa = parseWbs(a);
+  const bb = parseWbs(b);
+  const len = Math.max(aa.length, bb.length);
+  for (let i = 0; i < len; i += 1) {
+    const av = aa[i] ?? 0;
+    const bv = bb[i] ?? 0;
+    if (av !== bv) return av - bv;
+  }
+  return String(a || '').localeCompare(String(b || ''));
+};
+
+// ── DD/MM/YYYY force helpers ─────────────────────────────────────────────────
+export const isoToDmy = (iso: string): string => {
+  if (!iso) return '';
+  const d = parseISO(iso);
+  return isValid(d) ? format(d, 'dd/MM/yyyy') : '';
+};
+
+export const dmyToIso = (dmy: string): string => {
+  const m = String(dmy || '').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return '';
+  const dd = Number(m[1]);
+  const mm = Number(m[2]);
+  const yyyy = Number(m[3]);
+  const dt = new Date(yyyy, mm - 1, dd);
+  if (
+    dt.getFullYear() !== yyyy ||
+    dt.getMonth() !== mm - 1 ||
+    dt.getDate() !== dd
+  ) {
+    return '';
+  }
+  return format(dt, 'yyyy-MM-dd');
+};
+
 // ── Money ─────────────────────────────────────────────────────────────────────
 export const fmtMoney = (n: number): string =>
   new Intl.NumberFormat('en', { minimumFractionDigits: 0 }).format(n || 0);

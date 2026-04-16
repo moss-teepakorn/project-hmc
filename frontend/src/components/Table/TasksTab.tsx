@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
 import { Btn, EditableCell, Avatar, Modal, FormRow, Input, Select, C } from '../Common';
-import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth } from '../../utils';
+import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth, compareWbs, isoToDmy, dmyToIso } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import type { Task, ViewMode } from '../../types';
 
@@ -28,6 +28,7 @@ const COLS = [
   { label: 'Resource',      w: 116 },
   { label: '',              w: 76  },
 ];
+const TABLE_FIXED_W = 52 + 94 + 94 + 100 + 46 + 110 + 116 + 76;
 
 // Inline % editor
 function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean; onSave: (n: number) => void }) {
@@ -98,6 +99,7 @@ export default function TasksTab({ projectId }: Props) {
 
   const projectTasks = tasks.filter(t => t.projectId === projectId);
   const visible      = flattenTree(projectTasks, expanded);
+  const isTableView = view === 'table';
 
   const toggle = (id: string) => setExpanded(p => {
     const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s;
@@ -193,83 +195,51 @@ export default function TasksTab({ projectId }: Props) {
     doc.setTextColor(0);
 
     const startY = 22;
-    const tableW = 120; // mm for the left table
+    const tableW = 160; // wider task table for readable task name
     const ganttX = tableW + 12; // start of gantt area
     const ganttW = W - ganttX - 6;
     const rowH   = 5.2; // mm per row
     const headerH = 7;
 
     // Flatten all tasks for display (with indentation in name)
-    const allVisible = flattenTree(projectTasks, new Set(projectTasks.map(t => t.id)));
+    const allVisible = [...projectTasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
+    const rowsPerPage = Math.max(1, Math.floor((H - startY - 10 - headerH) / rowH));
+    const totalPages = Math.max(1, Math.ceil(allVisible.length / rowsPerPage));
 
-    // ── Left side: Task table ──
-    // Table header
-    doc.setFillColor(79,70,229);
-    doc.rect(6, startY, tableW, headerH, 'F');
-    doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
-    const cols = [
-      { label: 'WBS',   x: 8,   w: 12 },
-      { label: 'Task',  x: 20,  w: 50 },
-      { label: 'Start', x: 70,  w: 18 },
-      { label: 'Finish',x: 88,  w: 18 },
-      { label: '%',     x: 106, w: 12 },
-      { label: 'Days',  x: 118, w: 8  },
-    ];
-    cols.forEach(c => doc.text(c.label, c.x, startY + 5));
-
-    // Table rows
-    doc.setFont('helvetica','normal'); doc.setTextColor(0);
-    allVisible.forEach((task, i) => {
-      const ry = startY + headerH + i * rowH;
-      if (ry + rowH > H - 8) return; // don't overflow page
-      // Alternate row bg
-      if (i % 2 === 0) { doc.setFillColor(248,250,252); doc.rect(6, ry, tableW, rowH, 'F'); }
-      // Row border
-      doc.setDrawColor(226,232,240); doc.setLineWidth(0.15);
-      doc.line(6, ry + rowH, 6 + tableW, ry + rowH);
-
-      doc.setFontSize(6); doc.setTextColor(100);
-      doc.text(task.wbs || '', 8, ry + rowH - 1.2);
-
-      // Indented task name
-      const indent = task.level * 3;
-      const isPar = hasChildren(projectTasks, task.id);
-      doc.setFont('helvetica', isPar ? 'bold' : 'normal');
-      doc.setTextColor(isPar ? 79 : 30, isPar ? 70 : 30, isPar ? 229 : 30);
-      doc.text((isPar ? '◆ ' : '') + task.taskName.substring(0, 28), 20 + indent, ry + rowH - 1.2, { maxWidth: 48 - indent });
-
-      doc.setFont('helvetica','normal'); doc.setTextColor(80);
-      doc.setFontSize(5.5);
-      doc.text(task.startDate ? fmtDate(task.startDate) : '', 70, ry + rowH - 1.2);
-      doc.text(task.endDate ? fmtDate(task.endDate) : '', 88, ry + rowH - 1.2);
-
-      // % with color
-      const pct = task.percentComplete;
-      const [pr,pg,pb] = pct >= 100 ? [16,185,129] : pct >= 60 ? [59,130,246] : [79,70,229];
-      doc.setFont('helvetica','bold'); doc.setTextColor(pr,pg,pb);
-      doc.text(`${pct}%`, 106, ry + rowH - 1.2);
-
-      doc.setFont('helvetica','normal'); doc.setTextColor(80);
-      doc.text(`${task.duration}d`, 118, ry + rowH - 1.2);
-    });
-
-    // ── Right side: Gantt bars (aligned with table rows) ──
     const validTasks = allVisible.filter(t => t.startDate && t.endDate);
-    if (validTasks.length > 0) {
-      const allDates = validTasks.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
-      const minD = new Date(Math.min(...allDates.map(d => d.getTime())));
-      const maxD = new Date(Math.max(...allDates.map(d => d.getTime())));
-      const totalDays = Math.max(1, Math.round((maxD.getTime() - minD.getTime()) / 86400000));
-      const dayPx = ganttW / totalDays;
+    const allDates = validTasks.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
+    const minD = allDates.length ? new Date(Math.min(...allDates.map(d => d.getTime()))) : new Date();
+    const maxD = allDates.length ? new Date(Math.max(...allDates.map(d => d.getTime()))) : new Date();
+    const totalDays = Math.max(1, Math.round((maxD.getTime() - minD.getTime()) / 86400000));
+    const dayPx = ganttW / totalDays;
 
-      // Gantt header - month labels
+    for (let page = 0; page < totalPages; page += 1) {
+      if (page > 0) doc.addPage('a4', 'landscape');
+
+      const pageRows = allVisible.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+      doc.setFillColor(79,70,229);
+      doc.rect(6, startY, tableW, headerH, 'F');
+      doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+      const taskTextX = 20;
+      const taskTextW = 90;
+      const cols = [
+        { label: 'WBS',   x: 8 },
+        { label: 'Task',  x: taskTextX },
+        { label: 'Start', x: 110 },
+        { label: 'Finish',x: 128 },
+        { label: '%',     x: 145 },
+        { label: 'Days',  x: 154 },
+      ];
+      cols.forEach(c => doc.text(c.label, c.x, startY + 5));
+
+      // Gantt header
       doc.setFillColor(245,247,250);
       doc.rect(ganttX, startY, ganttW, headerH, 'F');
       doc.setDrawColor(79,70,229); doc.setLineWidth(0.3);
       doc.rect(ganttX, startY, ganttW, headerH, 'S');
       doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.setTextColor(79,70,229);
 
-      // Month labels in header
       const cur = new Date(minD.getFullYear(), minD.getMonth(), 1);
       while (cur <= maxD) {
         const offD = Math.round((cur.getTime() - minD.getTime()) / 86400000);
@@ -278,67 +248,79 @@ export default function TasksTab({ projectId }: Props) {
           doc.setDrawColor(200,210,230); doc.setLineWidth(0.1);
           doc.line(lx, startY, lx, startY + headerH);
           const monthLabel = cur.toLocaleString('en', { month: 'short', year: '2-digit' });
-          if (lx + 12 < ganttX + ganttW) {
-            doc.text(monthLabel, lx + 1, startY + 5);
-          }
+          if (lx + 12 < ganttX + ganttW) doc.text(monthLabel, lx + 1, startY + 5);
         }
         cur.setMonth(cur.getMonth() + 1);
       }
 
-      // Today line
       const todayOff = Math.round((new Date().getTime() - minD.getTime()) / 86400000);
-      if (todayOff >= 0 && todayOff <= totalDays) {
-        const tx = ganttX + todayOff * dayPx;
-        doc.setDrawColor(239,68,68); doc.setLineWidth(0.3);
-        doc.line(tx, startY + headerH, tx, startY + headerH + allVisible.length * rowH);
-      }
+      const todayX = ganttX + todayOff * dayPx;
 
-      // Gantt bars — one per task row, aligned with table
-      allVisible.forEach((task, i) => {
+      doc.setFont('helvetica','normal');
+      pageRows.forEach((task, i) => {
         const ry = startY + headerH + i * rowH;
-        if (ry + rowH > H - 8) return;
-        if (!task.startDate || !task.endDate) return;
 
-        const s2 = Math.round((new Date(task.startDate).getTime() - minD.getTime()) / 86400000);
-        const e2 = Math.round((new Date(task.endDate).getTime() - minD.getTime()) / 86400000);
-        const bx = ganttX + s2 * dayPx;
-        const bw = Math.max((e2 - s2) * dayPx, 1);
-        const by = ry + 1;
-        const bh = rowH - 2;
-        const fw = bw * (task.percentComplete / 100);
+        if (i % 2 === 0) { doc.setFillColor(248,250,252); doc.rect(6, ry, tableW, rowH, 'F'); }
+        doc.setDrawColor(226,232,240); doc.setLineWidth(0.15);
+        doc.line(6, ry + rowH, 6 + tableW, ry + rowH);
+
         const isPar = hasChildren(projectTasks, task.id);
+        const indent = task.level * 2.5;
 
-        // Row grid line
+        doc.setFontSize(5.8); doc.setTextColor(90);
+        doc.text(task.wbs || '', 8, ry + rowH - 1.3);
+
+        doc.setFont('helvetica', isPar ? 'bold' : 'normal');
+        doc.setTextColor(isPar ? 65 : 30, isPar ? 65 : 30, isPar ? 155 : 30);
+        doc.setFontSize(5.4);
+        doc.text(task.taskName, taskTextX + indent, ry + rowH - 1.3, { maxWidth: Math.max(8, taskTextW - indent) });
+
+        doc.setFont('helvetica','normal'); doc.setTextColor(80); doc.setFontSize(5.1);
+        doc.text(task.startDate ? fmtDate(task.startDate) : '', 110, ry + rowH - 1.3);
+        doc.text(task.endDate ? fmtDate(task.endDate) : '', 128, ry + rowH - 1.3);
+
+        const pct = task.percentComplete;
+        const [pr,pg,pb] = pct >= 100 ? [16,185,129] : pct >= 60 ? [59,130,246] : [79,70,229];
+        doc.setFont('helvetica','bold'); doc.setTextColor(pr,pg,pb); doc.setFontSize(5.2);
+        doc.text(`${pct}%`, 145, ry + rowH - 1.3);
+
+        doc.setFont('helvetica','normal'); doc.setTextColor(80);
+        doc.text(`${task.duration}d`, 154, ry + rowH - 1.3);
+
+        // Gantt bar
         doc.setDrawColor(226,232,240); doc.setLineWidth(0.1);
         doc.line(ganttX, ry + rowH, ganttX + ganttW, ry + rowH);
+        if (task.startDate && task.endDate) {
+          const s2 = Math.round((new Date(task.startDate).getTime() - minD.getTime()) / 86400000);
+          const e2 = Math.round((new Date(task.endDate).getTime() - minD.getTime()) / 86400000);
+          const bx = ganttX + s2 * dayPx;
+          const bw = Math.max((e2 - s2) * dayPx, 1);
+          const by = ry + 1;
+          const bh = rowH - 2;
+          const fw = bw * (task.percentComplete / 100);
 
-        // Background bar
-        doc.setFillColor(238,242,255); doc.setDrawColor(79,70,229); doc.setLineWidth(0.12);
-        doc.roundedRect(bx, by, bw, bh, 0.4, 0.4, 'FD');
-
-        // Progress fill
-        if (fw > 0.3) {
-          const [r,g,b] = task.percentComplete >= 100 ? [16,185,129] : task.percentComplete >= 60 ? [59,130,246] : [79,70,229];
-          doc.setFillColor(r,g,b);
-          doc.roundedRect(bx, by, fw, bh, 0.4, 0.4, 'F');
-        }
-
-        // Bar label
-        if (bw > 14) {
-          doc.setFontSize(4); doc.setFont('helvetica', isPar ? 'bold' : 'normal'); doc.setTextColor(30);
-          doc.text(task.taskName.substring(0, 18), bx + 0.8, by + bh - 0.6, { maxWidth: bw - 1 });
+          doc.setFillColor(238,242,255); doc.setDrawColor(79,70,229); doc.setLineWidth(0.12);
+          doc.roundedRect(bx, by, bw, bh, 0.4, 0.4, 'FD');
+          if (fw > 0.3) {
+            const [r,g,b] = task.percentComplete >= 100 ? [16,185,129] : task.percentComplete >= 60 ? [59,130,246] : [79,70,229];
+            doc.setFillColor(r,g,b);
+            doc.roundedRect(bx, by, fw, bh, 0.4, 0.4, 'F');
+          }
         }
       });
+
+      if (todayOff >= 0 && todayOff <= totalDays) {
+        doc.setDrawColor(239,68,68); doc.setLineWidth(0.3);
+        doc.line(todayX, startY + headerH, todayX, startY + headerH + pageRows.length * rowH);
+      }
+
+      doc.setDrawColor(79,70,229); doc.setLineWidth(0.3);
+      doc.line(ganttX - 3, startY, ganttX - 3, startY + headerH + pageRows.length * rowH);
+
+      doc.setFontSize(6); doc.setTextColor(160);
+      doc.text('ProjectMS - Task Plan + Gantt', 10, H - 4);
+      doc.text(`Page ${page + 1} of ${totalPages}`, W - 10, H - 4, { align: 'right' });
     }
-
-    // Divider line between table and gantt
-    doc.setDrawColor(79,70,229); doc.setLineWidth(0.3);
-    doc.line(ganttX - 3, startY, ganttX - 3, startY + headerH + allVisible.length * rowH);
-
-    // Footer
-    doc.setFontSize(6); doc.setTextColor(160);
-    doc.text('ProjectMS — Task Plan + Gantt', 10, H - 4);
-    doc.text('Page 1 of 1', W - 10, H - 4, { align: 'right' });
 
     doc.save(`tasks-gantt-${projectId}.pdf`);
     toast.success('Exported PDF'); setShowExport(false);
@@ -350,13 +332,17 @@ export default function TasksTab({ projectId }: Props) {
       {/* Table header — same height as Gantt header (HDR_H) */}
       <div style={{ display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
         {COLS.map(c => (
-          <div key={c.label} style={{ width:c.w, minWidth:c.w, padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center' }}>
+          <div key={c.label} style={{
+            width: c.label === 'Task Name' ? (isTableView ? `calc(100% - ${TABLE_FIXED_W}px)` : c.w) : c.w,
+            minWidth: c.label === 'Task Name' ? (isTableView ? 380 : c.w) : c.w,
+            padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center'
+          }}>
             {c.label}
           </div>
         ))}
       </div>
       <div ref={tableBodyRef} onScroll={onTableScroll}
-        style={{ flex:1, overflowY:'scroll', overflowX:'auto' }}>
+        style={{ flex:1, overflowY:'scroll', overflowX:isTableView?'hidden':'auto' }}>
         {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
         {!loading && visible.map((task, i) => {
           const isPar = hasChildren(projectTasks, task.id);
@@ -367,7 +353,12 @@ export default function TasksTab({ projectId }: Props) {
             <div key={task.id} onClick={() => setSelected(task.id)}
               style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isSel?C.primaryBg:i%2===0?C.white:C.bg, borderLeft: isSel?`3px solid ${C.primary}`:'3px solid transparent', cursor:'pointer', flexShrink:0 }}>
               <div style={{ width:52, minWidth:52, padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'monospace', flexShrink:0 }}>{task.wbs}</div>
-              <div style={{ width:200, minWidth:200, padding:`0 4px 0 ${8+task.level*20}px`, display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+              <div style={{
+                width:isTableView?`calc(100% - ${TABLE_FIXED_W}px)`:200,
+                minWidth:isTableView?380:200,
+                padding:`0 4px 0 ${8+task.level*20}px`,
+                display:'flex', alignItems:'center', gap:4, flexShrink:0
+              }}>
                 {isPar ? (
                   <button onClick={e=>{ e.stopPropagation(); toggle(task.id); }}
                     style={{ width:18, height:18, background:C.primaryBg, border:`1px solid ${C.primary}33`, borderRadius:4, cursor:'pointer', color:C.primary, padding:0, fontSize:11, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -508,11 +499,21 @@ export default function TasksTab({ projectId }: Props) {
 }
 
 function TaskModal({ tasks, onClose, onSave }: { tasks:Task[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
-  const today    = new Date().toISOString().split('T')[0];
-  const nextWeek = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
-  const [form, setForm] = useState<Partial<Task>>({ taskName:'', startDate:today, endDate:nextWeek, resource:'', parentId:'', relatedTask:'' });
+  const todayIso    = new Date().toISOString().split('T')[0];
+  const nextWeekIso = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
+  const [form, setForm] = useState<Partial<Task>>({
+    taskName:'',
+    startDate:isoToDmy(todayIso),
+    endDate:isoToDmy(nextWeekIso),
+    resource:'',
+    parentId:'',
+    relatedTask:''
+  });
   const up = (k:string,v:string) => setForm(p=>({...p,[k]:v}));
-  const dur = calcDuration(form.startDate??'', form.endDate??'');
+  const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
+  const startIso = dmyToIso(String(form.startDate || ''));
+  const endIso = dmyToIso(String(form.endDate || ''));
+  const dur = calcDuration(startIso, endIso);
   return (
     <Modal title="New Task" onClose={onClose} width={480}>
       <FormRow label="Task Name" required>
@@ -521,8 +522,8 @@ function TaskModal({ tasks, onClose, onSave }: { tasks:Task[]; onClose:()=>void;
           onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border} />
       </FormRow>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <FormRow label="Start Date"><input type="date" value={form.startDate??''} onChange={e=>up('startDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
-        <FormRow label="End Date"><input type="date" value={form.endDate??''} onChange={e=>up('endDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+        <FormRow label="Start Date (dd/mm/yyyy)"><input value={form.startDate??''} onChange={e=>up('startDate',e.target.value)} placeholder="dd/mm/yyyy" inputMode="numeric" style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
+        <FormRow label="End Date (dd/mm/yyyy)"><input value={form.endDate??''} onChange={e=>up('endDate',e.target.value)} placeholder="dd/mm/yyyy" inputMode="numeric" style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
       </div>
       {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
       <FormRow label="Resource">
@@ -532,15 +533,24 @@ function TaskModal({ tasks, onClose, onSave }: { tasks:Task[]; onClose:()=>void;
       </FormRow>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <FormRow label="Parent Task">
-          <Select value={form.parentId??''} onChange={v=>up('parentId',v)} options={[{value:'',label:'— None —'},...tasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+          <Select value={form.parentId??''} onChange={v=>up('parentId',v)} options={[{value:'',label:'— None —'},...sortedTasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
         </FormRow>
         <FormRow label="Predecessor (FS)">
-          <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)} options={[{value:'',label:'— None —'},...tasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+          <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)} options={[{value:'',label:'— None —'},...sortedTasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
         </FormRow>
       </div>
       <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={()=>{ if(!form.taskName?.trim()) return; onSave(form); }}>Create Task</Btn>
+        <Btn onClick={()=>{
+          if(!form.taskName?.trim()) return;
+          const startDate = dmyToIso(String(form.startDate || ''));
+          const endDate = dmyToIso(String(form.endDate || ''));
+          if (!startDate || !endDate) {
+            toast.error('Start/End Date ต้องอยู่ในรูปแบบ dd/mm/yyyy');
+            return;
+          }
+          onSave({ ...form, startDate, endDate });
+        }}>Create Task</Btn>
       </div>
     </Modal>
   );
@@ -550,6 +560,7 @@ function TaskEditModal({ task, tasks, onClose, onSave }: { task:Task; tasks:Task
   const [form, setForm] = useState<Partial<Task>>({ ...task });
   const up = (k:string,v:string|number) => setForm(p=>({...p,[k]:v}));
   const dur = calcDuration(form.startDate??'', form.endDate??'');
+  const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
   return (
     <Modal title="Edit Task" onClose={onClose} width={520}>
       <FormRow label="Task Name" required>
@@ -577,11 +588,11 @@ function TaskEditModal({ task, tasks, onClose, onSave }: { task:Task; tasks:Task
       </FormRow>
       <FormRow label="Parent Task (change to restructure)">
         <Select value={form.parentId??''} onChange={v=>up('parentId',v)}
-          options={[{value:'',label:'— None (Root) —'},...tasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+          options={[{value:'',label:'— None (Root) —'},...sortedTasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
       </FormRow>
       <FormRow label="Predecessor (FS)">
         <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)}
-          options={[{value:'',label:'— None —'},...tasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+          options={[{value:'',label:'— None —'},...sortedTasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
       </FormRow>
       <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>

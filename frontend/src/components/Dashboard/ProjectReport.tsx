@@ -1,10 +1,10 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Printer, X } from 'lucide-react';
 import { useStore } from '../../store';
 import { C, Badge, ProgressBar, MILESTONE_STATUS, PROJECT_STATUS } from '../Common';
-import { fmtDate, fmtMoney, hasChildren, PROCESS_STATUS_STYLE, RISK_LEVEL_COLOR } from '../../utils';
+import { fmtDate, fmtMoney, compareWbs, PROCESS_STATUS_STYLE, RISK_LEVEL_COLOR } from '../../utils';
 import type { Project } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -36,7 +36,7 @@ export default function ProjectReport({ project, onClose }: Props) {
   const rks = risks.filter(r => r.projectId === project.id);
 
   const roots    = pt.filter(t => !t.parentId);
-  const tasksForReport = [...pt].sort((a, b) => String(a.wbs || '').localeCompare(String(b.wbs || '')));
+  const tasksForReport = [...roots].sort((a, b) => compareWbs(a.wbs, b.wbs));
   const prog     = roots.length ? Math.round(roots.reduce((s,t)=>s+t.percentComplete,0)/roots.length) : 0;
   const done     = pt.filter(t=>t.percentComplete===100).length;
   const inProg   = pt.filter(t=>t.percentComplete>0&&t.percentComplete<100).length;
@@ -56,6 +56,7 @@ export default function ProjectReport({ project, onClose }: Props) {
   const openCRs    = crs.filter(c=>c.status==='Draft'||c.status==='Submitted'||c.status==='Under Review').length;
 
   const s = PROJECT_STATUS[project.status]??PROJECT_STATUS['Planning'];
+  const money2 = (n: number) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 
   // ── PDF export ─────────────────────────────────────────────────────────────
   const exportPDF = () => {
@@ -68,7 +69,7 @@ export default function ProjectReport({ project, onClose }: Props) {
     doc.setFontSize(15); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
     doc.text(project.name, 12, 13);
     doc.setFontSize(8); doc.setFont('helvetica','normal');
-    doc.text(`${project.code}  ·  ${project.client}  ·  ${fmtDate(project.startDate)} – ${fmtDate(project.endDate)}`, 12, 20);
+    doc.text(`${project.code} | ${project.client} | ${fmtDate(project.startDate)} - ${fmtDate(project.endDate)}`, 12, 20);
     doc.setFillColor(255,255,255);
     doc.roundedRect(W-46,7,32,12,3,3,'F');
     doc.setTextColor(79,70,229); doc.setFontSize(8); doc.setFont('helvetica','bold');
@@ -82,7 +83,7 @@ export default function ProjectReport({ project, onClose }: Props) {
     // KPI boxes row
     const kpis = [
       {label:'Overall Progress',  value:`${prog}%`,   sub:`${done} done / ${inProg} in-progress`,    c:[79,70,229]  as [number,number,number]},
-      {label:'Payment Collected', value:`${payPct}%`, sub:`฿${fmtMoney(paidAmt)} / ฿${fmtMoney(totalContract)}`, c:[16,185,129] as [number,number,number]},
+      {label:'Payment Collected', value:`${payPct}%`, sub:`${money2(paidAmt)} / ${money2(totalContract)}`, c:[16,185,129] as [number,number,number]},
       {label:'Manday Used',       value:`${efPct}%`,  sub:`${tUsedMD} / ${tBudMD} MD`,               c:[245,158,11] as [number,number,number]},
       {label:'Open Issues/CRs',   value:`${openIssues+openCRs}`, sub:`${openRisks} open risks`,    c:openIssues+openCRs>0?[239,68,68] as [number,number,number]:[16,185,129] as [number,number,number]},
     ];
@@ -106,7 +107,7 @@ export default function ProjectReport({ project, onClose }: Props) {
     const summaryTaskRows = tasksForReport.slice(0,12).map(t=>[
       t.wbs, t.taskName.substring(0,36),
       fmtDate(t.startDate), fmtDate(t.endDate),
-      t.actualFinish ? fmtDate(t.actualFinish) : '—',
+      t.actualFinish ? fmtDate(t.actualFinish) : '-',
       `${t.percentComplete}%`,
     ]);
     autoTable(doc,{
@@ -127,7 +128,7 @@ export default function ProjectReport({ project, onClose }: Props) {
     });
 
     // Milestones
-    const msRows = ms.map(m=>[m.phase,m.name.substring(0,26),`฿${fmtMoney(m.amount)}`,fmtDate(m.dueDate),m.status.toUpperCase()]);
+    const msRows = ms.map(m=>[m.phase,m.name.substring(0,26),money2(m.amount),fmtDate(m.dueDate),m.status.toUpperCase()]);
     autoTable(doc,{
       startY:y, tableWidth:cw, margin:{left:12+cw+3, right:12},
       head:[['Phase','Milestone','Amount','Due','Status']],
@@ -150,7 +151,7 @@ export default function ProjectReport({ project, onClose }: Props) {
     // CR | Issues | Risks (3 columns)
     const sw = (W-28-6)/3;
     const crRows2  = crs.map(c=>[c.crId,c.title.substring(0,22),`${c.totalManday}MD`,c.status]);
-    const issRows2 = iss.map(i=>[fmtDate(i.issueDate),i.title.substring(0,22),i.assignedTo||'—',i.status]);
+    const issRows2 = iss.map(i=>[fmtDate(i.issueDate),i.title.substring(0,22),i.assignedTo||'-',i.status]);
     const rskRows2 = rks.map(r=>[r.title.substring(0,24),r.probability,r.impact,r.status]);
     const sections: Array<{rows:string[][];title:string;head:string[];color:[number,number,number];left:number}> = [
       {rows:crRows2,  title:'Change Requests',head:['CR ID','Title','MD','Status'],       color:[79,70,229],  left:12},
@@ -170,8 +171,8 @@ export default function ProjectReport({ project, onClose }: Props) {
 
     // Footer
     doc.setFontSize(6.5); doc.setTextColor(160);
-    doc.text('ProjectMS Enterprise — Executive Report', 12, H-4);
-    doc.text('Page 1 of 1  ·  Confidential', W-12, H-4, {align:'right'});
+    doc.text('ProjectMS Enterprise - Executive Report', 12, H-4);
+    doc.text('Page 1 of 1 | Confidential', W-12, H-4, {align:'right'});
 
     // Full Task appendix (all tasks)
     if (tasksForReport.length > 0) {
@@ -181,9 +182,9 @@ export default function ProjectReport({ project, onClose }: Props) {
 
       doc.setFillColor(79,70,229); doc.rect(0,0,W2,20,'F');
       doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
-      doc.text(`${project.name} — Task Details`, 12, 12);
+      doc.text(`${project.name} - Task Details`, 12, 12);
       doc.setFontSize(8); doc.setFont('helvetica','normal');
-      doc.text(`${project.code}  ·  ${project.client}`, 12, 17);
+      doc.text(`${project.code} | ${project.client}`, 12, 17);
       doc.setTextColor(0);
 
       const allTaskRows = tasksForReport.map(t => {
@@ -195,7 +196,7 @@ export default function ProjectReport({ project, onClose }: Props) {
           `${indent}${t.taskName}`,
           fmtDate(t.startDate),
           fmtDate(t.endDate),
-          t.actualFinish ? fmtDate(t.actualFinish) : '—',
+          t.actualFinish ? fmtDate(t.actualFinish) : '-',
           String(t.duration ?? ''),
           `${t.percentComplete}%`,
         ];
@@ -228,9 +229,9 @@ export default function ProjectReport({ project, onClose }: Props) {
         didDrawPage() {
           doc.setFontSize(6.5);
           doc.setTextColor(160);
-          doc.text('ProjectMS Enterprise — Task Details', 10, H2 - 4);
+          doc.text('ProjectMS Enterprise - Task Details', 10, H2 - 4);
           const pageNo = doc.getNumberOfPages();
-          doc.text(`Page ${pageNo}  ·  Confidential`, W2 - 10, H2 - 4, { align: 'right' });
+          doc.text(`Page ${pageNo} | Confidential`, W2 - 10, H2 - 4, { align: 'right' });
           doc.setTextColor(0);
         },
       });
@@ -242,77 +243,77 @@ export default function ProjectReport({ project, onClose }: Props) {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:400, background:'rgba(15,23,42,0.6)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-start', justifyContent:'center', overflowY:'auto', padding:'20px 16px' }}>
-      <div style={{ background:C.white, borderRadius:16, width:'100%', maxWidth:1080, boxShadow:'0 32px 80px rgba(0,0,0,0.25)' }}>
+      <div style={{ background:C.white, borderRadius:16, width:'100%', maxWidth:1020, boxShadow:'0 32px 80px rgba(0,0,0,0.25)' }}>
         {/* Toolbar */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 24px', borderBottom:`1px solid ${C.border}` }}>
-          <span style={{ fontSize:15, fontWeight:700, color:C.text }}>📊 Executive Report — {project.name}</span>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 18px', borderBottom:`1px solid ${C.border}` }}>
+          <span style={{ fontSize:13, fontWeight:700, color:C.text }}>Executive Report - {project.name}</span>
           <div style={{ display:'flex', gap:10 }}>
             <button onClick={exportPDF}
-              style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 18px', background:C.primary, border:'none', borderRadius:8, color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
+              style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 14px', background:C.primary, border:'none', borderRadius:8, color:'#fff', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
               <Printer size={14}/> Export PDF
             </button>
             <button onClick={onClose}
-              style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, color:C.text2, fontSize:13, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
               <X size={14}/> Close
             </button>
           </div>
         </div>
 
         {/* Report body */}
-        <div style={{ padding:24 }}>
+        <div style={{ padding:18 }}>
           {/* Header */}
-          <div style={{ background:`linear-gradient(135deg,${C.primary},#818CF8)`, borderRadius:12, padding:'20px 28px', marginBottom:20, color:'#fff', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div style={{ background:`linear-gradient(135deg,${C.primary},#818CF8)`, borderRadius:12, padding:'14px 20px', marginBottom:14, color:'#fff', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
             <div>
-              <div style={{ fontSize:22, fontWeight:800 }}>{project.name}</div>
-              <div style={{ fontSize:12, opacity:0.8, marginTop:3 }}>{project.code} · {project.client} · {fmtDate(project.startDate)} – {fmtDate(project.endDate)}</div>
+              <div style={{ fontSize:18, fontWeight:800 }}>{project.name}</div>
+              <div style={{ fontSize:11, opacity:0.86, marginTop:2 }}>{project.code} | {project.client} | {fmtDate(project.startDate)} - {fmtDate(project.endDate)}</div>
             </div>
             <div style={{ textAlign:'right' }}>
-              <div style={{ background:'rgba(255,255,255,0.25)', borderRadius:8, padding:'4px 14px', fontSize:12, fontWeight:600 }}>{s.label}</div>
-              <div style={{ fontSize:10, opacity:0.7, marginTop:4 }}>{new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'})}</div>
+              <div style={{ background:'rgba(255,255,255,0.25)', borderRadius:8, padding:'3px 10px', fontSize:11, fontWeight:600 }}>{s.label}</div>
+              <div style={{ fontSize:9, opacity:0.75, marginTop:3 }}>{new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'})}</div>
             </div>
           </div>
 
           {/* KPI row */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:16 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:12 }}>
             {[
               { label:'Overall Progress', value:prog,   color:C.primary, sub:`${done} done · ${inProg} in progress` },
-              { label:'Payment',          value:payPct, color:C.green,   sub:`฿${fmtMoney(paidAmt)} collected` },
+              { label:'Payment',          value:payPct, color:C.green,   sub:`${money2(paidAmt)} collected` },
               { label:'Manday',           value:efPct,  color:efPct>90?C.red:efPct>70?C.amber:C.primary, sub:`${tUsedMD}/${tBudMD} MD` },
               { label:'Issues/CRs Open', value:openIssues+openCRs, color:openIssues+openCRs>0?C.red:C.green, sub:`${openRisks} risks open`, isCount:true },
             ].map(k => (
-              <div key={k.label} style={{ background:C.bg, borderRadius:10, padding:'14px 16px', display:'flex', alignItems:'center', gap:12 }}>
+              <div key={k.label} style={{ background:C.bg, borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>
                 {!k.isCount ? <DonutChart value={k.value} color={k.color} size={72}/> : (
                   <div style={{ width:72, height:72, borderRadius:'50%', background:k.color+'18', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, fontWeight:800, color:k.color }}>{k.value}</div>
                 )}
                 <div>
-                  <div style={{ fontSize:12, fontWeight:700, color:C.text }}>{k.label}</div>
-                  <div style={{ fontSize:11, color:C.text2, marginTop:3 }}>{k.sub}</div>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.text }}>{k.label}</div>
+                  <div style={{ fontSize:10, color:C.text2, marginTop:2 }}>{k.sub}</div>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Tasks + Milestones */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
             {/* Tasks */}
             <div>
-              <div style={{ fontSize:12, fontWeight:700, color:C.text, marginBottom:8 }}>📋 Tasks ({pt.length})</div>
-              <div style={{ background:C.bg, borderRadius:10, overflow:'hidden', maxHeight:220, overflowY:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:C.text, marginBottom:6 }}>Main Tasks ({tasksForReport.length})</div>
+              <div style={{ background:C.bg, borderRadius:10, overflow:'hidden', maxHeight:260, overflowY:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:10 }}>
                   <thead><tr style={{ background:C.primary }}>
                     {['WBS','Task','Start','Finish','Actual','%'].map(h=>(
-                      <th key={h} style={{ padding:'6px 8px', color:'#fff', textAlign:'left', fontSize:10, fontWeight:600 }}>{h}</th>
+                      <th key={h} style={{ padding:'5px 7px', color:'#fff', textAlign:'left', fontSize:9, fontWeight:600 }}>{h}</th>
                     ))}
                   </tr></thead>
                   <tbody>
                     {tasksForReport.map((t,i)=>(
                       <tr key={t.id} style={{ background:i%2===0?C.white:C.bg }}>
-                        <td style={{ padding:'5px 8px', fontSize:10, color:C.text3 }}>{t.wbs}</td>
-                        <td style={{ padding:'5px 8px', fontWeight:500 }}>{t.taskName}</td>
-                        <td style={{ padding:'5px 8px', fontSize:10, color:C.text2 }}>{fmtDate(t.startDate)}</td>
-                        <td style={{ padding:'5px 8px', fontSize:10, color:C.text2 }}>{fmtDate(t.endDate)}</td>
-                        <td style={{ padding:'5px 8px', fontSize:10, color:t.actualFinish?C.green:C.text3 }}>{t.actualFinish?fmtDate(t.actualFinish):'—'}</td>
-                        <td style={{ padding:'5px 8px', fontWeight:700, color:t.percentComplete>=100?C.green:t.percentComplete>=60?C.blue:C.primary }}>{t.percentComplete}%</td>
+                        <td style={{ padding:'4px 7px', fontSize:9, color:C.text3 }}>{t.wbs}</td>
+                        <td style={{ padding:'4px 7px', fontWeight:500 }}>{t.taskName}</td>
+                        <td style={{ padding:'4px 7px', fontSize:9, color:C.text2 }}>{fmtDate(t.startDate)}</td>
+                        <td style={{ padding:'4px 7px', fontSize:9, color:C.text2 }}>{fmtDate(t.endDate)}</td>
+                        <td style={{ padding:'4px 7px', fontSize:9, color:t.actualFinish?C.green:C.text3 }}>{t.actualFinish?fmtDate(t.actualFinish):'-'}</td>
+                        <td style={{ padding:'4px 7px', fontWeight:700, color:t.percentComplete>=100?C.green:t.percentComplete>=60?C.blue:C.primary }}>{t.percentComplete}%</td>
                       </tr>
                     ))}
                     {tasksForReport.length===0&&<tr><td colSpan={6} style={{ padding:16, textAlign:'center', color:C.text3 }}>No tasks</td></tr>}
@@ -322,22 +323,22 @@ export default function ProjectReport({ project, onClose }: Props) {
             </div>
             {/* Milestones */}
             <div>
-              <div style={{ fontSize:12, fontWeight:700, color:C.text, marginBottom:8 }}>🏁 Milestones ({ms.length})</div>
-              <div style={{ background:C.bg, borderRadius:10, overflow:'hidden', maxHeight:220, overflowY:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:C.text, marginBottom:6 }}>Milestones ({ms.length})</div>
+              <div style={{ background:C.bg, borderRadius:10, overflow:'hidden', maxHeight:260, overflowY:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:10 }}>
                   <thead><tr style={{ background:C.green }}>
                     {['Phase','Name','Amount','Due','Status'].map(h=>(
-                      <th key={h} style={{ padding:'6px 8px', color:'#fff', textAlign:'left', fontSize:10, fontWeight:600 }}>{h}</th>
+                      <th key={h} style={{ padding:'5px 7px', color:'#fff', textAlign:'left', fontSize:9, fontWeight:600 }}>{h}</th>
                     ))}
                   </tr></thead>
                   <tbody>
                     {ms.map((m,i)=>{const ss=MILESTONE_STATUS[m.status]??MILESTONE_STATUS.pending;return(
                       <tr key={m.id} style={{ background:i%2===0?C.white:C.bg }}>
-                        <td style={{ padding:'5px 8px', fontSize:10, color:C.text3 }}>{m.phase}</td>
-                        <td style={{ padding:'5px 8px', fontWeight:500 }}>{m.name}</td>
-                        <td style={{ padding:'5px 8px', fontSize:10, fontFamily:'monospace', color:C.primary }}>฿{fmtMoney(m.amount)}</td>
-                        <td style={{ padding:'5px 8px', fontSize:10, color:C.text2 }}>{fmtDate(m.dueDate)}</td>
-                        <td style={{ padding:'5px 8px' }}><span style={{ fontSize:10, fontWeight:600, color:ss.color, background:ss.bg, padding:'2px 8px', borderRadius:10 }}>{ss.label}</span></td>
+                        <td style={{ padding:'4px 7px', fontSize:9, color:C.text3 }}>{m.phase}</td>
+                        <td style={{ padding:'4px 7px', fontWeight:500 }}>{m.name}</td>
+                        <td style={{ padding:'4px 7px', fontSize:9, fontFamily:'monospace', color:C.primary }}>{money2(m.amount)}</td>
+                        <td style={{ padding:'4px 7px', fontSize:9, color:C.text2 }}>{fmtDate(m.dueDate)}</td>
+                        <td style={{ padding:'4px 7px' }}><span style={{ fontSize:9, fontWeight:600, color:ss.color, background:ss.bg, padding:'2px 8px', borderRadius:10 }}>{ss.label}</span></td>
                       </tr>
                     );})}
                     {ms.length===0&&<tr><td colSpan={5} style={{ padding:16, textAlign:'center', color:C.text3 }}>No milestones</td></tr>}
