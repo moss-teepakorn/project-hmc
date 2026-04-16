@@ -84,7 +84,6 @@ export default function ProjectModal({ project, onClose }: Props) {
             options={[
               { value: '', label: '— Do not copy —' },
               ...projects
-                .filter(p => p.id !== project?.id)
                 .map(p => ({ value: p.id, label: `${p.code || p.id} - ${p.name}` })),
             ]}
           />

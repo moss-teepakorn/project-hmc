@@ -4,10 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "start": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "npm --prefix frontend run dev",
+    "start": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
     "lint:modal-size": "node scripts/check-modal-size.mjs",
     "migrate:local": "bash scripts/run_migrations.sh",
     "backup:system-config": "bash scripts/backup_system_config.sh"
