@@ -214,23 +214,26 @@ export default function TasksTab({ projectId }: Props) {
     const W = doc.internal.pageSize.getWidth();
     const H = doc.internal.pageSize.getHeight();
     const proj = useStore.getState().activeProject;
+    const pastelPrimary: [number, number, number] = [219, 234, 254];
+    const pastelPrimaryText: [number, number, number] = [49, 46, 129];
+    const pastelGrid: [number, number, number] = [191, 219, 254];
 
     // Header band
-    doc.setFillColor(79,70,229); doc.rect(0,0,W,18,'F');
-    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+    doc.setFillColor(...pastelPrimary); doc.rect(0,0,W,18,'F');
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(...pastelPrimaryText);
     doc.text(`${proj?.name ?? projectId} - Task Plan + Gantt`, 10, 11);
     doc.setFontSize(7); doc.setFont('helvetica','normal');
     doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, W-10, 11, { align:'right' });
     doc.setTextColor(0);
 
     const startY = 22;
-    const tableW = 160; // wider task table for readable task name
+    const tableW = 168; // include resource column
     const ganttX = tableW + 12; // start of gantt area
     const ganttW = W - ganttX - 6;
     const baseRowH = 5.2; // mm per row (minimum)
     const headerH = 7;
     const taskTextX = 20;
-    const taskTextW = 90;
+    const taskTextW = 78;
 
     // Flatten all tasks for display (with indentation in name)
     const allVisible = [...projectTasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
@@ -273,25 +276,26 @@ export default function TasksTab({ projectId }: Props) {
 
       const pageRows = pageTaskRows[page] || [];
 
-      doc.setFillColor(79,70,229);
+      doc.setFillColor(...pastelPrimary);
       doc.rect(6, startY, tableW, headerH, 'F');
-      doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+      doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(...pastelPrimaryText);
       const cols = [
         { label: 'WBS',   x: 8 },
         { label: 'Task',  x: taskTextX },
-        { label: 'Start', x: 110 },
-        { label: 'Finish',x: 128 },
-        { label: '%',     x: 145 },
-        { label: 'Days',  x: 154 },
+        { label: 'Start', x: 102 },
+        { label: 'Finish',x: 117 },
+        { label: 'Days',  x: 132 },
+        { label: '%',     x: 142 },
+        { label: 'Resource', x: 150 },
       ];
       cols.forEach(c => doc.text(c.label, c.x, startY + 5));
 
       // Gantt header
       doc.setFillColor(245,247,250);
       doc.rect(ganttX, startY, ganttW, headerH, 'F');
-      doc.setDrawColor(79,70,229); doc.setLineWidth(0.3);
+      doc.setDrawColor(...pastelGrid); doc.setLineWidth(0.3);
       doc.rect(ganttX, startY, ganttW, headerH, 'S');
-      doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.setTextColor(79,70,229);
+      doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.setTextColor(...pastelPrimaryText);
 
       const cur = new Date(minD.getFullYear(), minD.getMonth(), 1);
       while (cur <= maxD) {
@@ -333,16 +337,21 @@ export default function TasksTab({ projectId }: Props) {
 
         doc.setFont('helvetica','normal'); doc.setTextColor(80); doc.setFontSize(5.1);
         const ym = ry + rowH / 2 + 0.6;
-        doc.text(task.startDate ? fmtDate(task.startDate) : '', 110, ym);
-        doc.text(task.endDate ? fmtDate(task.endDate) : '', 128, ym);
+        doc.text(task.startDate ? fmtDate(task.startDate) : '', 102, ym);
+        doc.text(task.endDate ? fmtDate(task.endDate) : '', 117, ym);
+
+        doc.setFont('helvetica','normal'); doc.setTextColor(80);
+        doc.text(`${task.duration}d`, 132, ym);
 
         const pct = task.percentComplete;
         const [pr,pg,pb] = pct >= 100 ? [16,185,129] : pct >= 60 ? [59,130,246] : [79,70,229];
         doc.setFont('helvetica','bold'); doc.setTextColor(pr,pg,pb); doc.setFontSize(5.2);
-        doc.text(`${pct}%`, 145, ym);
+        doc.text(`${pct}%`, 142, ym);
 
-        doc.setFont('helvetica','normal'); doc.setTextColor(80);
-        doc.text(`${task.duration}d`, 154, ym);
+        doc.setFont('helvetica','normal'); doc.setTextColor(80); doc.setFontSize(5.0);
+        const resourceText = String(task.resource || '-');
+        const resourceOneLine = doc.splitTextToSize(resourceText, 14)[0] || '-';
+        doc.text(resourceOneLine, 150, ym);
 
         // Gantt bar
         doc.setDrawColor(226,232,240); doc.setLineWidth(0.1);
@@ -373,9 +382,11 @@ export default function TasksTab({ projectId }: Props) {
         doc.line(todayX, startY + headerH, todayX, yCursor);
       }
 
-      doc.setDrawColor(79,70,229); doc.setLineWidth(0.3);
+      doc.setDrawColor(...pastelGrid); doc.setLineWidth(0.3);
       doc.line(ganttX - 3, startY, ganttX - 3, yCursor);
 
+      doc.setFontSize(5.5); doc.setTextColor(150);
+      doc.text(`Project ID: ${proj?.code || projectId} | Client: ${proj?.client || '-'}`, 10, H - 7);
       doc.setFontSize(6); doc.setTextColor(160);
       doc.text('ProjectMS - Task Plan + Gantt', 10, H - 4);
       doc.text(`Page ${page + 1} of ${totalPages}`, W - 10, H - 4, { align: 'right' });
