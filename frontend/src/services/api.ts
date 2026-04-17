@@ -99,6 +99,44 @@ export const taskApi = {
     const row = objToRow(t as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
+
+    const requestedOrder = Number(row.order);
+    const projectId = String(row.project_id || '');
+    const normalizeParent = (v: unknown): string => {
+      if (v === null || v === undefined || v === '') return '';
+      return String(v);
+    };
+
+    // Insert-before/after from UI sends .5 order markers. Convert them to integer slots.
+    if (projectId && Number.isFinite(requestedOrder) && !Number.isInteger(requestedOrder)) {
+      const insertSlot = Math.max(1, Math.ceil(requestedOrder));
+      const targetParent = normalizeParent(row.parent_id);
+
+      const { data: siblingRows, error: siblingErr } = await supabase
+        .from('tasks')
+        .select('id, "order", parent_id')
+        .eq('project_id', projectId);
+      if (siblingErr) throw new Error(siblingErr.message);
+
+      const siblings = (siblingRows || [])
+        .filter((s) => normalizeParent(s.parent_id) === targetParent)
+        .filter((s) => Number(s.order) >= insertSlot)
+        .sort((a, b) => Number(b.order) - Number(a.order));
+
+      for (const s of siblings) {
+        await supabase
+          .from('tasks')
+          .update({ order: Number(s.order) + 1 })
+          .eq('id', s.id);
+      }
+
+      row.order = insertSlot;
+    }
+
+    if (Number.isFinite(requestedOrder) && Number.isInteger(requestedOrder)) {
+      row.order = requestedOrder;
+    }
+
     const { data, error } = await supabase
       .from('tasks')
       .insert(row)

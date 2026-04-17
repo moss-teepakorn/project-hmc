@@ -129,7 +129,10 @@ export default function TasksTab({ projectId }: Props) {
 
   const handleCreate = async (form: Partial<Task>) => {
     try { await createTask({ ...form, projectId }); toast.success('Task created'); setAddModal(false); }
-    catch { toast.error('Failed to create'); }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to create';
+      toast.error(msg || 'Failed to create');
+    }
   };
 
   const handleEditSave = async (form: Partial<Task>) => {
