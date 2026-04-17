@@ -3,7 +3,7 @@
 // No custom backend needed.
 
 import { supabase } from './supabase';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk } from '../types';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment } from '../types';
 
 // ── Snake ↔ Camel conversion helpers ────────────────────────────────────────
 
@@ -79,6 +79,51 @@ export const projectApi = {
 
   remove: async (id: string): Promise<void> => {
     const { error } = await supabase.from('projects').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+};
+
+// ── Project Environments ───────────────────────────────────────────────────
+
+export const projectEnvironmentApi = {
+  getByProject: async (pid?: string): Promise<{ data: ProjectEnvironment[] }> => {
+    let q = supabase.from('project_environments').select('*');
+    if (pid) q = q.eq('project_id', pid);
+    q = q.order('created_at', { ascending: true });
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<ProjectEnvironment>(data || []) };
+  },
+
+  create: async (env: Partial<ProjectEnvironment>): Promise<{ data: ProjectEnvironment }> => {
+    const row = objToRow(env as Record<string, unknown>);
+    delete row.id;
+    delete row.created_at;
+    const { data, error } = await supabase
+      .from('project_environments')
+      .insert(row)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<ProjectEnvironment>(data) };
+  },
+
+  update: async (id: string, env: Partial<ProjectEnvironment>): Promise<{ data: ProjectEnvironment }> => {
+    const row = objToRow(env as Record<string, unknown>);
+    delete row.id;
+    delete row.created_at;
+    const { data, error } = await supabase
+      .from('project_environments')
+      .update(row)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<ProjectEnvironment>(data) };
+  },
+
+  remove: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('project_environments').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 };

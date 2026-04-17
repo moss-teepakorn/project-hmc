@@ -3,11 +3,21 @@ export interface Project {
   name: string;
   code: string;
   client: string;
+  softwareVersion: '' | 'Humatrix' | 'Workplaze';
   status: 'Planning' | 'Req & Design' | 'Setup' | 'Testing' | 'Go Live' | 'Hyper Care';
   startDate: string;
   endDate: string;
   description: string;
   color: string;
+}
+
+export interface ProjectEnvironment {
+  id: string;
+  projectId: string;
+  environment: 'DEV' | 'QA' | 'UAT' | 'Production';
+  url: string;
+  username: string;
+  password: string;
 }
 
 export interface Task {

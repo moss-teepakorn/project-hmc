@@ -26,6 +26,7 @@ export default function ProjectDetail({ project }: Props) {
     changeRequests,
     issues,
     risks,
+    projectEnvironments,
     fetchTasks,
     fetchMembers,
     fetchMilestones,
@@ -33,6 +34,7 @@ export default function ProjectDetail({ project }: Props) {
     fetchCRs,
     fetchIssues,
     fetchRisks,
+    fetchProjectEnvironments,
   } = useStore();
 
   const s = PROJECT_STATUS[project.status] ?? PROJECT_STATUS['Planning'];
@@ -45,7 +47,7 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'cr',      label: 'Change Req', icon: '📝', count: changeRequests.length },
     { id: 'issues',  label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
     { id: 'risks',   label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
-    { id: 'env',     label: 'Program URL', icon: '🌐' },
+    { id: 'env',     label: 'Program URL', icon: '🌐', count: projectEnvironments.filter((e) => e.projectId === project.id).length },
     { id: 'report',  label: 'Report',     icon: '📊' },
   ];
 
@@ -61,6 +63,7 @@ export default function ProjectDetail({ project }: Props) {
       fetchCRs(project.id),
       fetchIssues(project.id),
       fetchRisks(project.id),
+      fetchProjectEnvironments(project.id),
     ]);
   }, [
     project?.id,
@@ -71,6 +74,7 @@ export default function ProjectDetail({ project }: Props) {
     fetchCRs,
     fetchIssues,
     fetchRisks,
+    fetchProjectEnvironments,
   ]);
 
   return (

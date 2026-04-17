@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk } from '../types';
-import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi } from '../services/api';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment } from '../types';
+import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi } from '../services/api';
 
 interface Store {
   _pendingMutationCount: number;
@@ -14,6 +14,7 @@ interface Store {
   changeRequests: (ChangeRequest & { items: CRItem[] })[];
   issues: Issue[];
   risks: Risk[];
+  projectEnvironments: ProjectEnvironment[];
   dataLoading: boolean;
   error: string | null;
 
@@ -58,6 +59,11 @@ interface Store {
   createRisk:      (r: Partial<Risk>) => Promise<void>;
   updateRisk:      (id: string, r: Partial<Risk>) => Promise<void>;
   deleteRisk:      (id: string) => Promise<void>;
+
+  fetchProjectEnvironments: (pid: string) => Promise<void>;
+  createProjectEnvironment: (env: Partial<ProjectEnvironment>) => Promise<void>;
+  updateProjectEnvironment: (id: string, env: Partial<ProjectEnvironment>) => Promise<void>;
+  deleteProjectEnvironment: (id: string) => Promise<void>;
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -65,7 +71,7 @@ export const useStore = create<Store>((set, get) => ({
   _pendingMutationCount: 0,
   projects: [], projectsLoading: false, activeProject: null,
   tasks: [], members: [], milestones: [], efforts: [],
-  changeRequests: [], issues: [], risks: [],
+  changeRequests: [], issues: [], risks: [], projectEnvironments: [],
   dataLoading: false, error: null,
 
   // ── Projects ───────────────────────────────────────────────────────────────
@@ -111,7 +117,7 @@ export const useStore = create<Store>((set, get) => ({
       });
     }
   },
-  setActiveProject: (p) => set({ activeProject: p, tasks: [], members: [], milestones: [], efforts: [], changeRequests: [], issues: [], risks: [] }),
+  setActiveProject: (p) => set({ activeProject: p, tasks: [], members: [], milestones: [], efforts: [], changeRequests: [], issues: [], risks: [], projectEnvironments: [] }),
 
   // ── Tasks ──────────────────────────────────────────────────────────────────
   fetchTasks: async (pid?: string) => {
@@ -393,6 +399,48 @@ export const useStore = create<Store>((set, get) => ({
     try {
       await riskApi.remove(id);
       set(s => ({ risks: s.risks.filter(r => r.id !== id) }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+
+  // ── Project Environments ──────────────────────────────────────────────────
+  fetchProjectEnvironments: async (pid?: string) => {
+    try { set({ projectEnvironments: (await projectEnvironmentApi.getByProject(pid)).data }); }
+    catch (e) { set({ error: (e as Error).message }); }
+  },
+  createProjectEnvironment: async (env) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      const res = await projectEnvironmentApi.create(env);
+      set(s => ({ projectEnvironments: [...s.projectEnvironments, res.data] }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  updateProjectEnvironment: async (id, env) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      const res = await projectEnvironmentApi.update(id, env);
+      set(s => ({ projectEnvironments: s.projectEnvironments.map(x => x.id === id ? res.data : x) }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  deleteProjectEnvironment: async (id) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      await projectEnvironmentApi.remove(id);
+      set(s => ({ projectEnvironments: s.projectEnvironments.filter(x => x.id !== id) }));
     } finally {
       set((s: any) => {
         const next = Math.max(0, (s._pendingMutationCount || 1) - 1);

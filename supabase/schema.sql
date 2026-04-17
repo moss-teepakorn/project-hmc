@@ -53,6 +53,7 @@ create table if not exists public.projects (
   name        text not null,
   code        text not null default '',
   client      text not null default '',
+  software_version text not null default '',
   status      text not null default 'Planning'
                 check (status in ('Planning','Req & Design','Setup','Testing','Go Live','Hyper Care')),
   start_date  text not null default '',
@@ -63,6 +64,20 @@ create table if not exists public.projects (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+
+create table if not exists public.project_environments (
+  id           uuid primary key default gen_random_uuid(),
+  project_id   uuid not null references public.projects(id) on delete cascade,
+  environment  text not null check (environment in ('DEV', 'QA', 'UAT', 'Production')),
+  url          text not null default '',
+  username     text not null default '',
+  password     text not null default '',
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  unique(project_id, environment)
+);
+
+create index if not exists idx_project_environments_project on public.project_environments(project_id);
 
 -- ============================================================================
 -- 3. PROJECT MEMBERS (access control + team)

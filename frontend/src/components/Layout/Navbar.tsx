@@ -17,8 +17,8 @@ export default function Navbar() {
   const navBorder = isDark ? '#334155' : C.border;
   const textColor = isDark ? '#F1F5F9' : C.text;
   const textMuted = isDark ? '#94A3B8' : C.text3;
-  const buildNo = (import.meta as any).env?.VITE_BUILD_NO || 'local';
-  const buildDate = (import.meta as any).env?.VITE_BUILD_DATE || new Date().toISOString().slice(0, 10);
+  const commitIdRaw = (import.meta as any).env?.VITE_COMMIT_ID || 'local';
+  const commitId = String(commitIdRaw).slice(0, 8);
 
   return (
     <nav style={{
@@ -69,7 +69,7 @@ export default function Navbar() {
           {projects.length} project{projects.length !== 1 ? 's' : ''}
         </span>
         <span style={{ color: textMuted, fontSize: 10, opacity: 0.9 }}>
-          build {buildNo} · {buildDate}
+          commit {commitId}
         </span>
 
         {/* Dark/Light mode toggle */}
