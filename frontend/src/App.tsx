@@ -91,36 +91,39 @@ export default function App() {
       </main>
 
       {dataLoading && (
-        <div style={{
-          position: 'fixed',
-          right: 16,
-          bottom: 16,
-          zIndex: 450,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '8px 12px',
-          borderRadius: 999,
-          background: isDark ? '#1E293B' : '#FFFFFF',
-          border: `1px solid ${isDark ? '#334155' : C.border}`,
-          boxShadow: C.shadow2,
-        }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 450, cursor: 'wait' }}>
+          <div style={{ position: 'absolute', inset: 0, background: isDark ? 'rgba(15,23,42,0.24)' : 'rgba(255,255,255,0.20)' }} />
           <div style={{
-            width: 14,
-            height: 14,
-            border: `2px solid ${C.primary}`,
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-          }} />
-          <span style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: isDark ? '#E2E8F0' : C.text2,
-            fontFamily: 'Poppins, sans-serif',
+            position: 'absolute',
+            right: 16,
+            bottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 12px',
+            borderRadius: 999,
+            background: isDark ? '#1E293B' : '#FFFFFF',
+            border: `1px solid ${isDark ? '#334155' : C.border}`,
+            boxShadow: C.shadow2,
+            pointerEvents: 'none',
           }}>
-            Saving...
-          </span>
+            <div style={{
+              width: 14,
+              height: 14,
+              border: `2px solid ${C.primary}`,
+              borderTopColor: 'transparent',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+            }} />
+            <span style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: isDark ? '#E2E8F0' : C.text2,
+              fontFamily: 'Poppins, sans-serif',
+            }}>
+              Saving...
+            </span>
+          </div>
         </div>
       )}
 

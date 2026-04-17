@@ -9,6 +9,7 @@ import EffortTab         from '../Effort/EffortTab';
 import ChangeRequestTab  from '../ChangeRequest/ChangeRequestTab';
 import IssuesTab         from '../Issues/IssuesTab';
 import RiskRegisterTab   from '../RiskRegister/RiskRegisterTab';
+import ProjectEnvironmentTab from './ProjectEnvironmentTab';
 import ProjectReport     from './ProjectReport';
 import { useStore }      from '../../store';
 
@@ -44,6 +45,7 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'cr',      label: 'Change Req', icon: '📝', count: changeRequests.length },
     { id: 'issues',  label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
     { id: 'risks',   label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
+    { id: 'env',     label: 'Program URL', icon: '🌐' },
     { id: 'report',  label: 'Report',     icon: '📊' },
   ];
 
@@ -102,6 +104,7 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'cr'      && <div style={{ height: '100%', overflowY: 'auto' }}><ChangeRequestTab  projectId={project.id} /></div>}
         {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
         {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} /></div>}
+        {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
       </div>
 
       {showReport && <ProjectReport project={project} onClose={() => setShowReport(false)} />}

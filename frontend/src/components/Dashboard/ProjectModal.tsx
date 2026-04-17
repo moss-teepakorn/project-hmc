@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
 import { Modal, FormRow, Input, Select, Textarea, Btn } from '../Common';
+import { buildProjectDescription, parseProjectDescription } from '../../utils/projectMeta';
 import type { Project } from '../../types';
 
 const COLORS = ['#4F46E5','#0EA5E9','#10B981','#F59E0B','#EC4899','#EF4444','#8B5CF6','#F97316'];
@@ -14,6 +15,7 @@ export default function ProjectModal({ project, onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [copyFromProjectId, setCopyFromProjectId] = useState('');
   const [copyScope, setCopyScope] = useState<'all' | 'main'>('all');
+  const parsedDescription = parseProjectDescription(project?.description ?? '');
   const [form, setForm] = useState({
     name:        project?.name        ?? '',
     code:        project?.code        ?? '',
@@ -21,7 +23,7 @@ export default function ProjectModal({ project, onClose }: Props) {
     status:      project?.status      ?? 'Planning',
     startDate:   project?.startDate   ?? '',
     endDate:     project?.endDate     ?? '',
-    description: project?.description ?? '',
+    description: parsedDescription.notes,
     color:       project?.color       ?? '#4F46E5',
   });
 
@@ -31,9 +33,13 @@ export default function ProjectModal({ project, onClose }: Props) {
     if (!form.name.trim()) { toast.error('Project name is required'); return; }
     setSaving(true);
     try {
-      if (project) { await updateProject(project.id, form); toast.success('Project updated'); }
+      const payload = {
+        ...form,
+        description: buildProjectDescription(form.description, parsedDescription.meta),
+      };
+      if (project) { await updateProject(project.id, payload); toast.success('Project updated'); }
       else {
-        const created = await createProject(form);
+        const created = await createProject(payload);
         if (copyFromProjectId) {
           await taskApi.copyFromProject(copyFromProjectId, created.id, copyScope);
           toast.success(copyScope === 'main' ? 'Project created with copied main tasks' : 'Project created with copied tasks');
