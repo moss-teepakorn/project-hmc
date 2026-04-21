@@ -111,11 +111,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string, role: UserRole = 'member') => {
     // 1. ตรวจสอบ email ใน members
-    const { data: member, error: memberError } = await supabase
-      .from('members')
-      .select('email,type')
-      .ilike('email', email.trim().toLowerCase())
-      .maybeSingle();
+    const response = await supabase.rpc('validate_member_email', { p_email: email.trim().toLowerCase() }).maybeSingle();
+    const member = response.data as { email: string; type: 'internal' | 'client' } | null;
+    const memberError = response.error;
     if (memberError || !member) {
       throw new Error('EMAIL_NOT_ALLOWED');
     }

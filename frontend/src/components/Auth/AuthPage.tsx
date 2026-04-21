@@ -26,11 +26,9 @@ export default function AuthPage() {
       return;
     }
 
-    const { data: member, error: memberError } = await supabase
-      .from('members')
-      .select('type')
-      .ilike('email', normalized)
-      .maybeSingle();
+    const response = await supabase.rpc('validate_member_email', { p_email: normalized }).maybeSingle();
+    const member = response.data as { email: string; type: 'internal' | 'client' } | null;
+    const memberError = response.error;
 
     if (memberError || !member) {
       setAllowedRole(null);
