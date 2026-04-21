@@ -108,6 +108,25 @@ create table if not exists public.project_members (
 create index if not exists idx_project_members_user on public.project_members(user_id);
 create index if not exists idx_project_members_project on public.project_members(project_id);
 
+create or replace function public.sync_project_members_for_new_profile()
+returns trigger
+language plpgsql security definer
+as $$
+begin
+  insert into public.project_members (project_id, user_id)
+  select m.project_id, new.id
+  from public.members m
+  where lower(m.email) = lower(new.email)
+  on conflict (project_id, user_id) do nothing;
+  return new;
+end;
+$$;
+
+create trigger trg_sync_project_members_on_profiles_insert
+  after insert on public.profiles
+  for each row
+  execute function public.sync_project_members_for_new_profile();
+
 create index if not exists idx_members_project on public.members(project_id);
 create index if not exists idx_members_user    on public.members(user_id);
 
