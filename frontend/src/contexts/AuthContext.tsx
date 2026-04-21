@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { useStore } from '../store';
 import type { Profile, UserRole } from '../types';
 
 interface AuthState {
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const configured = isSupabaseConfigured();
+  const fetchProjects = useStore(state => state.fetchProjects);
 
   useEffect(() => {
     if (!configured) {
@@ -42,29 +44,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    async function handleSession(s: Session | null) {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        syncProjectMemberships(s.user.email ?? '', s.user.id);
-        fetchProfile(s.user.id);
-      } else setLoading(false);
+        await syncProjectMemberships(s.user.email ?? '', s.user.id);
+        fetchProjects();
+        await fetchProfile(s.user.id);
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
+    }
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      handleSession(s);
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) {
-        syncProjectMemberships(s.user.email ?? '', s.user.id);
-        fetchProfile(s.user.id);
-      } else {
-        setProfile(null);
-        setLoading(false);
-      }
+      handleSession(s);
     });
 
     return () => subscription.unsubscribe();
