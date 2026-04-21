@@ -30,7 +30,7 @@ export default function AuthPage() {
       .from('members')
       .select('type')
       .eq('email', normalized)
-      .single();
+      .maybeSingle();
 
     if (memberError || !member) {
       setAllowedRole(null);

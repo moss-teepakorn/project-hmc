@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .from('members')
       .select('email,type')
       .eq('email', email.trim().toLowerCase())
-      .single();
+      .maybeSingle();
     if (memberError || !member) {
       throw new Error('EMAIL_NOT_ALLOWED');
     }
