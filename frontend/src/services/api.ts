@@ -18,17 +18,20 @@ export async function updateUserRole(userId: string, newRole: 'admin' | 'member'
 export async function checkProjectPermission(projectId: string, action: 'read' | 'write'): Promise<boolean> {
   const { role, userId } = await getCurrentUserRoleAndId();
   if (role === 'admin') return true;
-  // Client can only read
-  if (role === 'client') return action === 'read';
-  // Member: must be part of project
-  const { data: pmember, error } = await supabase
+  if (role === 'client') return action === 'read' && await isProjectMember(projectId, userId);
+  if (role === 'member') return await isProjectMember(projectId, userId);
+  return false;
+}
+
+async function isProjectMember(projectId: string, userId: string): Promise<boolean> {
+  const { data, error } = await supabase
     .from('project_members')
     .select('id')
     .eq('user_id', userId)
     .eq('project_id', projectId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return !!pmember;
+  return !!data;
 }
 
 // helper: get current user id and role
@@ -86,16 +89,7 @@ function rowsToObjs<T>(rows: Record<string, unknown>[]): T[] {
 
 export const projectApi = {
   getAll: async (): Promise<{ data: Project[] }> => {
-    // Get current user profile for role
-    const { data: userData } = await supabase.auth.getUser();
-    let role = 'member';
-    let userId = '';
-    if (userData?.user?.id) {
-      userId = userData.user.id;
-      // fetch profile for role
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single();
-      if (profile?.role) role = profile.role;
-    }
+    const { role, userId } = await getCurrentUserRoleAndId();
     if (role === 'admin') {
       // Admin เห็นทุก project
       const { data, error } = await supabase
@@ -126,7 +120,6 @@ export const projectApi = {
   create: async (p: Partial<Project>): Promise<{ data: Project }> => {
     const { role } = await getCurrentUserRoleAndId();
     if (role !== 'admin') throw new Error('FORBIDDEN');
-
     const row = objToRow(p as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -143,7 +136,6 @@ export const projectApi = {
   update: async (id: string, p: Partial<Project>): Promise<{ data: Project }> => {
     const can = await checkProjectPermission(id, 'write');
     if (!can) throw new Error('FORBIDDEN');
-
     const row = objToRow(p as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -161,7 +153,6 @@ export const projectApi = {
   remove: async (id: string): Promise<void> => {
     const can = await checkProjectPermission(id, 'write');
     if (!can) throw new Error('FORBIDDEN');
-
     const { error } = await supabase.from('projects').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
