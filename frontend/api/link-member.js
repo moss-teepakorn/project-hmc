@@ -19,10 +19,14 @@ export default async function handler(req, res) {
       body: JSON.stringify({ p_email: email }),
     });
     const rpcData = await rpcResp.json();
-    if (!Array.isArray(rpcData) || rpcData.length === 0) return res.status(404).json({ error: 'No matching member rows' });
+    if (!Array.isArray(rpcData) || rpcData.length === 0) {
+      return res.status(200).json({ message: 'No matching member rows', linked: [] });
+    }
 
     const projectIds = Array.from(new Set(rpcData.map((r) => r.project_id).filter(Boolean)));
-    if (projectIds.length === 0) return res.status(404).json({ error: 'No project mapped for that email' });
+    if (projectIds.length === 0) {
+      return res.status(200).json({ message: 'No project mapped for that email', linked: [] });
+    }
 
     // 2) find existing project_members for this user to avoid duplicates
     const existingResp = await fetch(`${SUPABASE_URL}/rest/v1/project_members?user_id=eq.${userId}&select=project_id`, {
