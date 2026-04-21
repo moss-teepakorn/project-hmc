@@ -130,10 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('ROLE_TYPE_MISMATCH');
     }
 
-    // 4. ห้ามสร้าง admin
-    if (role === 'admin') {
-      throw new Error('FORBIDDEN');
-    }
+    // 4. ห้ามสร้าง admin (redundant, already enforced by allowedRole)
 
     const { error } = await supabase.auth.signUp({
       email,

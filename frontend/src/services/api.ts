@@ -1,11 +1,11 @@
 // ── User Role Management (Admin Only) ─────────────────────────────────────
 export async function updateUserRole(userId: string, newRole: 'admin' | 'member' | 'client'): Promise<void> {
   // Get current user profile for role
-  const user = supabase.auth.user?.() || supabase.auth.getUser?.();
+  const { data: userData } = await supabase.auth.getUser();
   let role = 'member';
   let myId = '';
-  if (user) {
-    myId = user.id || user.user?.id || '';
+  if (userData?.user?.id) {
+    myId = userData.user.id;
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', myId).single();
     if (profile?.role) role = profile.role;
   }
@@ -17,11 +17,11 @@ export async function updateUserRole(userId: string, newRole: 'admin' | 'member'
 // ── RBAC Utility ──────────────────────────────────────────────────────────
 export async function checkProjectPermission(projectId: string, action: 'read' | 'write'): Promise<boolean> {
   // Get current user profile for role
-  const user = supabase.auth.user?.() || supabase.auth.getUser?.();
+  const { data: userData } = await supabase.auth.getUser();
   let role = 'member';
   let userId = '';
-  if (user) {
-    userId = user.id || user.user?.id || '';
+  if (userData?.user?.id) {
+    userId = userData.user.id;
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single();
     if (profile?.role) role = profile.role;
   }
@@ -76,11 +76,11 @@ function rowsToObjs<T>(rows: Record<string, unknown>[]): T[] {
 export const projectApi = {
   getAll: async (): Promise<{ data: Project[] }> => {
     // Get current user profile for role
-    const user = supabase.auth.user?.() || supabase.auth.getUser?.();
+    const { data: userData } = await supabase.auth.getUser();
     let role = 'member';
     let userId = '';
-    if (user) {
-      userId = user.id || user.user?.id || '';
+    if (userData?.user?.id) {
+      userId = userData.user.id;
       // fetch profile for role
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single();
       if (profile?.role) role = profile.role;

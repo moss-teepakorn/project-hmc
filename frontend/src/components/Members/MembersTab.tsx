@@ -6,6 +6,7 @@ import { Card, Btn, Badge, Avatar, Modal, FormRow, Input, Select, Textarea, Conf
 import { roleColor } from '../../utils';
 import type { Member, Profile, UserRole } from '../../types';
 import { updateUserRole } from '../../services/api';
+import { supabase } from '../../services/supabase';
 
 export const ROLES = [
   'Project Sponsor', 'Project Advisor', 'Project Leader', 'Project Manager',
@@ -29,13 +30,13 @@ export default function MembersTab({ projectId }: Props) {
     fetchMembers(projectId);
     // Fetch all profiles for role info
     (async () => {
-      const { data, error } = await C.supabase.from('profiles').select('*');
+      const { data, error } = await supabase.from('profiles').select('*');
       if (!error) setProfiles(data || []);
       // Get current user role
-      const user = C.supabase.auth.user?.() || C.supabase.auth.getUser?.();
+      const { data: userData } = await supabase.auth.getUser();
       let role: UserRole = 'member';
-      if (user) {
-        const { data: profile } = await C.supabase.from('profiles').select('role').eq('id', user.id || user.user?.id || '').single();
+      if (userData?.user?.id) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', userData.user.id).single();
         if (profile?.role) role = profile.role;
       }
       setCurrentUserRole(role);
@@ -57,10 +58,12 @@ export default function MembersTab({ projectId }: Props) {
   // PATCH user role (admin only)
   const handlePatchRole = async (userId: string, newRole: UserRole) => {
     try {
-      await updateUserRole(userId, newRole);
+      // Only allow 'admin', 'member', 'client'
+      if (!['admin','member','client'].includes(newRole)) throw new Error('Invalid role');
+      await updateUserRole(userId, newRole as 'admin' | 'member' | 'client');
       toast.success('Role updated');
       // reload profiles
-      const { data } = await C.supabase.from('profiles').select('*');
+      const { data } = await supabase.from('profiles').select('*');
       setProfiles(data || []);
     } catch (e: any) {
       toast.error(e.message || 'Failed to update role');
