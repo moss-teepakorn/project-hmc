@@ -69,17 +69,22 @@ export function useRealtimeSubscription(projectId: string | undefined) {
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
-    const channel = supabase
+    const projectChannel = supabase
       .channel('projects-global')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'projects' },
         () => { fetchProjects(); }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'project_members' },
+        () => { fetchProjects(); }
+      )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(projectChannel);
     };
   }, [fetchProjects]);
 }
