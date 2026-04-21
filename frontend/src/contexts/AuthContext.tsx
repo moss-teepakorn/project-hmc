@@ -110,32 +110,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string, role: UserRole = 'member') => {
-    // 1. ตรวจสอบ email ใน members
-    const response = await supabase.rpc('validate_member_email', { p_email: email.trim().toLowerCase() }).maybeSingle();
-    const member = response.data as { email: string; type: 'internal' | 'client' } | null;
+    const normalized = email.trim().toLowerCase();
+    // 1. ตรวจสอบ email ใน members (RPC now returns project_id rows)
+    const response = await supabase.rpc('validate_member_email', { p_email: normalized });
+    const members = (response.data as Array<{ email: string; type: 'internal' | 'client'; project_id?: string }>) || [];
     const memberError = response.error;
-    if (memberError || !member) {
-      throw new Error('EMAIL_NOT_ALLOWED');
-    }
+    if (memberError || !members || members.length === 0) throw new Error('EMAIL_NOT_ALLOWED');
 
+    const member = members[0];
     // 2. กำหนด role ตาม type
     let allowedRole: UserRole = 'member';
     if (member.type === 'internal') allowedRole = 'member';
     else if (member.type === 'client') allowedRole = 'client';
 
     // 3. ถ้าเลือก role ไม่ตรง type
-    if (role !== allowedRole) {
-      throw new Error('ROLE_TYPE_MISMATCH');
-    }
+    if (role !== allowedRole) throw new Error('ROLE_TYPE_MISMATCH');
 
     // 4. ห้ามสร้าง admin (redundant, already enforced by allowedRole)
 
-    const { error } = await supabase.auth.signUp({
-      email,
+    const { data: signupData, error: signupError } = await supabase.auth.signUp({
+      email: normalized,
       password,
       options: { data: { full_name: fullName, role: allowedRole } },
     });
-    if (error) throw new Error(error.message);
+    if (signupError) throw new Error(signupError.message);
+
+    const createdUserId = (signupData as any)?.user?.id;
+    // try to link the created profile to project(s) using serverless endpoint
+    if (createdUserId) {
+      try {
+        await fetch('/api/link-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalized, userId: createdUserId }),
+        });
+      } catch (e) {
+        // non-fatal: linking can be retried by admin or via migration if it fails
+        console.warn('link-member failed', e);
+      }
+    }
   };
 
   const signOut = async () => {

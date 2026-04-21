@@ -26,17 +26,18 @@ export default function AuthPage() {
       return;
     }
 
-    const response = await supabase.rpc('validate_member_email', { p_email: normalized }).maybeSingle();
-    const member = response.data as { email: string; type: 'internal' | 'client' } | null;
+    const response = await supabase.rpc('validate_member_email', { p_email: normalized });
+    const members = (response.data as Array<{ email: string; type: 'internal' | 'client'; project_id?: string }>) || [];
     const memberError = response.error;
 
-    if (memberError || !member) {
+    if (memberError || !members || members.length === 0) {
       setAllowedRole(null);
       setEmailError('EMAIL_NOT_ALLOWED');
       setRole('member');
       return;
     }
 
+    const member = members[0];
     setEmailError('');
     if (member.type === 'client') {
       setAllowedRole('client');

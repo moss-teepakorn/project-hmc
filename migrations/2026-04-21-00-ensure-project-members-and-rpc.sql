@@ -15,12 +15,13 @@ create index if not exists idx_project_members_user on public.project_members(us
 create index if not exists idx_project_members_project on public.project_members(project_id);
 
 -- ensure the RPC exists (security definer for RLS safety)
-create or replace function public.validate_member_email(p_email text)
-returns table(email text, type text)
+-- drop existing version first to allow changing return row type
+drop function if exists public.validate_member_email(text);
+create function public.validate_member_email(p_email text)
+returns table(email text, type text, project_id uuid)
 language sql security definer stable
 as $$
-  select email, type
+  select email, type, project_id
   from public.members
-  where lower(email) = lower(p_email)
-  limit 1;
+  where lower(email) = lower(p_email);
 $$;

@@ -328,14 +328,15 @@ create policy "Authenticated can update members"
 create policy "Authenticated can delete members"
   on public.members for delete using (auth.uid() is not null);
 
-create or replace function public.validate_member_email(p_email text)
-returns table(email text, type text)
+-- drop existing version first to allow changing return row type
+drop function if exists public.validate_member_email(text);
+create function public.validate_member_email(p_email text)
+returns table(email text, type text, project_id uuid)
 language sql security definer stable
 as $$
-  select email, type
+  select email, type, project_id
   from public.members
-  where lower(email) = lower(p_email)
-  limit 1;
+  where lower(email) = lower(p_email);
 $$;
 
 -- TASKS
