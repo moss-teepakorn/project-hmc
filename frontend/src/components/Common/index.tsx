@@ -73,10 +73,10 @@ export const Textarea: React.FC<{ value: string; onChange: (v: string) => void; 
 
 export const Select: React.FC<{
   value: string; onChange: (v: string) => void;
-  options: { value: string; label: string }[]; style?: React.CSSProperties;
-}> = ({ value, onChange, options, style }) => (
-  <select value={value} onChange={e => onChange(e.target.value)}
-    style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, padding: '8px 12px', border: `1.5px solid ${C.border}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box', color: C.text, background: C.white, ...style }}
+  options: { value: string; label: string }[]; style?: React.CSSProperties; disabled?: boolean;
+}> = ({ value, onChange, options, style, disabled = false }) => (
+  <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled}
+    style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, padding: '8px 12px', border: `1.5px solid ${C.border}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box', color: C.text, background: disabled ? '#F8FAFC' : C.white, ...style }}
     onFocus={e => (e.target.style.borderColor = C.primary)}
     onBlur={e  => (e.target.style.borderColor = C.border)}>
     {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
