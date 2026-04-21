@@ -46,8 +46,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) fetchProfile(s.user.id);
-      else setLoading(false);
+      if (s?.user) {
+        syncProjectMemberships(s.user.email ?? '', s.user.id);
+        fetchProfile(s.user.id);
+      } else setLoading(false);
     });
 
     // Listen for auth changes
@@ -56,8 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) fetchProfile(s.user.id);
-      else {
+      if (s?.user) {
+        syncProjectMemberships(s.user.email ?? '', s.user.id);
+        fetchProfile(s.user.id);
+      } else {
         setProfile(null);
         setLoading(false);
       }
@@ -109,6 +113,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  async function syncProjectMemberships(email: string, userId: string) {
+    if (!email || !userId) return;
+    try {
+      const response = await fetch('/api/link-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), userId }),
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        console.warn('link-member failed', response.status, body);
+      }
+    } catch (e) {
+      console.warn('link-member failed', e);
+    }
+  }
+
   const signUp = async (email: string, password: string, fullName: string, role: UserRole = 'member') => {
     const normalized = email.trim().toLowerCase();
     // 1. ตรวจสอบ email ใน members (RPC now returns project_id rows)
@@ -136,18 +157,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (signupError) throw new Error(signupError.message);
 
     const createdUserId = (signupData as any)?.user?.id;
-    // try to link the created profile to project(s) using serverless endpoint
     if (createdUserId) {
-      try {
-        await fetch('/api/link-member', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: normalized, userId: createdUserId }),
-        });
-      } catch (e) {
-        // non-fatal: linking can be retried by admin or via migration if it fails
-        console.warn('link-member failed', e);
-      }
+      await syncProjectMemberships(normalized, createdUserId);
     }
   };
 
