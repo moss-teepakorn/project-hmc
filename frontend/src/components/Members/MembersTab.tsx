@@ -174,13 +174,13 @@ export default function MembersTab({ projectId }: Props) {
         {shown.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: C.text3 }}>No members yet.</div>}
       </Card>
 
-      {modal !== null && <MemberModal data={modal} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal !== null && <MemberModal data={modal} currentUserRole={currentUserRole} onClose={() => setModal(null)} onSave={handleSave} />}
       {deleting && <ConfirmModal message={`Remove ${deleting.name}?`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
     </div>
   );
 }
 
-function MemberModal({ data, onClose, onSave }: { data: Partial<Member>; onClose: () => void; onSave: (f: Partial<Member>) => void }) {
+function MemberModal({ data, currentUserRole, onClose, onSave }: { data: Partial<Member>; currentUserRole: UserRole; onClose: () => void; onSave: (f: Partial<Member>) => void }) {
   const [form, setForm] = useState<Partial<Member>>({ name: '', nickname: '', role: '', position: '', email: '', tel: '', type: 'internal', notes: '', ...data });
   const up = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
   return (
@@ -198,7 +198,10 @@ function MemberModal({ data, onClose, onSave }: { data: Partial<Member>; onClose
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <FormRow label="Role">
           <Select value={form.role ?? ''} onChange={v => up('role', v)}
-            options={[{ value: '', label: 'Select role…' }, ...ROLES.map(r => ({ value: r, label: r }))]} />
+            options={[{ value: '', label: 'Select role…' }, ...ROLES.map(r => ({ value: r, label: r }))]}
+            disabled={currentUserRole !== 'admin'}
+          />
+          {currentUserRole !== 'admin' && <div style={{ fontSize: 11, color: C.text3, marginTop: 6 }}>Only admins can change profile role.</div>}
         </FormRow>
         <FormRow label="Position"><Input value={form.position ?? ''} onChange={v => up('position', v)} placeholder="e.g. Senior Developer" /></FormRow>
       </div>
