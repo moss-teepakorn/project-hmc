@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: member, error: memberError } = await supabase
       .from('members')
       .select('email,type')
-      .eq('email', email.trim().toLowerCase())
+      .ilike('email', email.trim().toLowerCase())
       .maybeSingle();
     if (memberError || !member) {
       throw new Error('EMAIL_NOT_ALLOWED');

@@ -29,7 +29,7 @@ export default function AuthPage() {
     const { data: member, error: memberError } = await supabase
       .from('members')
       .select('type')
-      .eq('email', normalized)
+      .ilike('email', normalized)
       .maybeSingle();
 
     if (memberError || !member) {
