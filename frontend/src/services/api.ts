@@ -1,3 +1,38 @@
+// ── User Role Management (Admin Only) ─────────────────────────────────────
+export async function updateUserRole(userId: string, newRole: 'admin' | 'member' | 'client'): Promise<void> {
+  // Get current user profile for role
+  const user = supabase.auth.user?.() || supabase.auth.getUser?.();
+  let role = 'member';
+  let myId = '';
+  if (user) {
+    myId = user.id || user.user?.id || '';
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', myId).single();
+    if (profile?.role) role = profile.role;
+  }
+  if (role !== 'admin') throw new Error('FORBIDDEN');
+  if (!['admin','member','client'].includes(newRole)) throw new Error('INVALID_ROLE');
+  const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+  if (error) throw new Error(error.message);
+}
+// ── RBAC Utility ──────────────────────────────────────────────────────────
+export async function checkProjectPermission(projectId: string, action: 'read' | 'write'): Promise<boolean> {
+  // Get current user profile for role
+  const user = supabase.auth.user?.() || supabase.auth.getUser?.();
+  let role = 'member';
+  let userId = '';
+  if (user) {
+    userId = user.id || user.user?.id || '';
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single();
+    if (profile?.role) role = profile.role;
+  }
+  if (role === 'admin') return true;
+  // Check membership
+  const { data: pmember } = await supabase.from('project_members').select('id').eq('user_id', userId).eq('project_id', projectId).single();
+  if (!pmember) return false;
+  if (role === 'member') return true;
+  if (role === 'client') return action === 'read';
+  return false;
+}
 // ===== SUPABASE API SERVICE =====
 // All data operations go through Supabase PostgreSQL directly.
 // No custom backend needed.
@@ -40,12 +75,41 @@ function rowsToObjs<T>(rows: Record<string, unknown>[]): T[] {
 
 export const projectApi = {
   getAll: async (): Promise<{ data: Project[] }> => {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .order('created_at', { ascending: true });
-    if (error) throw new Error(error.message);
-    return { data: rowsToObjs<Project>(data || []) };
+    // Get current user profile for role
+    const user = supabase.auth.user?.() || supabase.auth.getUser?.();
+    let role = 'member';
+    let userId = '';
+    if (user) {
+      userId = user.id || user.user?.id || '';
+      // fetch profile for role
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single();
+      if (profile?.role) role = profile.role;
+    }
+    if (role === 'admin') {
+      // Admin เห็นทุก project
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (error) throw new Error(error.message);
+      return { data: rowsToObjs<Project>(data || []) };
+    } else {
+      // Member/Client เห็นเฉพาะ project ที่อยู่ใน project_members
+      const { data: pmembers, error: pmemErr } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', userId);
+      if (pmemErr) throw new Error(pmemErr.message);
+      const projectIds = (pmembers || []).map((p: any) => p.project_id);
+      if (!projectIds.length) return { data: [] };
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .in('id', projectIds)
+        .order('created_at', { ascending: true });
+      if (error) throw new Error(error.message);
+      return { data: rowsToObjs<Project>(data || []) };
+    }
   },
 
   create: async (p: Partial<Project>): Promise<{ data: Project }> => {

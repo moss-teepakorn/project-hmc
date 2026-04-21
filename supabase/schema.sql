@@ -94,8 +94,19 @@ create table if not exists public.members (
   type        text not null default 'internal' check (type in ('internal','client')),
   notes       text not null default '',
   user_id     uuid references public.profiles(id),
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  unique(email)
 );
+-- PROJECT MEMBERS (for project visibility)
+create table if not exists public.project_members (
+  id uuid primary key default uuid_generate_v4(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique(project_id, user_id)
+);
+create index if not exists idx_project_members_user on public.project_members(user_id);
+create index if not exists idx_project_members_project on public.project_members(project_id);
 
 create index if not exists idx_members_project on public.members(project_id);
 create index if not exists idx_members_user    on public.members(user_id);

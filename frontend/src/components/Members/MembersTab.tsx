@@ -4,7 +4,8 @@ import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, Avatar, Modal, FormRow, Input, Select, Textarea, ConfirmModal, C, TH, TD } from '../Common';
 import { roleColor } from '../../utils';
-import type { Member } from '../../types';
+import type { Member, Profile, UserRole } from '../../types';
+import { updateUserRole } from '../../services/api';
 
 export const ROLES = [
   'Project Sponsor', 'Project Advisor', 'Project Leader', 'Project Manager',
@@ -18,11 +19,28 @@ interface Props { projectId: string; }
 
 export default function MembersTab({ projectId }: Props) {
   const { members, fetchMembers, createMember, updateMember, deleteMember } = useStore();
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole>('member');
   const [filter, setFilter]     = useState<'all' | 'internal' | 'client'>('all');
   const [modal, setModal]       = useState<Partial<Member> | null>(null);
   const [deleting, setDeleting] = useState<Member | null>(null);
 
-  useEffect(() => { fetchMembers(projectId); }, [projectId]);
+  useEffect(() => {
+    fetchMembers(projectId);
+    // Fetch all profiles for role info
+    (async () => {
+      const { data, error } = await C.supabase.from('profiles').select('*');
+      if (!error) setProfiles(data || []);
+      // Get current user role
+      const user = C.supabase.auth.user?.() || C.supabase.auth.getUser?.();
+      let role: UserRole = 'member';
+      if (user) {
+        const { data: profile } = await C.supabase.from('profiles').select('role').eq('id', user.id || user.user?.id || '').single();
+        if (profile?.role) role = profile.role;
+      }
+      setCurrentUserRole(role);
+    })();
+  }, [projectId]);
 
   const shown    = filter === 'all' ? members : members.filter(m => m.type === filter);
   const internal = members.filter(m => m.type === 'internal');
@@ -34,6 +52,19 @@ export default function MembersTab({ projectId }: Props) {
       else         { await createMember({ ...form, projectId }); toast.success('Member added'); }
       setModal(null);
     } catch { toast.error('Failed to save'); }
+  };
+
+  // PATCH user role (admin only)
+  const handlePatchRole = async (userId: string, newRole: UserRole) => {
+    try {
+      await updateUserRole(userId, newRole);
+      toast.success('Role updated');
+      // reload profiles
+      const { data } = await C.supabase.from('profiles').select('*');
+      setProfiles(data || []);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update role');
+    }
   };
 
   const handleDelete = async () => {
@@ -92,9 +123,31 @@ export default function MembersTab({ projectId }: Props) {
                 </td>
                 <td style={{ ...TD, color: C.text2 }}>{mb.nickname}</td>
                 <td style={TD}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: roleColor(mb.role), background: roleColor(mb.role) + '18', padding: '3px 10px', borderRadius: 20 }}>
-                    {mb.role || '—'}
-                  </span>
+                  {/* Show role from profile if available */}
+                  {(() => {
+                    const profile = profiles.find(p => p.email === mb.email);
+                    const role = profile?.role || mb.role || '—';
+                    if (currentUserRole === 'admin' && profile) {
+                      return (
+                        <span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: roleColor(role), background: roleColor(role) + '18', padding: '3px 10px', borderRadius: 20, marginRight: 6 }}>{role}</span>
+                          <select
+                            value={role}
+                            onChange={e => handlePatchRole(profile.id, e.target.value as UserRole)}
+                            style={{ fontSize: 11, borderRadius: 6, border: '1px solid #ddd', padding: '2px 6px' }}
+                          >
+                            <option value="admin">admin</option>
+                            <option value="member">member</option>
+                            <option value="client">client</option>
+                          </select>
+                        </span>
+                      );
+                    } else {
+                      return (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: roleColor(role), background: roleColor(role) + '18', padding: '3px 10px', borderRadius: 20 }}>{role}</span>
+                      );
+                    }
+                  })()}
                 </td>
                 <td style={{ ...TD, color: C.text2, fontSize: 11 }}>{mb.position || '—'}</td>
                 <td style={{ ...TD, color: C.blue }}>{mb.email}</td>

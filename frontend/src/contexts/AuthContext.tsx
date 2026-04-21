@@ -110,10 +110,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string, role: UserRole = 'member') => {
+    // 1. ตรวจสอบ email ใน members
+    const { data: member, error: memberError } = await supabase
+      .from('members')
+      .select('email,type')
+      .eq('email', email.trim().toLowerCase())
+      .single();
+    if (memberError || !member) {
+      throw new Error('EMAIL_NOT_ALLOWED');
+    }
+
+    // 2. กำหนด role ตาม type
+    let allowedRole: UserRole = 'member';
+    if (member.type === 'internal') allowedRole = 'member';
+    else if (member.type === 'client') allowedRole = 'client';
+
+    // 3. ถ้าเลือก role ไม่ตรง type
+    if (role !== allowedRole) {
+      throw new Error('ROLE_TYPE_MISMATCH');
+    }
+
+    // 4. ห้ามสร้าง admin
+    if (role === 'admin') {
+      throw new Error('FORBIDDEN');
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, role } },
+      options: { data: { full_name: fullName, role: allowedRole } },
     });
     if (error) throw new Error(error.message);
   };
