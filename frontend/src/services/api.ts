@@ -16,14 +16,47 @@ export async function updateUserRole(userId: string, newRole: 'admin' | 'member'
 }
 // ── RBAC Utility ──────────────────────────────────────────────────────────
 export async function checkProjectPermission(projectId: string, action: 'read' | 'write'): Promise<boolean> {
-  const { role, userId } = await getCurrentUserRoleAndId();
+  const { role, userId, email } = await getCurrentUserRoleAndId();
   if (role === 'admin') return true;
-  if (role === 'client') return action === 'read' && await isProjectMember(projectId, userId);
-  if (role === 'member') return await isProjectMember(projectId, userId);
+  if (role === 'client') return action === 'read' && await isProjectMember(projectId, userId, email);
+  if (role === 'member') return await isProjectMember(projectId, userId, email);
   return false;
 }
 
-async function isProjectMember(projectId: string, userId: string): Promise<boolean> {
+async function getProjectIdsFromMembership(userId: string, email: string | null): Promise<string[]> {
+  const ids = new Set<string>();
+
+  if (userId) {
+    const { data: pmData, error: pmErr } = await supabase
+      .from('project_members')
+      .select('project_id')
+      .eq('user_id', userId);
+    if (pmErr) throw new Error(pmErr.message);
+    (pmData || []).forEach((row: any) => { if (row.project_id) ids.add(row.project_id); });
+  }
+
+  if (ids.size === 0 && email) {
+    const { data: memberRows, error: memberErr } = await supabase
+      .from('members')
+      .select('project_id')
+      .ilike('email', email);
+    if (memberErr) throw new Error(memberErr.message);
+    (memberRows || []).forEach((row: any) => { if (row.project_id) ids.add(row.project_id); });
+  }
+
+  if (ids.size === 0 && userId) {
+    const { data: memberRows, error: memberErr } = await supabase
+      .from('members')
+      .select('project_id')
+      .eq('user_id', userId);
+    if (memberErr) throw new Error(memberErr.message);
+    (memberRows || []).forEach((row: any) => { if (row.project_id) ids.add(row.project_id); });
+  }
+
+  return Array.from(ids);
+}
+
+async function isProjectMember(projectId: string, userId: string, email: string | null): Promise<boolean> {
   const { data, error } = await supabase
     .from('project_members')
     .select('id')
@@ -31,21 +64,36 @@ async function isProjectMember(projectId: string, userId: string): Promise<boole
     .eq('project_id', projectId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return !!data;
+  if (data) return true;
+
+  if (!email) return false;
+  const { data: memberData, error: memberErr } = await supabase
+    .from('members')
+    .select('project_id')
+    .eq('project_id', projectId)
+    .ilike('email', email)
+    .limit(1);
+  if (memberErr) throw new Error(memberErr.message);
+  return Array.isArray(memberData) && memberData.length > 0;
 }
 
 // helper: get current user id and role
-export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId: string }>{
+export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId: string; email: string | null }> {
   const { data: userData } = await supabase.auth.getUser();
   let role = 'member';
   let userId = '';
+  let email: string | null = null;
   if (userData?.user?.id) {
     userId = userData.user.id;
-    const { data: profile, error } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle();
+    const { data: profile, error } = await supabase.from('profiles').select('role,email').eq('id', userId).maybeSingle();
     if (error) throw new Error(error.message);
     if ((profile as any)?.role) role = (profile as any).role;
+    if ((profile as any)?.email) email = (profile as any).email;
+    if (!email && userData.user.email) {
+      email = userData.user.email;
+    }
   }
-  return { role, userId };
+  return { role, userId, email };
 }
 // ===== SUPABASE API SERVICE =====
 // All data operations go through Supabase PostgreSQL directly.
@@ -89,7 +137,7 @@ function rowsToObjs<T>(rows: Record<string, unknown>[]): T[] {
 
 export const projectApi = {
   getAll: async (): Promise<{ data: Project[] }> => {
-    const { role, userId } = await getCurrentUserRoleAndId();
+    const { role, userId, email } = await getCurrentUserRoleAndId();
     if (role === 'admin') {
       // Admin เห็นทุก project
       const { data, error } = await supabase
@@ -99,13 +147,8 @@ export const projectApi = {
       if (error) throw new Error(error.message);
       return { data: rowsToObjs<Project>(data || []) };
     } else {
-      // Member/Client เห็นเฉพาะ project ที่อยู่ใน project_members
-      const { data: pmembers, error: pmemErr } = await supabase
-        .from('project_members')
-        .select('project_id')
-        .eq('user_id', userId);
-      if (pmemErr) throw new Error(pmemErr.message);
-      const projectIds = (pmembers || []).map((p: any) => p.project_id);
+      // Member/Client เห็นเฉพาะ project ที่อยู่ใน project_members หรือ members
+      const projectIds = await getProjectIdsFromMembership(userId, email);
       if (!projectIds.length) return { data: [] };
       const { data, error } = await supabase
         .from('projects')
