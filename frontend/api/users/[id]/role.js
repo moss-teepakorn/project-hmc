@@ -1,6 +1,6 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
 
   const { id } = req.query;
@@ -16,18 +16,16 @@ module.exports = async (req, res) => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { global: { headers: { 'x-application-role': 'server' } } });
 
-  // Expect caller's access token in Authorization header
-  const auth = (req.headers.authorization || '').split(' ');
-  const accessToken = auth[0] === 'Bearer' ? auth[1] : auth[0] || null;
+  const authHeader = req.headers.authorization || '';
+  const authParts = authHeader.split(' ');
+  const accessToken = authParts[0] === 'Bearer' ? authParts[1] : authParts[0] || null;
   if (!accessToken) return res.status(401).json({ error: 'MISSING_TOKEN' });
 
-  // Verify caller user
   const { data: callerUser, error: callerErr } = await supabase.auth.getUser(accessToken);
   if (callerErr || !callerUser?.user) return res.status(401).json({ error: 'INVALID_TOKEN' });
 
   const callerId = callerUser.user.id;
 
-  // Check caller role from profiles table
   const { data: callerProfile, error: profErr } = await supabase
     .from('profiles')
     .select('role')
@@ -36,9 +34,8 @@ module.exports = async (req, res) => {
   if (profErr) return res.status(500).json({ error: profErr.message });
   if (!callerProfile || callerProfile.role !== 'admin') return res.status(403).json({ error: 'FORBIDDEN' });
 
-  // Update target user's role
   const { error: updErr } = await supabase.from('profiles').update({ role }).eq('id', id);
   if (updErr) return res.status(500).json({ error: updErr.message });
 
   return res.status(200).json({ ok: true });
-};
+}
