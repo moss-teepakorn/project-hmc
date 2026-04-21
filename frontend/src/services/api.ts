@@ -16,22 +16,33 @@ export async function updateUserRole(userId: string, newRole: 'admin' | 'member'
 }
 // ── RBAC Utility ──────────────────────────────────────────────────────────
 export async function checkProjectPermission(projectId: string, action: 'read' | 'write'): Promise<boolean> {
-  // Get current user profile for role
+  const { role, userId } = await getCurrentUserRoleAndId();
+  if (role === 'admin') return true;
+  // Client can only read
+  if (role === 'client') return action === 'read';
+  // Member: must be part of project
+  const { data: pmember, error } = await supabase
+    .from('project_members')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('project_id', projectId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return !!pmember;
+}
+
+// helper: get current user id and role
+export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId: string }>{
   const { data: userData } = await supabase.auth.getUser();
   let role = 'member';
   let userId = '';
   if (userData?.user?.id) {
     userId = userData.user.id;
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single();
-    if (profile?.role) role = profile.role;
+    const { data: profile, error } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle();
+    if (error) throw new Error(error.message);
+    if ((profile as any)?.role) role = (profile as any).role;
   }
-  if (role === 'admin') return true;
-  // Check membership
-  const { data: pmember } = await supabase.from('project_members').select('id').eq('user_id', userId).eq('project_id', projectId).single();
-  if (!pmember) return false;
-  if (role === 'member') return true;
-  if (role === 'client') return action === 'read';
-  return false;
+  return { role, userId };
 }
 // ===== SUPABASE API SERVICE =====
 // All data operations go through Supabase PostgreSQL directly.
@@ -113,6 +124,9 @@ export const projectApi = {
   },
 
   create: async (p: Partial<Project>): Promise<{ data: Project }> => {
+    const { role } = await getCurrentUserRoleAndId();
+    if (role !== 'admin') throw new Error('FORBIDDEN');
+
     const row = objToRow(p as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -127,6 +141,9 @@ export const projectApi = {
   },
 
   update: async (id: string, p: Partial<Project>): Promise<{ data: Project }> => {
+    const can = await checkProjectPermission(id, 'write');
+    if (!can) throw new Error('FORBIDDEN');
+
     const row = objToRow(p as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -142,6 +159,9 @@ export const projectApi = {
   },
 
   remove: async (id: string): Promise<void> => {
+    const can = await checkProjectPermission(id, 'write');
+    if (!can) throw new Error('FORBIDDEN');
+
     const { error } = await supabase.from('projects').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
@@ -246,6 +266,11 @@ export const taskApi = {
       row.order = requestedOrder;
     }
 
+    // permission: must have write access to project
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const okCreate = await checkProjectPermission(projectId, 'write');
+    if (!okCreate) throw new Error('FORBIDDEN');
+
     const { data, error } = await supabase
       .from('tasks')
       .insert(row)
@@ -265,6 +290,13 @@ export const taskApi = {
     const row = objToRow(t as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
+    // permission: must have write access to project
+    const { data: existing } = await supabase.from('tasks').select('project_id').eq('id', id).maybeSingle();
+    const projectIdForUpdate = (existing as any)?.project_id || row.project_id;
+    if (!projectIdForUpdate) throw new Error('MISSING_PROJECT_ID');
+    const okUpdate = await checkProjectPermission(projectIdForUpdate, 'write');
+    if (!okUpdate) throw new Error('FORBIDDEN');
+
     const { data, error } = await supabase
       .from('tasks')
       .update(row)
@@ -306,6 +338,9 @@ export const taskApi = {
       .eq('id', id)
       .single();
     const projectId = taskData?.project_id;
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const okRemove = await checkProjectPermission(projectId, 'write');
+    if (!okRemove) throw new Error('FORBIDDEN');
     // Delete task and children
     await deleteTaskAndChildren(id);
     if (projectId) {
@@ -512,6 +547,10 @@ function recalcParents(tasks: Task[]): Task[] {
 
 export const memberApi = {
   getByProject: async (pid?: string): Promise<{ data: Member[] }> => {
+    if (pid) {
+      const ok = await checkProjectPermission(pid, 'read');
+      if (!ok) throw new Error('FORBIDDEN');
+    }
     let q = supabase.from('members').select('*');
     if (pid) q = q.eq('project_id', pid);
     q = q.order('created_at', { ascending: true });
@@ -521,6 +560,11 @@ export const memberApi = {
   },
 
   create: async (m: Partial<Member>): Promise<{ data: Member }> => {
+    const projectId = String((m as any).projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const ok = await checkProjectPermission(projectId, 'write');
+    if (!ok) throw new Error('FORBIDDEN');
+
     const row = objToRow(m as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -534,6 +578,13 @@ export const memberApi = {
   },
 
   update: async (id: string, m: Partial<Member>): Promise<{ data: Member }> => {
+    // ensure write permission for the member's project
+    const { data: orig } = await supabase.from('members').select('project_id').eq('id', id).maybeSingle();
+    const pid = (orig as any)?.project_id || (m as any).projectId;
+    if (!pid) throw new Error('MISSING_PROJECT_ID');
+    const ok = await checkProjectPermission(pid, 'write');
+    if (!ok) throw new Error('FORBIDDEN');
+
     const row = objToRow(m as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -548,6 +599,11 @@ export const memberApi = {
   },
 
   remove: async (id: string): Promise<void> => {
+    const { data: orig } = await supabase.from('members').select('project_id').eq('id', id).maybeSingle();
+    const pid = (orig as any)?.project_id;
+    if (!pid) throw new Error('MISSING_PROJECT_ID');
+    const ok = await checkProjectPermission(pid, 'write');
+    if (!ok) throw new Error('FORBIDDEN');
     const { error } = await supabase.from('members').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
