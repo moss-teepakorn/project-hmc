@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { supabase } from '../../services/supabase';
 import type { UserRole } from '../../types';
 
 export default function AuthPage() {
@@ -11,13 +12,50 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<UserRole>('member');
+  const [allowedRole, setAllowedRole] = useState<'member' | 'client' | null>(null);
+  const [emailError, setEmailError] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
 
+  const validateEmailRole = async (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized || !normalized.includes('@')) {
+      setAllowedRole(null);
+      setEmailError('');
+      return;
+    }
+
+    const { data: member, error: memberError } = await supabase
+      .from('members')
+      .select('type')
+      .eq('email', normalized)
+      .single();
+
+    if (memberError || !member) {
+      setAllowedRole(null);
+      setEmailError('EMAIL_NOT_ALLOWED');
+      setRole('member');
+      return;
+    }
+
+    setEmailError('');
+    if (member.type === 'client') {
+      setAllowedRole('client');
+      setRole('client');
+    } else {
+      setAllowedRole('member');
+      setRole('member');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (mode === 'signup' && emailError) {
+      setError(emailError);
+      return;
+    }
     setLoading(true);
     try {
       if (mode === 'login') {
@@ -180,7 +218,8 @@ export default function AuthPage() {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); setEmailError(''); setAllowedRole(null); }}
+                  onBlur={() => validateEmailRole(email)}
                   placeholder="you@company.com"
                   required
                   style={{
@@ -231,11 +270,26 @@ export default function AuthPage() {
                       boxSizing: 'border-box',
                     }}
                   >
-                    <option value="member">Member</option>
-                    <option value="pm">Project Manager</option>
-                    <option value="admin">Admin</option>
-                    <option value="client">Client (View Only)</option>
+                    {!allowedRole && <option value="member">Member</option>}
+                    {!allowedRole && <option value="client">Client</option>}
+                    {allowedRole === 'member' && <option value="member">Member</option>}
+                    {allowedRole === 'client' && <option value="client">Client</option>}
                   </select>
+                  {allowedRole === 'member' && (
+                    <div style={{ marginTop: 8, color: isDark ? '#A7F3D0' : '#047857', fontSize: 12 }}>
+                      Your email is registered as internal; only Member is allowed.
+                    </div>
+                  )}
+                  {allowedRole === 'client' && (
+                    <div style={{ marginTop: 8, color: isDark ? '#A7F3D0' : '#047857', fontSize: 12 }}>
+                      Your email is registered as client; only Client is allowed.
+                    </div>
+                  )}
+                  {emailError && (
+                    <div style={{ marginTop: 8, color: isDark ? '#FECACA' : '#B91C1C', fontSize: 12 }}>
+                      {emailError}
+                    </div>
+                  )}
                 </div>
               )}
               <button
