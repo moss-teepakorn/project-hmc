@@ -41,9 +41,35 @@ export default function MembersTab({ projectId }: Props) {
     })();
   }, [projectId]);
 
-  const shown    = filter === 'all' ? members : members.filter(m => m.type === filter);
-  const internal = members.filter(m => m.type === 'internal');
-  const client   = members.filter(m => m.type === 'client');
+  const typeOrder: Record<string, number> = { internal: 0, client: 1 };
+  const roleOrder: Record<string, number> = {
+    'Project Sponsor': 0,
+    'Project Advisor': 1,
+    'Project Manager': 2,
+    'Project Leader': 3,
+    'Project Coordinate': 4,
+    'Project Consultant': 5,
+    'Development': 6,
+    'HRD User': 7,
+    'HRM User': 8,
+    'Key User': 9,
+    'IT Support': 10,
+  };
+
+  const sortMembers = (a: Member, b: Member) => {
+    const ta = typeOrder[a.type] ?? 99;
+    const tb = typeOrder[b.type] ?? 99;
+    if (ta !== tb) return ta - tb;
+    const ra = roleOrder[a.role || ''] ?? 99;
+    const rb = roleOrder[b.role || ''] ?? 99;
+    if (ra !== rb) return ra - rb;
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  };
+
+  const shownUnsorted = filter === 'all' ? members : members.filter(m => m.type === filter);
+  const shown = [...shownUnsorted].sort(sortMembers);
+  const internal = members.filter(m => m.type === 'internal').sort(sortMembers);
+  const client   = members.filter(m => m.type === 'client').sort(sortMembers);
 
   const handleSave = async (form: Partial<Member>) => {
     try {
