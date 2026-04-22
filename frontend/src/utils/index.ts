@@ -1,5 +1,5 @@
 import {
-  format, parseISO, isValid, addDays,
+  format, parseISO, isValid, differenceInCalendarDays, addDays,
   startOfMonth, endOfMonth,
 } from 'date-fns';
 import type { Task } from '../types';
