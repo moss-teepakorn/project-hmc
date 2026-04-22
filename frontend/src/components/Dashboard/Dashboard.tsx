@@ -187,6 +187,8 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
   const hypercareProjects = projects.filter(p => p.status === 'Hyper Care');
   const planning   = projects.filter(p => p.status === 'Planning');
   const reqDesign  = projects.filter(p => p.status === 'Req & Design');
+  const setup      = projects.filter(p => p.status === 'Setup');
+  const testing    = projects.filter(p => p.status === 'Testing');
   const goLive     = projects.filter(p => p.status === 'Go Live');
 
   const renderOverviewProjectCard = (p: Project, fallbackColor = C.primary) => {
@@ -238,10 +240,12 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
       <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 6 }}>Portfolio Overview</h2>
       <p style={{ color: C.text2, fontSize: 13, marginBottom: 24 }}>Select a project on the left to view its executive summary.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 28 }}>
         {[
           { label: 'Planning',     value: planning.length,          color: C.amber,   bg: C.amberBg,   icon: '📋' },
           { label: 'Req & Design', value: reqDesign.length,         color: C.primary, bg: C.primaryBg, icon: '🚀' },
+          { label: 'Setup',        value: setup.length,             color: '#9A3412', bg: '#FED7AA', icon: '🧩' },
+          { label: 'Testing',      value: testing.length,           color: '#6B21A8', bg: '#E9D5FF', icon: '🧪' },
           { label: 'Go Live',      value: goLive.length,            color: C.green,   bg: C.greenBg,   icon: '✅' },
           { label: 'Hyper Care',   value: hypercareProjects.length, color: C.amber,   bg: C.amberBg,   icon: '🛡️' },
         ].map(s => (
