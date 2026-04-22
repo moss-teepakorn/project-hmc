@@ -100,6 +100,7 @@ export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId:
 // No custom backend needed.
 
 import { supabase } from './supabase';
+import { parseISO, isValid } from 'date-fns';
 import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment } from '../types';
 
 // ── Snake ↔ Camel conversion helpers ────────────────────────────────────────
@@ -255,7 +256,19 @@ export const taskApi = {
     q = q.order('order', { ascending: true });
     const { data, error } = await q;
     if (error) throw new Error(error.message);
-    return { data: rowsToObjs<Task>(data || []) };
+    const tasks = rowsToObjs<Task>(data || []);
+    const normalized = tasks.map((task) => {
+      if (!task.startDate || !task.endDate) return task;
+      const calculated = calcDurationFromDates(task);
+      return task.duration !== calculated ? { ...task, duration: calculated } : task;
+    });
+    const mismatches = normalized.filter((task, index) => task.duration !== tasks[index].duration);
+    if (mismatches.length > 0) {
+      for (const task of mismatches) {
+        await supabase.from('tasks').update({ duration: task.duration }).eq('id', task.id);
+      }
+    }
+    return { data: normalized };
   },
 
   create: async (t: Partial<Task>): Promise<{ data: Task; allTasks: Task[] }> => {
@@ -591,9 +604,9 @@ function recalcParents(tasks: Task[]): Task[] {
 
 function calcDurationFromDates(task: Task): number {
   if (!task.startDate || !task.endDate) return task.duration || 0;
-  const start = new Date(task.startDate);
-  const end = new Date(task.endDate);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
+  const start = parseISO(task.startDate);
+  const end = parseISO(task.endDate);
+  if (!isValid(start) || !isValid(end) || end < start) return 0;
 
   let count = 0;
   const current = new Date(start.getTime());
