@@ -791,12 +791,12 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
 function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertAfter }: { task:Task; tasks:Task[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void; onInsertBefore: () => void; onInsertAfter: () => void }) {
   const [form, setForm] = useState<Partial<Task>>({
     ...task,
-    startDate: task.startDate ? isoToDmy(task.startDate) : '',
-    endDate: task.endDate ? isoToDmy(task.endDate) : '',
-    actualFinish: task.actualFinish ? isoToDmy(task.actualFinish) : '',
+    startDate: task.startDate ?? '',
+    endDate: task.endDate ?? '',
+    actualFinish: task.actualFinish ?? '',
   });
   const up = (k:string,v:string|number) => setForm(p=>({...p,[k]:v}));
-  const dur = calcDuration(dmyToIso(form.startDate??''), dmyToIso(form.endDate??''));
+  const dur = calcDuration(String(form.startDate || ''), String(form.endDate || ''));
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
   return (
     <Modal title="Edit Task" onClose={onClose} width={520}>
@@ -806,13 +806,12 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
           onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
       </FormRow>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <FormRow label="Start Date"><input value={form.startDate??''} onChange={e=>up('startDate',formatDmyInput(e.target.value))} inputMode="numeric" maxLength={10} placeholder="DD/MM/YYYY" style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
-        <FormRow label="End Date"><input value={form.endDate??''} onChange={e=>up('endDate',formatDmyInput(e.target.value))} inputMode="numeric" maxLength={10} placeholder="DD/MM/YYYY" style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
+        <FormRow label="Start Date"><input type="date" value={form.startDate??''} onChange={e=>up('startDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+        <FormRow label="End Date"><input type="date" value={form.endDate??''} onChange={e=>up('endDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <FormRow label="Actual Finish Date">
-          <input value={form.actualFinish??''} onChange={e=>up('actualFinish',formatDmyInput(e.target.value))} inputMode="numeric" maxLength={10} placeholder="DD/MM/YYYY"
-            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.green}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/>
+          <input type="date" value={form.actualFinish??''} onChange={e=>up('actualFinish',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.green}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/>
         </FormRow>
         <FormRow label="% Complete">
           <input type="number" min={0} max={100} value={form.percentComplete??0} onChange={e=>up('percentComplete',Math.min(100,Math.max(0,Number(e.target.value))))}
@@ -851,10 +850,10 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
           if(!form.taskName?.trim()) return;
           onSave({
             ...form,
-            startDate: dmyToIso(form.startDate ?? ''),
-            endDate: dmyToIso(form.endDate ?? ''),
-            actualFinish: form.actualFinish ? dmyToIso(form.actualFinish) : '',
-            duration: calcDuration(dmyToIso(form.startDate ?? ''), dmyToIso(form.endDate ?? '')),
+            startDate: String(form.startDate || ''),
+            endDate: String(form.endDate || ''),
+            actualFinish: String(form.actualFinish || ''),
+            duration: calcDuration(String(form.startDate || ''), String(form.endDate || '')),
           });
         }}>Save Changes</Btn>
       </div>
