@@ -25,6 +25,7 @@ export default function ProjectSummaryTab({ project }: Props) {
 
   const [drafts, setDrafts] = useState<Record<string, DraftRow>>({});
   const [savingSnapshot, setSavingSnapshot] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!project?.id) return;
@@ -146,8 +147,33 @@ export default function ProjectSummaryTab({ project }: Props) {
 
   const refreshBaseline = async () => {
     if (!project.id) return;
-    await fetchTasks(project.id);
-    await fetchProjectProgressSnapshots(project.id);
+    setRefreshing(true);
+    try {
+      await fetchTasks(project.id);
+
+      const currentSaved = new Map<string, ProjectProgressSnapshot>();
+      projectProgressSnapshots
+        .filter((s) => s.projectId === project.id)
+        .forEach((s) => currentSaved.set(s.snapshotDate, s));
+
+      for (const [index, snapshotDate] of snapshotDates.entries()) {
+        const saved = currentSaved.get(snapshotDate);
+        const draft = drafts[snapshotDate];
+        await saveProjectProgressSnapshot({
+          id: saved?.id,
+          projectId: project.id,
+          snapshotDate,
+          baselinePercent: baselineProgress[index] ?? 0,
+          actualPercent: draft?.actualPercent ?? saved?.actualPercent ?? 0,
+          note: draft?.note ?? saved?.note ?? '',
+        });
+      }
+
+      setDrafts({});
+      await fetchProjectProgressSnapshots(project.id);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const graphRows = useMemo(() => {
@@ -207,9 +233,11 @@ export default function ProjectSummaryTab({ project }: Props) {
         <h3 style={{ margin: 0, fontSize: 18, color: C.text }}>Project Summary</h3>
         <span style={{ color: C.text2, fontSize: 12 }}>15-day baseline progress with actual tracking and snapshot persistence.</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Btn variant="outline" onClick={refreshBaseline} small>Recalculate baseline</Btn>
+          <Btn variant="outline" onClick={refreshBaseline} small disabled={refreshing || savingSnapshot !== null}>
+            {refreshing ? 'Recalculating…' : 'Recalculate baseline'}
+          </Btn>
           <Btn variant="ghost" onClick={exportPDF} small>Export PDF</Btn>
-          <Btn variant="primary" onClick={saveAll} small disabled={!rows.some((r) => r.dirty)}>Save all</Btn>
+          <Btn variant="primary" onClick={saveAll} small disabled={!rows.some((r) => r.dirty) || refreshing || savingSnapshot !== null}>Save all</Btn>
         </div>
       </div>
 
