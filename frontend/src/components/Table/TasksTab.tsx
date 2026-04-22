@@ -74,6 +74,7 @@ export default function TasksTab({ projectId }: Props) {
   const [showExport, setShowExport] = useState(false);
   const [splitW, setSplitW]     = useState(630);
   const [zoomIndex, setZoomIndex] = useState(3); // default = Week
+  const [colWidths, setColWidths] = useState<number[]>(COLS.map((c) => c.w));
   const [addPreset, setAddPreset] = useState<{ anchorId: string | null; mode: 'main' | 'sub'; position: 'before' | 'after' | 'append' }>({
     anchorId: null,
     mode: 'main',
@@ -85,6 +86,11 @@ export default function TasksTab({ projectId }: Props) {
   const tableHeaderRef = useRef<HTMLDivElement>(null);
   const ganttBodyRef = useRef<HTMLDivElement>(null);
   const syncing      = useRef(false);
+
+  // Column resize
+  const resizingColumn = useRef<number | null>(null);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
 
   // Resize drag
   const dragRef    = useRef(false);
@@ -190,18 +196,41 @@ export default function TasksTab({ projectId }: Props) {
     ganttBodyRef.current.scrollTop = tableBodyRef.current.scrollTop;
     requestAnimationFrame(() => { syncing.current = false; });
   }, []);
-  const onGanttScroll = useCallback(() => {
-    if (syncing.current || !tableBodyRef.current || !ganttBodyRef.current) return;
-    syncing.current = true;
-    tableBodyRef.current.scrollTop = ganttBodyRef.current.scrollTop;
-    requestAnimationFrame(() => { syncing.current = false; });
-  }, []);
 
   const onHeaderScroll = useCallback(() => {
     if (!tableHeaderRef.current || !tableBodyRef.current) return;
     if (tableBodyRef.current.scrollLeft !== tableHeaderRef.current.scrollLeft) {
       tableBodyRef.current.scrollLeft = tableHeaderRef.current.scrollLeft;
     }
+  }, []);
+
+  const onColumnResizeStart = useCallback((index: number, e: React.MouseEvent<HTMLDivElement>) => {
+    resizingColumn.current = index;
+    resizeStartX.current = e.clientX;
+    resizeStartWidth.current = colWidths[index];
+    e.preventDefault();
+    e.stopPropagation();
+  }, [colWidths]);
+
+  const onColumnResizeMove = useCallback((e: MouseEvent) => {
+    if (resizingColumn.current === null) return;
+    const delta = e.clientX - resizeStartX.current;
+    const nextWidth = Math.max(60, resizeStartWidth.current + delta);
+    setColWidths((prev) => {
+      const next = [...prev];
+      if (resizingColumn.current !== null) next[resizingColumn.current] = nextWidth;
+      return next;
+    });
+  }, []);
+
+  const onColumnResizeEnd = useCallback(() => {
+    resizingColumn.current = null;
+  }, []);
+  const onGanttScroll = useCallback(() => {
+    if (syncing.current || !tableBodyRef.current || !ganttBodyRef.current) return;
+    syncing.current = true;
+    tableBodyRef.current.scrollTop = ganttBodyRef.current.scrollTop;
+    requestAnimationFrame(() => { syncing.current = false; });
   }, []);
 
   // Resize handlers
@@ -220,8 +249,15 @@ export default function TasksTab({ projectId }: Props) {
   useEffect(() => {
     window.addEventListener('mousemove', onResizeMove);
     window.addEventListener('mouseup', onResizeEnd);
-    return () => { window.removeEventListener('mousemove', onResizeMove); window.removeEventListener('mouseup', onResizeEnd); };
-  }, [onResizeMove, onResizeEnd]);
+    window.addEventListener('mousemove', onColumnResizeMove);
+    window.addEventListener('mouseup', onColumnResizeEnd);
+    return () => {
+      window.removeEventListener('mousemove', onResizeMove);
+      window.removeEventListener('mouseup', onResizeEnd);
+      window.removeEventListener('mousemove', onColumnResizeMove);
+      window.removeEventListener('mouseup', onColumnResizeEnd);
+    };
+  }, [onResizeMove, onResizeEnd, onColumnResizeMove, onColumnResizeEnd]);
 
   // ── XLSX export ──────────────────────────────────────────────────────────
   const exportXLSX = () => {
@@ -431,13 +467,16 @@ export default function TasksTab({ projectId }: Props) {
         <div style={{ overflowX:'auto', overflowY:'hidden', minWidth:0 }}>
           {/* Table header — same height as Gantt header (HDR_H) */}
           <div ref={tableHeaderRef} onScroll={onHeaderScroll} style={{ minWidth:'max-content', display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
-            {COLS.map(c => (
+            {COLS.map((c, i) => (
               <div key={c.label} style={{
-                width: c.label === 'Task Name' ? (isTableView ? `calc(100% - ${TABLE_FIXED_W}px)` : c.w) : c.w,
-                minWidth: c.label === 'Task Name' ? (isTableView ? 380 : c.w) : c.w,
+                position:'relative',
+                width: colWidths[i],
+                minWidth: colWidths[i],
                 padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center'
               }}>
                 {c.label}
+                <div onMouseDown={e => onColumnResizeStart(i, e)}
+                  style={{ position:'absolute', right:0, top:0, width:8, height:'100%', cursor:'col-resize', zIndex:2 }} />
               </div>
             ))}
           </div>
@@ -452,10 +491,10 @@ export default function TasksTab({ projectId }: Props) {
           return (
             <div key={task.id} onClick={() => setSelected(task.id)}
               style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isSel?C.primaryBg:i%2===0?C.white:C.bg, borderLeft: isSel?`3px solid ${C.primary}`:'3px solid transparent', cursor:'pointer', flexShrink:0 }}>
-              <div style={{ width:52, minWidth:52, padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'monospace', flexShrink:0 }}>{task.wbs}</div>
+              <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'monospace', flexShrink:0 }}>{task.wbs}</div>
               <div style={{
-                width:isTableView?`calc(100% - ${TABLE_FIXED_W}px)`:200,
-                minWidth:isTableView?380:200,
+                width: colWidths[1],
+                minWidth: colWidths[1],
                 padding:`0 4px 0 ${8+task.level*20}px`,
                 display:'flex', alignItems:'center', gap:4, flexShrink:0
               }}>
@@ -472,24 +511,24 @@ export default function TasksTab({ projectId }: Props) {
                 {isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
                 <EditableCell value={task.taskName} onSave={v=>handleUpdate(task.id,{taskName:v})} />
               </div>
-              <div style={{ width:94, minWidth:94, padding:'0 6px', flexShrink:0 }}>
-                <EditableCell value={isoToDmy(task.startDate)} onSave={v=>handleUpdateDate(task.id,'startDate',v)} alwaysSave style={{ color:isPar?C.text3:C.text }} />
+              <div style={{ width:colWidths[2], minWidth:colWidths[2], padding:'0 6px', flexShrink:0 }}>
+                <EditableCell type="date" value={isoToDmy(task.startDate)} placeholder="—" onSave={v=>handleUpdateDate(task.id,'startDate',v)} alwaysSave style={{ color:isPar?C.text3:C.text }} />
               </div>
-              <div style={{ width:94, minWidth:94, padding:'0 6px', flexShrink:0 }}>
-                <EditableCell value={isoToDmy(task.endDate)} onSave={v=>handleUpdateDate(task.id,'endDate',v)} alwaysSave style={{ color:isPar?C.text3:C.text }} />
+              <div style={{ width:colWidths[3], minWidth:colWidths[3], padding:'0 6px', flexShrink:0 }}>
+                <EditableCell type="date" value={isoToDmy(task.endDate)} placeholder="—" onSave={v=>handleUpdateDate(task.id,'endDate',v)} alwaysSave style={{ color:isPar?C.text3:C.text }} />
               </div>
-              <div style={{ width:100, minWidth:100, padding:'0 6px', flexShrink:0 }}>
-                <EditableCell value={task.actualFinish?isoToDmy(task.actualFinish):''} onSave={v=>handleUpdateDate(task.id,'actualFinish',v)} placeholder="—" alwaysSave style={{ color:task.actualFinish?C.green:C.text3 }} />
+              <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
+                <EditableCell type="date" value={task.actualFinish?isoToDmy(task.actualFinish):''} placeholder="—" onSave={v=>handleUpdateDate(task.id,'actualFinish',v)} alwaysSave style={{ color:task.actualFinish?C.green:C.text3 }} />
               </div>
-              <div style={{ width:46, minWidth:46, padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'monospace', flexShrink:0 }}>{task.duration}d</div>
-              <div style={{ width:110, minWidth:110, padding:'0 6px', flexShrink:0 }}>
+              <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'monospace', flexShrink:0 }}>{task.duration}d</div>
+              <div style={{ width:colWidths[6], minWidth:colWidths[6], padding:'0 6px', flexShrink:0 }}>
                 <PctCell value={task.percentComplete} isParent={isPar} onSave={n=>handlePct(task.id,n)} />
               </div>
-              <div style={{ width:116, minWidth:116, padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+              <div style={{ width:colWidths[7], minWidth:colWidths[7], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
                 {task.resource && <Avatar name={task.resource} size={20} />}
                 <EditableCell value={task.resource} onSave={v=>handleUpdate(task.id,{resource:v})} placeholder="Assign..." />
               </div>
-              <div style={{ width:76, minWidth:76, padding:'0 5px', flexShrink:0, display:'flex', gap:4 }}>
+              <div style={{ width:colWidths[8], minWidth:colWidths[8], padding:'0 5px', flexShrink:0, display:'flex', gap:4 }}>
                 <button onClick={e=>{ e.stopPropagation(); setEditModal(task); }}
                   style={{ height:22, padding:'0 7px', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary, fontSize:11, fontWeight:600 }}>Edit</button>
                 <button onClick={e=>{ e.stopPropagation(); handleDelete(task.id); }}

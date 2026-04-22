@@ -162,8 +162,7 @@ export const EditableCell: React.FC<{
   const commit = useCallback(() => {
     let nextValue = draft;
     if (type === 'date') {
-      const formatted = dateValue ? isoToDmy(dateValue) : value;
-      nextValue = formatted || value;
+      nextValue = dateValue ? isoToDmy(dateValue) : '';
     }
     setEditing(false);
     if (nextValue !== value || type === 'date' || alwaysSave) onSave(nextValue);
