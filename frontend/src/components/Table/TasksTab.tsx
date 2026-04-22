@@ -481,7 +481,7 @@ export default function TasksTab({ projectId }: Props) {
             ))}
           </div>
           <div ref={tableBodyRef} onScroll={onTableScroll}
-            style={{ flex:1, minHeight:0, overflowY:'auto', overflowX:'auto', minWidth:'max-content' }}>
+            style={{ height:`calc(100% - ${HDR_H}px)`, minHeight:0, overflowY:'scroll', overflowX:'auto', minWidth:'max-content' }}>
         {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
         {!loading && visible.map((task, i) => {
           const isPar = hasChildren(projectTasks, task.id);
