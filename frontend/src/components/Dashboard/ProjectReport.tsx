@@ -139,6 +139,9 @@ export default function ProjectReport({ project, onClose }: Props) {
     const msRows = ms.slice(0, 10).map(m=>[m.phase,m.name.substring(0,26),money2(m.amount),fmtDate(m.dueDate),m.status.toUpperCase()]);
     autoTable(doc,{ 
       startY:y + 6, tableWidth:cw, margin:{left:12+cw+3, right:12},
+      head:[['Phase','Milestone','Amount','Due','Status']],
+      body:msRows.length?msRows:[['','No milestones','','','']],
+      styles:{fontSize:7,cellPadding:1.5},
       headStyles:{fillColor:[16,185,129],textColor:255,fontSize:7},
       columnStyles:{0:{cellWidth:14},1:{cellWidth:cw-68},2:{cellWidth:18},3:{cellWidth:17},4:{cellWidth:15}},
       didParseCell(d){
