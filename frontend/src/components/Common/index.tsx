@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { avatarColor, getInitials } from '../../utils';
+import { avatarColor, getInitials, dmyToIso, isoToDmy } from '../../utils';
 
 export const C = {
   white: '#FFFFFF', bg: '#F5F7FA', bg2: '#EEF1F6',
@@ -150,22 +150,34 @@ export const EditableCell: React.FC<{
 }> = ({ value, onSave, type = 'text', placeholder = '—', style, alwaysSave = false }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState(value);
+  const [dateValue, setDateValue] = useState(type === 'date' ? dmyToIso(value) : value);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setDraft(value); }, [value]);
+  useEffect(() => {
+    setDraft(value);
+    if (type === 'date') setDateValue(dmyToIso(value));
+  }, [value, type]);
   useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
 
   const commit = useCallback(() => {
+    let nextValue = draft;
+    if (type === 'date') {
+      const formatted = dateValue ? isoToDmy(dateValue) : value;
+      nextValue = formatted || value;
+    }
     setEditing(false);
-    if (draft !== value || type === 'date' || alwaysSave) onSave(draft);
-  }, [draft, value, onSave, type, alwaysSave]);
+    if (nextValue !== value || type === 'date' || alwaysSave) onSave(nextValue);
+  }, [draft, value, onSave, type, alwaysSave, dateValue]);
 
   if (editing) {
     return (
-      <input ref={inputRef} type={type} value={draft}
-        onChange={e => setDraft(e.target.value)}
+      <input ref={inputRef} type={type} value={type === 'date' ? dateValue : draft}
+        onChange={e => {
+          if (type === 'date') setDateValue(e.target.value);
+          else setDraft(e.target.value);
+        }}
         onBlur={commit}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setDraft(value); } }}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setDraft(value); if (type === 'date') setDateValue(dmyToIso(value)); } }}
         style={{ width: '100%', border: `1.5px solid ${C.primary}`, borderRadius: 4, padding: '2px 6px', fontSize: 12, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg, colorScheme: type === 'date' ? 'light' : undefined, ...style }}
       />
     );

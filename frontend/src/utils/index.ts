@@ -122,11 +122,11 @@ export const isoToDmy = (iso: string): string => {
 };
 
 export const dmyToIso = (dmy: string): string => {
-  const m = String(dmy || '').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const m = String(dmy || '').trim().match(/^(\d{2})([\/\-])(\d{2})\2(\d{4})$/);
   if (!m) return '';
   const dd = Number(m[1]);
-  const mm = Number(m[2]);
-  const yyyy = Number(m[3]);
+  const mm = Number(m[3]);
+  const yyyy = Number(m[4]);
   const dt = new Date(yyyy, mm - 1, dd);
   if (
     dt.getFullYear() !== yyyy ||

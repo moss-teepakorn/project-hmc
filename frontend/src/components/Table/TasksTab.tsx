@@ -629,8 +629,8 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
   const nextWeekIso = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
   const [form, setForm] = useState<Partial<Task>>({
     taskName:'',
-    startDate:isoToDmy(todayIso),
-    endDate:isoToDmy(nextWeekIso),
+    startDate: todayIso,
+    endDate: nextWeekIso,
     resource:'',
     parentId:'',
     relatedTask:''
@@ -639,9 +639,7 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
   const [insertPosition, setInsertPosition] = useState<'before' | 'after' | 'append'>(preset.position);
   const up = (k:string,v:string) => setForm(p=>({...p,[k]:v}));
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
-  const startIso = dmyToIso(String(form.startDate || ''));
-  const endIso = dmyToIso(String(form.endDate || ''));
-  const dur = calcDuration(startIso, endIso);
+  const dur = calcDuration(String(form.startDate || ''), String(form.endDate || ''));
   return (
     <Modal title="New Task" onClose={onClose} width={480}>
       <FormRow label="Task Name" required>
@@ -684,8 +682,12 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
         </div>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <FormRow label="Start Date (dd/mm/yyyy)"><input value={form.startDate??''} onChange={e=>up('startDate',formatDmyInput(e.target.value))} placeholder="dd/mm/yyyy" inputMode="numeric" maxLength={10} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
-        <FormRow label="End Date (dd/mm/yyyy)"><input value={form.endDate??''} onChange={e=>up('endDate',formatDmyInput(e.target.value))} placeholder="dd/mm/yyyy" inputMode="numeric" maxLength={10} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
+        <FormRow label="Start Date"><input type="date" value={form.startDate??''} onChange={e=>up('startDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+        <FormRow label="End Date"><input type="date" value={form.endDate??''} onChange={e=>up('endDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8 }}>
+        <FormRow label="Actual Finish Date"><input type="date" value={form.actualFinish??''} onChange={e=>up('actualFinish',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.green}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+        <div />
       </div>
       {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
       <FormRow label="Resource">
@@ -705,10 +707,10 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={()=>{
           if(!form.taskName?.trim()) return;
-          const startDate = dmyToIso(String(form.startDate || ''));
-          const endDate = dmyToIso(String(form.endDate || ''));
+          const startDate = String(form.startDate || '');
+          const endDate = String(form.endDate || '');
           if (!startDate || !endDate) {
-            toast.error('Start/End Date ต้องอยู่ในรูปแบบ dd/mm/yyyy');
+            toast.error('Start/End Date ต้องเลือกวันที่');
             return;
           }
 
