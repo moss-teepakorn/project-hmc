@@ -57,6 +57,56 @@ export const getProjectDateRange = (tasks: Task[]) => {
   };
 };
 
+export const getHalfMonthSnapshotDates = (startDateStr: string, endDateStr: string): string[] => {
+  const start = parseISO(startDateStr);
+  const end = parseISO(endDateStr);
+  if (!isValid(start) || !isValid(end) || end < start) return [];
+
+  const toIso = (date: Date) => format(date, 'yyyy-MM-dd');
+  const dates: string[] = [];
+  let current: Date;
+
+  if (start.getDate() <= 15) {
+    current = new Date(start.getFullYear(), start.getMonth(), 15);
+  } else {
+    current = endOfMonth(start);
+  }
+
+  if (current < start) {
+    current = addDays(start, 14);
+  }
+
+  while (current <= end) {
+    dates.push(toIso(current));
+    const next = current.getDate() === 15
+      ? endOfMonth(addDays(current, 1))
+      : new Date(current.getFullYear(), current.getMonth() + 1, 15);
+    current = next;
+  }
+
+  const last = parseISO(dates[dates.length - 1] || '');
+  if (dates.length === 0 || (isValid(end) && last < end)) {
+    dates.push(toIso(end));
+  }
+
+  return dates.filter((value, index, self) => self.indexOf(value) === index);
+};
+
+export const computeBaselineProgress = (tasks: Task[], snapshotDates: string[]) => {
+  const validTasks = tasks.filter((task) => task.startDate && task.endDate && task.duration > 0);
+  const totalWeight = validTasks.reduce((sum, task) => sum + task.duration, 0) || validTasks.length;
+  return snapshotDates.map((snapshot) => {
+    const snapshotDate = parseISO(snapshot);
+    const completedWeight = validTasks
+      .filter((task) => {
+        const taskEnd = parseISO(task.endDate);
+        return isValid(taskEnd) && taskEnd <= snapshotDate;
+      })
+      .reduce((sum, task) => sum + task.duration, 0);
+    return totalWeight > 0 ? Math.min(100, Math.round((completedWeight / totalWeight) * 100)) : 0;
+  });
+};
+
 export const dayOffset = (minDate: Date, dateStr: string): number => {
   if (!dateStr) return 0;
   const d = parseISO(dateStr);

@@ -20,6 +20,17 @@ export interface ProjectEnvironment {
   password: string;
 }
 
+export interface ProjectProgressSnapshot {
+  id: string;
+  projectId: string;
+  snapshotDate: string;
+  baselinePercent: number;
+  actualPercent: number;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Task {
   id: string;
   projectId: string;

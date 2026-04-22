@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment } from '../types';
-import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi } from '../services/api';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot } from '../types';
+import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi, projectProgressApi } from '../services/api';
 
 interface Store {
   _pendingMutationCount: number;
@@ -15,6 +15,7 @@ interface Store {
   issues: Issue[];
   risks: Risk[];
   projectEnvironments: ProjectEnvironment[];
+  projectProgressSnapshots: ProjectProgressSnapshot[];
   dataLoading: boolean;
   error: string | null;
 
@@ -64,6 +65,10 @@ interface Store {
   createProjectEnvironment: (env: Partial<ProjectEnvironment>) => Promise<void>;
   updateProjectEnvironment: (id: string, env: Partial<ProjectEnvironment>) => Promise<void>;
   deleteProjectEnvironment: (id: string) => Promise<void>;
+
+  fetchProjectProgressSnapshots: (pid: string) => Promise<void>;
+  saveProjectProgressSnapshot: (snapshot: Partial<ProjectProgressSnapshot>) => Promise<ProjectProgressSnapshot>;
+  deleteProjectProgressSnapshot: (id: string) => Promise<void>;
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -71,7 +76,7 @@ export const useStore = create<Store>((set, get) => ({
   _pendingMutationCount: 0,
   projects: [], projectsLoading: false, activeProject: null,
   tasks: [], members: [], milestones: [], efforts: [],
-  changeRequests: [], issues: [], risks: [], projectEnvironments: [],
+  changeRequests: [], issues: [], risks: [], projectEnvironments: [], projectProgressSnapshots: [],
   dataLoading: false, error: null,
 
   // ── Projects ───────────────────────────────────────────────────────────────
@@ -441,6 +446,39 @@ export const useStore = create<Store>((set, get) => ({
     try {
       await projectEnvironmentApi.remove(id);
       set(s => ({ projectEnvironments: s.projectEnvironments.filter(x => x.id !== id) }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  fetchProjectProgressSnapshots: async (pid: string) => {
+    try { set({ projectProgressSnapshots: (await projectProgressApi.getByProject(pid)).data }); }
+    catch (e) { set({ error: (e as Error).message }); }
+  },
+  saveProjectProgressSnapshot: async (snapshot) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      const res = await projectProgressApi.save(snapshot);
+      set(s => ({
+        projectProgressSnapshots: snapshot.id
+          ? s.projectProgressSnapshots.map(x => x.id === snapshot.id ? res.data : x)
+          : [...s.projectProgressSnapshots, res.data],
+      }));
+      return res.data;
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  deleteProjectProgressSnapshot: async (id) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      await projectProgressApi.remove(id);
+      set(s => ({ projectProgressSnapshots: s.projectProgressSnapshots.filter(x => x.id !== id) }));
     } finally {
       set((s: any) => {
         const next = Math.max(0, (s._pendingMutationCount || 1) - 1);

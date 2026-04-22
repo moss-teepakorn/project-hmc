@@ -101,7 +101,7 @@ export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId:
 
 import { supabase } from './supabase';
 import { parseISO, isValid } from 'date-fns';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment } from '../types';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot } from '../types';
 
 // ── Snake ↔ Camel conversion helpers ────────────────────────────────────────
 
@@ -243,6 +243,56 @@ export const projectEnvironmentApi = {
 
   remove: async (id: string): Promise<void> => {
     const { error } = await supabase.from('project_environments').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+};
+
+export const projectProgressApi = {
+  getByProject: async (pid?: string): Promise<{ data: ProjectProgressSnapshot[] }> => {
+    const q = supabase.from('project_progress_snapshots').select('*').order('snapshot_date', { ascending: true });
+    const query = pid ? q.eq('project_id', pid) : q;
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<ProjectProgressSnapshot>(data || []) };
+  },
+
+  save: async (snapshot: Partial<ProjectProgressSnapshot>): Promise<{ data: ProjectProgressSnapshot }> => {
+    if (!snapshot.projectId) throw new Error('MISSING_PROJECT_ID');
+    const can = await checkProjectPermission(snapshot.projectId, 'write');
+    if (!can) throw new Error('FORBIDDEN');
+    const row = objToRow(snapshot as Record<string, unknown>);
+    delete row.id;
+    delete row.created_at;
+    delete row.updated_at;
+
+    if (snapshot.id) {
+      const { data, error } = await supabase
+        .from('project_progress_snapshots')
+        .update(row)
+        .eq('id', snapshot.id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return { data: rowToObj<ProjectProgressSnapshot>(data) };
+    }
+
+    const { data, error } = await supabase
+      .from('project_progress_snapshots')
+      .insert(row)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<ProjectProgressSnapshot>(data) };
+  },
+
+  remove: async (id: string): Promise<void> => {
+    const { data, error: fetchErr } = await supabase.from('project_progress_snapshots').select('project_id').eq('id', id).maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
+    const projectId = (data as any)?.project_id;
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const can = await checkProjectPermission(projectId, 'write');
+    if (!can) throw new Error('FORBIDDEN');
+    const { error } = await supabase.from('project_progress_snapshots').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 };
