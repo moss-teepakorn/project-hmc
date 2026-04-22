@@ -93,8 +93,10 @@ export default async function handler(req, res) {
         {
           method: 'DELETE',
           headers: {
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
             apikey: SUPABASE_SERVICE_KEY,
+            Prefer: 'return=representation',
           },
         }
       );
@@ -102,7 +104,7 @@ export default async function handler(req, res) {
         const err = await deleteResp.text();
         throw new Error(`Delete failed: ${err}`);
       }
-      deleted = await deleteResp.json();
+      deleted = deleteResp.status === 204 ? [] : await deleteResp.json();
     }
 
     return res.status(200).json({
