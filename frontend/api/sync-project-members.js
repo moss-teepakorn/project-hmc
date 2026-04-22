@@ -23,19 +23,23 @@ export default async function handler(req, res) {
     const emails = Array.from(
       new Set(
         (members || [])
-          .map((row: any) => String(row.email || '').trim().toLowerCase())
-          .filter((email: string) => email)
+          .map((row) => String(row.email || '').trim().toLowerCase())
+          .filter((email) => email)
       )
     );
 
-    const { data: profiles, error: profilesError } = emails.length
-      ? await supabase.from('profiles').select('id,email').in('email', emails)
+    const profilesQuery = emails.length
+      ? await supabase.from('profiles').select('id,email,role').in('email', emails)
       : { data: [], error: null };
-    if (profilesError) throw profilesError;
+    if (profilesQuery.error) throw profilesQuery.error;
+    const profiles = profilesQuery.data;
 
-    const profileByEmail = new Map<string, string>();
-    (profiles || []).forEach((row: any) => {
-      if (row.email) profileByEmail.set(String(row.email).trim().toLowerCase(), row.id);
+    const profileByEmail = new Map();
+    (profiles || []).forEach((row) => {
+      const role = String(row.role || '').trim().toLowerCase();
+      if (row.email && (role === 'member' || role === 'client')) {
+        profileByEmail.set(String(row.email).trim().toLowerCase(), row.id);
+      }
     });
 
     const { data: existingRows, error: existingError } = await supabase
@@ -44,30 +48,30 @@ export default async function handler(req, res) {
       .eq('project_id', projectId);
     if (existingError) throw existingError;
 
-    const existingUserIds = new Set((existingRows || []).map((row: any) => row.user_id));
+    const existingUserIds = new Set((existingRows || []).map((row) => row.user_id));
     const desiredUserIds = Array.from(
-      new Set(emails.map((email) => profileByEmail.get(email)).filter(Boolean))
+      new Set(
+        emails.map((email) => profileByEmail.get(email)).filter(Boolean)
+      )
     );
 
     const inserted = [];
-    if (desiredUserIds.length > 0) {
-      const toInsert = desiredUserIds
-        .filter((userId) => !existingUserIds.has(userId))
-        .map((userId) => ({ project_id: projectId, user_id: userId }));
-      if (toInsert.length > 0) {
-        const { data: insertedRows, error: insertError } = await supabase
-          .from('project_members')
-          .insert(toInsert)
-          .select();
-        if (insertError) throw insertError;
-        inserted.push(...(insertedRows || []));
-      }
+    const toInsert = desiredUserIds
+      .filter((userId) => !existingUserIds.has(userId))
+      .map((userId) => ({ project_id: projectId, user_id: userId }));
+    if (toInsert.length > 0) {
+      const { data: insertedRows, error: insertError } = await supabase
+        .from('project_members')
+        .insert(toInsert)
+        .select();
+      if (insertError) throw insertError;
+      inserted.push(...(insertedRows || []));
     }
 
     const desiredSet = new Set(desiredUserIds);
     const toDeleteIds = (existingRows || [])
-      .filter((row: any) => row.user_id && !desiredSet.has(row.user_id))
-      .map((row: any) => row.id);
+      .filter((row) => row.user_id && !desiredSet.has(row.user_id))
+      .map((row) => row.id);
 
     const deleted = [];
     if (toDeleteIds.length > 0) {
