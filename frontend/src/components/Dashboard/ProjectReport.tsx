@@ -168,15 +168,11 @@ export default function ProjectReport({ project, onClose }: Props) {
     ];
     doc.setFontSize(9);
     doc.setFont('helvetica','bold');
-    sections.forEach(({title, left, color}) => {
-      const titleWidth = doc.getTextWidth(title) + 8;
-      doc.setFillColor(...color);
-      doc.roundedRect(left - 2, midY - 4.5, titleWidth, 8, 2, 2, 'F');
-      doc.setTextColor(255,255,255);
-      doc.text(title, left + 1, midY + 1.5);
+    sections.forEach(({title, left}) => {
+      doc.setTextColor(0);
+      doc.text(title, left, midY + 2);
     });
     doc.setFont('helvetica','normal');
-    doc.setTextColor(0);
 
     sections.forEach(({rows, head, color, left}) => {
       autoTable(doc,{ 
