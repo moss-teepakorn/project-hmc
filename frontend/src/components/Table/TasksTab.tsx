@@ -115,6 +115,22 @@ export default function TasksTab({ projectId }: Props) {
     catch { toast.error('Failed to save'); }
   }, [updateTask]);
 
+  const handleUpdateDate = useCallback(async (id: string, field: 'startDate' | 'endDate' | 'actualFinish', value: string) => {
+    const raw = String(value || '').trim();
+    if (!raw) {
+      try { await updateTask(id, { [field]: '' }); }
+      catch { toast.error('Failed to save'); }
+      return;
+    }
+    const iso = dmyToIso(raw);
+    if (!iso) {
+      toast.error('วันที่ต้องเป็นรูปแบบ DD/MM/YYYY');
+      return;
+    }
+    try { await updateTask(id, { [field]: iso }); }
+    catch { toast.error('Failed to save'); }
+  }, [updateTask]);
+
   const handlePct = useCallback(async (id: string, pct: number) => {
     try {
       const res = await taskApi.setComplete(id, pct);
@@ -186,7 +202,7 @@ export default function TasksTab({ projectId }: Props) {
   const onResizeMove = useCallback((e: MouseEvent) => {
     if (!dragRef.current) return;
     const delta = e.clientX - dragStartX.current;
-    setSplitW(Math.max(300, Math.min(900, dragStartW.current + delta)));
+    setSplitW(Math.max(0, dragStartW.current + delta));
   }, []);
   const onResizeEnd = useCallback(() => { dragRef.current = false; }, []);
   useEffect(() => {
@@ -399,20 +415,22 @@ export default function TasksTab({ projectId }: Props) {
   // ── Table content ─────────────────────────────────────────────────────────
   const tableContent = (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
-      {/* Table header — same height as Gantt header (HDR_H) */}
-      <div style={{ display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
-        {COLS.map(c => (
-          <div key={c.label} style={{
-            width: c.label === 'Task Name' ? (isTableView ? `calc(100% - ${TABLE_FIXED_W}px)` : c.w) : c.w,
-            minWidth: c.label === 'Task Name' ? (isTableView ? 380 : c.w) : c.w,
-            padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center'
-          }}>
-            {c.label}
+      <div style={{ flex:1, minWidth:0, overflowX:'auto' }}>
+        <div style={{ display:'flex', flexDirection:'column', minWidth:'max-content', height:'100%' }}>
+          {/* Table header — same height as Gantt header (HDR_H) */}
+          <div style={{ display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
+            {COLS.map(c => (
+              <div key={c.label} style={{
+                width: c.label === 'Task Name' ? (isTableView ? `calc(100% - ${TABLE_FIXED_W}px)` : c.w) : c.w,
+                minWidth: c.label === 'Task Name' ? (isTableView ? 380 : c.w) : c.w,
+                padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center'
+              }}>
+                {c.label}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div ref={tableBodyRef} onScroll={onTableScroll}
-        style={{ flex:1, overflowY:'scroll', overflowX:isTableView?'hidden':'auto' }}>
+          <div ref={tableBodyRef} onScroll={onTableScroll}
+            style={{ flex:1, overflowY:'scroll', overflowX:'hidden' }}>
         {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
         {!loading && visible.map((task, i) => {
           const isPar = hasChildren(projectTasks, task.id);
@@ -443,13 +461,13 @@ export default function TasksTab({ projectId }: Props) {
                 <EditableCell value={task.taskName} onSave={v=>handleUpdate(task.id,{taskName:v})} />
               </div>
               <div style={{ width:94, minWidth:94, padding:'0 6px', flexShrink:0 }}>
-                <EditableCell value={task.startDate} type="date" onSave={v=>handleUpdate(task.id,{startDate:v})} style={{ color:isPar?C.text3:C.text }} />
+                <EditableCell value={isoToDmy(task.startDate)} onSave={v=>handleUpdateDate(task.id,'startDate',v)} alwaysSave style={{ color:isPar?C.text3:C.text }} />
               </div>
               <div style={{ width:94, minWidth:94, padding:'0 6px', flexShrink:0 }}>
-                <EditableCell value={task.endDate} type="date" onSave={v=>handleUpdate(task.id,{endDate:v})} style={{ color:isPar?C.text3:C.text }} />
+                <EditableCell value={isoToDmy(task.endDate)} onSave={v=>handleUpdateDate(task.id,'endDate',v)} alwaysSave style={{ color:isPar?C.text3:C.text }} />
               </div>
               <div style={{ width:100, minWidth:100, padding:'0 6px', flexShrink:0 }}>
-                <EditableCell value={task.actualFinish||''} type="date" onSave={v=>handleUpdate(task.id,{actualFinish:v})} placeholder="—" style={{ color:task.actualFinish?C.green:C.text3 }} />
+                <EditableCell value={task.actualFinish?isoToDmy(task.actualFinish):''} onSave={v=>handleUpdateDate(task.id,'actualFinish',v)} placeholder="—" alwaysSave style={{ color:task.actualFinish?C.green:C.text3 }} />
               </div>
               <div style={{ width:46, minWidth:46, padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'monospace', flexShrink:0 }}>{task.duration}d</div>
               <div style={{ width:110, minWidth:110, padding:'0 6px', flexShrink:0 }}>
@@ -476,6 +494,8 @@ export default function TasksTab({ projectId }: Props) {
         <span>{projectTasks.filter(t=>!t.parentId).length} root</span>
         <span>{projectTasks.length} total</span>
         <span>{Math.round(projectTasks.reduce((s,t)=>s+t.percentComplete,0)/Math.max(projectTasks.length,1))}% avg</span>
+      </div>
+        </div>
       </div>
     </div>
   );
@@ -585,6 +605,13 @@ export default function TasksTab({ projectId }: Props) {
   );
 }
 
+function formatDmyInput(raw: string): string {
+  const digits = String(raw || '').replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
 function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Task[]; selectedTask: Task | null; preset: { anchorId: string | null; mode: 'main' | 'sub'; position: 'before' | 'after' | 'append' }; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
   const todayIso    = new Date().toISOString().split('T')[0];
   const nextWeekIso = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
@@ -598,12 +625,6 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
   });
   const [insertType, setInsertType] = useState<'main' | 'sub'>(preset.mode);
   const [insertPosition, setInsertPosition] = useState<'before' | 'after' | 'append'>(preset.position);
-  const formatDmyInput = (raw: string): string => {
-    const digits = String(raw || '').replace(/\D/g, '').slice(0, 8);
-    if (digits.length <= 2) return digits;
-    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-  };
   const up = (k:string,v:string) => setForm(p=>({...p,[k]:v}));
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
   const startIso = dmyToIso(String(form.startDate || ''));
@@ -715,9 +736,14 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
 }
 
 function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertAfter }: { task:Task; tasks:Task[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void; onInsertBefore: () => void; onInsertAfter: () => void }) {
-  const [form, setForm] = useState<Partial<Task>>({ ...task });
+  const [form, setForm] = useState<Partial<Task>>({
+    ...task,
+    startDate: task.startDate ? isoToDmy(task.startDate) : '',
+    endDate: task.endDate ? isoToDmy(task.endDate) : '',
+    actualFinish: task.actualFinish ? isoToDmy(task.actualFinish) : '',
+  });
   const up = (k:string,v:string|number) => setForm(p=>({...p,[k]:v}));
-  const dur = calcDuration(form.startDate??'', form.endDate??'');
+  const dur = calcDuration(dmyToIso(form.startDate??''), dmyToIso(form.endDate??''));
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
   return (
     <Modal title="Edit Task" onClose={onClose} width={520}>
@@ -727,18 +753,19 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
           onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
       </FormRow>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <FormRow label="Start Date"><input type="date" value={form.startDate??''} onChange={e=>up('startDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
-        <FormRow label="End Date"><input type="date" value={form.endDate??''} onChange={e=>up('endDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+        <FormRow label="Start Date"><input value={form.startDate??''} onChange={e=>up('startDate',formatDmyInput(e.target.value))} inputMode="numeric" maxLength={10} placeholder="DD/MM/YYYY" style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
+        <FormRow label="End Date"><input value={form.endDate??''} onChange={e=>up('endDate',formatDmyInput(e.target.value))} inputMode="numeric" maxLength={10} placeholder="DD/MM/YYYY" style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/></FormRow>
       </div>
-      <FormRow label="Actual Finish Date">
-        <input type="date" value={form.actualFinish??''} onChange={e=>up('actualFinish',e.target.value)}
-          style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.green}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/>
-      </FormRow>
-      {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
-      <FormRow label="% Complete">
-        <input type="number" min={0} max={100} value={form.percentComplete??0} onChange={e=>up('percentComplete',Math.min(100,Math.max(0,Number(e.target.value))))}
-          style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/>
-      </FormRow>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <FormRow label="Actual Finish Date">
+          <input value={form.actualFinish??''} onChange={e=>up('actualFinish',formatDmyInput(e.target.value))} inputMode="numeric" maxLength={10} placeholder="DD/MM/YYYY"
+            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.green}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/>
+        </FormRow>
+        <FormRow label="% Complete">
+          <input type="number" min={0} max={100} value={form.percentComplete??0} onChange={e=>up('percentComplete',Math.min(100,Math.max(0,Number(e.target.value))))}
+            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/>
+        </FormRow>
+      </div>
       <FormRow label="Resource">
         <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
           style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
@@ -767,7 +794,16 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
       </FormRow>
       <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={()=>{ if(!form.taskName?.trim()) return; onSave({ ...form, duration: calcDuration(form.startDate??'', form.endDate??'') }); }}>Save Changes</Btn>
+        <Btn onClick={()=>{
+          if(!form.taskName?.trim()) return;
+          onSave({
+            ...form,
+            startDate: dmyToIso(form.startDate ?? ''),
+            endDate: dmyToIso(form.endDate ?? ''),
+            actualFinish: form.actualFinish ? dmyToIso(form.actualFinish) : '',
+            duration: calcDuration(dmyToIso(form.startDate ?? ''), dmyToIso(form.endDate ?? '')),
+          });
+        }}>Save Changes</Btn>
       </div>
     </Modal>
   );

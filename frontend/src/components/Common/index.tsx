@@ -146,7 +146,8 @@ export const Tabs: React.FC<{
 export const EditableCell: React.FC<{
   value: string; onSave: (v: string) => void;
   type?: string; placeholder?: string; style?: React.CSSProperties;
-}> = ({ value, onSave, type = 'text', placeholder = '—', style }) => {
+  alwaysSave?: boolean;
+}> = ({ value, onSave, type = 'text', placeholder = '—', style, alwaysSave = false }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -156,8 +157,8 @@ export const EditableCell: React.FC<{
 
   const commit = useCallback(() => {
     setEditing(false);
-    if (draft !== value || type === 'date') onSave(draft);
-  }, [draft, value, onSave, type]);
+    if (draft !== value || type === 'date' || alwaysSave) onSave(draft);
+  }, [draft, value, onSave, type, alwaysSave]);
 
   if (editing) {
     return (
