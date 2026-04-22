@@ -1,11 +1,29 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
-  const { email, userId } = req.body || {};
-  if (!email || !userId) return res.status(400).json({ error: 'Missing email or userId' });
+  const { email, userId: providedUserId } = req.body || {};
+  if (!email) return res.status(400).json({ error: 'Missing email' });
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ error: 'Missing Supabase service env' });
+
+  let userId = providedUserId;
+  if (!userId) {
+    const profResp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodeURIComponent(email.trim().toLowerCase())}&select=id`, {
+      headers: {
+        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+        apikey: SUPABASE_SERVICE_KEY,
+      },
+    });
+    const profData = await profResp.json();
+    if (Array.isArray(profData) && profData.length > 0 && profData[0].id) {
+      userId = profData[0].id;
+    }
+  }
+
+  if (!userId) {
+    return res.status(200).json({ message: 'No linked auth user found for email', linked: [] });
+  }
 
   try {
     // 1) call RPC to get matching member rows (may include project_id)

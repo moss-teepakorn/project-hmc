@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, Avatar, Modal, FormRow, Input, Select, Textarea, ConfirmModal, C, TH, TD } from '../Common';
@@ -23,6 +23,7 @@ export default function MembersTab({ projectId }: Props) {
   const [filter, setFilter]     = useState<'all' | 'internal' | 'client'>('all');
   const [modal, setModal]       = useState<Partial<Member> | null>(null);
   const [deleting, setDeleting] = useState<Member | null>(null);
+  const [syncing, setSyncing]   = useState(false);
 
   useEffect(() => {
     fetchMembers(projectId);
@@ -71,12 +72,59 @@ export default function MembersTab({ projectId }: Props) {
   const internal = members.filter(m => m.type === 'internal').sort(sortMembers);
   const client   = members.filter(m => m.type === 'client').sort(sortMembers);
 
+  const syncMemberEmail = async (email: string) => {
+    const normalized = String(email || '').trim().toLowerCase();
+    if (!normalized) return;
+    try {
+      const response = await fetch('/api/link-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalized }),
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        console.warn('link-member failed', response.status, body);
+      }
+    } catch (e) {
+      console.warn('link-member failed', e);
+    }
+  };
+
   const handleSave = async (form: Partial<Member>) => {
     try {
-      if (form.id) { await updateMember(form.id, { ...form, projectId }); toast.success('Member updated'); }
-      else         { await createMember({ ...form, projectId }); toast.success('Member added'); }
+      if (form.id) {
+        await updateMember(form.id, { ...form, projectId });
+        toast.success('Member updated');
+      } else {
+        await createMember({ ...form, projectId });
+        toast.success('Member added');
+        if (form.email) await syncMemberEmail(form.email);
+      }
       setModal(null);
-    } catch { toast.error('Failed to save'); }
+    } catch {
+      toast.error('Failed to save');
+    }
+  };
+
+  const handleSyncProjectMembers = async () => {
+    if (!projectId) return;
+    setSyncing(true);
+    try {
+      const response = await fetch('/api/sync-project-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Sync failed');
+      toast.success(`Sync completed: ${result.insertedCount || 0} added, ${result.deletedCount || 0} removed`);
+      await fetchMembers(projectId);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to sync';
+      toast.error(message);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   // PATCH user role (admin only)
@@ -125,7 +173,12 @@ export default function MembersTab({ projectId }: Props) {
             </button>
           ))}
         </div>
-        <Btn onClick={() => setModal({})} small><Plus size={14} /> Add Member</Btn>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Btn variant="outline" small disabled={syncing} onClick={handleSyncProjectMembers}>
+            <RefreshCcw size={14} /> Sync Members
+          </Btn>
+          <Btn onClick={() => setModal({})} small><Plus size={14} /> Add Member</Btn>
+        </div>
       </div>
 
       <Card>
