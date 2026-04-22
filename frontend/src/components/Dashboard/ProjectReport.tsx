@@ -106,8 +106,20 @@ export default function ProjectReport({ project, onClose }: Props) {
     // Section titles
     doc.setFontSize(9);
     doc.setFont('helvetica','bold');
-    doc.text('Main Tasks', 12, y + 2);
-    doc.text('Milestones', 12 + cw + 3, y + 2);
+    doc.setFillColor(79,70,229);
+    const taskTitle = 'Main Tasks';
+    const taskTitleWidth = doc.getTextWidth(taskTitle) + 8;
+    doc.roundedRect(12 - 2, y - 4.5, taskTitleWidth, 8, 2, 2, 'F');
+    doc.setTextColor(255,255,255);
+    doc.text(taskTitle, 12 + 1, y + 1.5);
+
+    doc.setFillColor(16,185,129);
+    const milestoneTitle = 'Milestones';
+    const milestoneTitleWidth = doc.getTextWidth(milestoneTitle) + 8;
+    doc.roundedRect(12 + cw + 3 - 2, y - 4.5, milestoneTitleWidth, 8, 2, 2, 'F');
+    doc.setTextColor(255,255,255);
+    doc.text(milestoneTitle, 12 + cw + 3 + 1, y + 1.5);
+    doc.setTextColor(0);
     doc.setFont('helvetica','normal');
 
     // Tasks
@@ -165,10 +177,15 @@ export default function ProjectReport({ project, onClose }: Props) {
     ];
     doc.setFontSize(9);
     doc.setFont('helvetica','bold');
-    sections.forEach(({title, left}) => {
-      doc.text(title, left, midY + 2);
+    sections.forEach(({title, left, color}) => {
+      const titleWidth = doc.getTextWidth(title) + 8;
+      doc.setFillColor(...color);
+      doc.roundedRect(left - 2, midY - 4.5, titleWidth, 8, 2, 2, 'F');
+      doc.setTextColor(255,255,255);
+      doc.text(title, left + 1, midY + 1.5);
     });
     doc.setFont('helvetica','normal');
+    doc.setTextColor(0);
 
     sections.forEach(({rows, head, color, left}) => {
       autoTable(doc,{ 
