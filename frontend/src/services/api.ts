@@ -477,7 +477,9 @@ async function persistTaskChanges(origTasks: Task[], newTasks: Task[]): Promise<
     if (orig.percentComplete !== t.percentComplete) updates.percent_complete = t.percentComplete;
     if (orig.startDate !== t.startDate) updates.start_date = t.startDate;
     if (orig.endDate !== t.endDate) updates.end_date = t.endDate;
-    if (orig.duration !== t.duration) updates.duration = t.duration;
+    const calculatedDuration = calcDurationFromDates(t);
+    if (t.startDate && t.endDate && orig.duration !== calculatedDuration) updates.duration = calculatedDuration;
+    if ((orig.actualFinish || '') !== (t.actualFinish || '')) updates.actual_finish = t.actualFinish || '';
     if (Object.keys(updates).length > 0) {
       await supabase.from('tasks').update(updates).eq('id', t.id);
     }
@@ -543,7 +545,8 @@ function recalcParents(tasks: Task[]): Task[] {
       // Recalc percent complete (weighted by duration)
       const totalDuration = children.reduce((s, c) => s + (c.duration || 1), 0);
       const weighted = children.reduce((s, c) => s + c.percentComplete * (c.duration || 1), 0);
-      const newPct = totalDuration > 0 ? Math.round(weighted / totalDuration) : 0;
+      const allChildrenComplete = children.every((c) => c.percentComplete === 100);
+      const newPct = allChildrenComplete ? 100 : (totalDuration > 0 ? Math.round(weighted / totalDuration) : 0);
       if (parent.percentComplete !== newPct) {
         parent.percentComplete = newPct;
         changed = true;
@@ -563,6 +566,15 @@ function recalcParents(tasks: Task[]): Task[] {
         changed = true;
       }
 
+      // If all direct children are complete, set actual finish from latest child end date
+      if (allChildrenComplete && childEnds.length > 0) {
+        const latestChildEnd = childEnds[childEnds.length - 1];
+        if (parent.actualFinish !== latestChildEnd) {
+          parent.actualFinish = latestChildEnd;
+          changed = true;
+        }
+      }
+
       // Recalc duration from new dates
       if (parent.startDate && parent.endDate) {
         const s = new Date(parent.startDate).getTime();
@@ -575,6 +587,14 @@ function recalcParents(tasks: Task[]): Task[] {
     }
   }
   return result;
+}
+
+function calcDurationFromDates(task: Task): number {
+  if (!task.startDate || !task.endDate) return task.duration || 0;
+  const s = new Date(task.startDate).getTime();
+  const e = new Date(task.endDate).getTime();
+  if (Number.isNaN(s) || Number.isNaN(e)) return task.duration || 0;
+  return Math.max(0, Math.round((e - s) / 86400000));
 }
 
 // ── Members ─────────────────────────────────────────────────────────────────
