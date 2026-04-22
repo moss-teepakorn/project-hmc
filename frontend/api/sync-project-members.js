@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
   const { projectId } = req.body || {};
@@ -7,104 +9,75 @@ export default async function handler(req, res) {
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ error: 'Missing Supabase service env' });
 
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
   try {
-    const membersResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?project_id=eq.${encodeURIComponent(projectId)}&select=email`,
-      {
-        headers: {
-          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-          apikey: SUPABASE_SERVICE_KEY,
-        },
-      }
+    const { data: members, error: membersError } = await supabase
+      .from('members')
+      .select('email')
+      .eq('project_id', projectId);
+    if (membersError) throw membersError;
+
+    const emails = Array.from(
+      new Set(
+        (members || [])
+          .map((row: any) => String(row.email || '').trim().toLowerCase())
+          .filter((email: string) => email)
+      )
     );
-    const members = await membersResp.json();
-    const emails = Array.from(new Set(
-      (Array.isArray(members) ? members : [])
-        .map((row) => String(row.email || '').trim().toLowerCase())
-        .filter((email) => email)
-    ));
 
-    const profiles = emails.length > 0 ? await (async () => {
-      const quoted = emails.map((email) => `'${email.replace(/'/g, "''")}'`).join(',');
-      const resp = await fetch(
-        `${SUPABASE_URL}/rest/v1/profiles?email=in.(${encodeURIComponent(quoted)})&select=id,email`,
-        {
-          headers: {
-            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            apikey: SUPABASE_SERVICE_KEY,
-          },
-        }
-      );
-      return await resp.json();
-    })() : [];
+    const { data: profiles, error: profilesError } = emails.length
+      ? await supabase.from('profiles').select('id,email').in('email', emails)
+      : { data: [], error: null };
+    if (profilesError) throw profilesError;
 
-    const profileByEmail = new Map();
-    (Array.isArray(profiles) ? profiles : []).forEach((row) => {
+    const profileByEmail = new Map<string, string>();
+    (profiles || []).forEach((row: any) => {
       if (row.email) profileByEmail.set(String(row.email).trim().toLowerCase(), row.id);
     });
 
-    const existingResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/project_members?project_id=eq.${encodeURIComponent(projectId)}&select=id,user_id`,
-      {
-        headers: {
-          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-          apikey: SUPABASE_SERVICE_KEY,
-        },
-      }
+    const { data: existingRows, error: existingError } = await supabase
+      .from('project_members')
+      .select('id,user_id')
+      .eq('project_id', projectId);
+    if (existingError) throw existingError;
+
+    const existingUserIds = new Set((existingRows || []).map((row: any) => row.user_id));
+    const desiredUserIds = Array.from(
+      new Set(emails.map((email) => profileByEmail.get(email)).filter(Boolean))
     );
-    const existingRows = await existingResp.json();
-    const existingUserIds = new Set((Array.isArray(existingRows) ? existingRows : []).map((row) => row.user_id));
 
-    const desiredUserIds = Array.from(new Set(
-      emails.map((email) => profileByEmail.get(email)).filter(Boolean)
-    ));
-
-    const toInsert = desiredUserIds.filter((userId) => !existingUserIds.has(userId));
     const inserted = [];
-    if (toInsert.length > 0) {
-      const insertRows = toInsert.map((userId) => ({ project_id: projectId, user_id: userId }));
-      const insertResp = await fetch(`${SUPABASE_URL}/rest/v1/project_members`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-          apikey: SUPABASE_SERVICE_KEY,
-          Prefer: 'return=representation',
-        },
-        body: JSON.stringify(insertRows),
-      });
-      if (!insertResp.ok) {
-        const err = await insertResp.text();
-        throw new Error(`Insert failed: ${err}`);
+    if (desiredUserIds.length > 0) {
+      const toInsert = desiredUserIds
+        .filter((userId) => !existingUserIds.has(userId))
+        .map((userId) => ({ project_id: projectId, user_id: userId }));
+      if (toInsert.length > 0) {
+        const { data: insertedRows, error: insertError } = await supabase
+          .from('project_members')
+          .insert(toInsert)
+          .select();
+        if (insertError) throw insertError;
+        inserted.push(...(insertedRows || []));
       }
-      const insertedRows = await insertResp.json();
-      inserted.push(...(Array.isArray(insertedRows) ? insertedRows : []));
     }
 
     const desiredSet = new Set(desiredUserIds);
-    const toDeleteIds = (Array.isArray(existingRows) ? existingRows : [])
-      .filter((row) => row.user_id && !desiredSet.has(row.user_id))
-      .map((row) => row.id);
-    let deleted = [];
+    const toDeleteIds = (existingRows || [])
+      .filter((row: any) => row.user_id && !desiredSet.has(row.user_id))
+      .map((row: any) => row.id);
+
+    const deleted = [];
     if (toDeleteIds.length > 0) {
-      const quotedIds = toDeleteIds.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(',');
-      const deleteResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/project_members?id=in.(${encodeURIComponent(quotedIds)})`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            apikey: SUPABASE_SERVICE_KEY,
-            Prefer: 'return=representation',
-          },
-        }
-      );
-      if (!deleteResp.ok) {
-        const err = await deleteResp.text();
-        throw new Error(`Delete failed: ${err}`);
-      }
-      deleted = deleteResp.status === 204 ? [] : await deleteResp.json();
+      const { data: deletedRows, error: deleteError } = await supabase
+        .from('project_members')
+        .delete()
+        .in('id', toDeleteIds)
+        .select();
+      if (deleteError) throw deleteError;
+      deleted.push(...(deletedRows || []));
     }
 
     return res.status(200).json({
