@@ -707,7 +707,7 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
             }
           }
 
-          onSave({ ...form, parentId, order, startDate, endDate });
+          onSave({ ...form, parentId, order, startDate, endDate, duration: dur });
         }}>Create Task</Btn>
       </div>
     </Modal>
@@ -767,7 +767,7 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
       </FormRow>
       <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={()=>{ if(!form.taskName?.trim()) return; onSave(form); }}>Save Changes</Btn>
+        <Btn onClick={()=>{ if(!form.taskName?.trim()) return; onSave({ ...form, duration: calcDuration(form.startDate??'', form.endDate??'') }); }}>Save Changes</Btn>
       </div>
     </Modal>
   );

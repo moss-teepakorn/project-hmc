@@ -156,8 +156,8 @@ export const EditableCell: React.FC<{
 
   const commit = useCallback(() => {
     setEditing(false);
-    if (draft !== value) onSave(draft);
-  }, [draft, value, onSave]);
+    if (draft !== value || type === 'date') onSave(draft);
+  }, [draft, value, onSave, type]);
 
   if (editing) {
     return (
