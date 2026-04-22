@@ -161,8 +161,8 @@ export default function MembersTab({ projectId }: Props) {
                 <td style={{ ...TD, color: C.text3, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{mb.notes || '—'}</td>
                 <td style={TD}>
                   <div style={{ display: 'flex', gap: 5 }}>
-                    <button onClick={() => setModal(mb)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={11} /></button>
-                    <button onClick={() => setDeleting(mb)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={11} /></button>
+                    <button onClick={() => setModal(mb)} style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', background: C.primaryBg, border: 'none', borderRadius: 8, padding: '8px', minWidth: 34, minHeight: 34, fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={16} /></button>
+                    <button onClick={() => setDeleting(mb)} style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', background: C.redBg, border: 'none', borderRadius: 8, padding: '8px', minWidth: 34, minHeight: 34, fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={16} /></button>
                   </div>
                 </td>
               </tr>

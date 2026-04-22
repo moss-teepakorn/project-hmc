@@ -462,8 +462,8 @@ export default function TasksTab({ projectId }: Props) {
 
   // ── Table content ─────────────────────────────────────────────────────────
   const tableContent = (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
-      <div style={{ flex:1, minWidth:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', minHeight:0 }}>
+      <div style={{ flex:1, minWidth:0, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
         <div style={{ overflowX:'auto', overflowY:'hidden', minWidth:0 }}>
           {/* Table header — same height as Gantt header (HDR_H) */}
           <div ref={tableHeaderRef} onScroll={onHeaderScroll} style={{ minWidth:'max-content', display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
