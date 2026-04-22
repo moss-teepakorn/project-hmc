@@ -462,7 +462,7 @@ export default function TasksTab({ projectId }: Props) {
 
   // ── Table content ─────────────────────────────────────────────────────────
   const tableContent = (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', minHeight:0 }}>
+    <div style={{ display:'flex', flex:1, flexDirection:'column', height:'100%', overflow:'hidden', minHeight:0 }}>
       <div style={{ flex:1, minWidth:0, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
         <div style={{ overflowX:'auto', overflowY:'hidden', minWidth:0 }}>
           {/* Table header — same height as Gantt header (HDR_H) */}
@@ -481,7 +481,7 @@ export default function TasksTab({ projectId }: Props) {
             ))}
           </div>
           <div ref={tableBodyRef} onScroll={onTableScroll}
-            style={{ flex:1, overflowY:'auto', overflowX:'auto', minWidth:'max-content' }}>
+            style={{ flex:1, minHeight:0, overflowY:'auto', overflowX:'auto', minWidth:'max-content' }}>
         {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
         {!loading && visible.map((task, i) => {
           const isPar = hasChildren(projectTasks, task.id);
@@ -610,7 +610,7 @@ export default function TasksTab({ projectId }: Props) {
       {/* Content */}
       <div style={{ flex:1, overflow:'hidden', display:'flex' }}>
         {(view==='table'||view==='split') && (
-          <div style={{ width:view==='split'?splitW:undefined, flex:view==='table'?1:undefined, minWidth:300, overflow:'hidden', display:'flex', flexDirection:'column', flexShrink:0 }}>
+          <div style={{ width:view==='split'?splitW:undefined, flex:view==='table'?1:undefined, minWidth:300, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column', flexShrink:0 }}>
             {tableContent}
           </div>
         )}
@@ -624,7 +624,7 @@ export default function TasksTab({ projectId }: Props) {
           </div>
         )}
         {(view==='gantt'||view==='split') && (
-          <div style={{ flex:1, overflow:'hidden', minWidth:200 }}>
+          <div style={{ flex:1, minHeight:0, overflow:'hidden', minWidth:200, display:'flex', flexDirection:'column' }}>
             <GanttChart tasks={projectTasks} visibleTasks={visible} selectedId={selected}
               onSelect={setSelected} ganttBodyRef={ganttBodyRef} onGanttScroll={onGanttScroll}
               zoomIndex={zoomIndex} onZoomChange={setZoomIndex}
