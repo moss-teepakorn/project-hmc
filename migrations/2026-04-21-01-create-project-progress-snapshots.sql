@@ -14,3 +14,31 @@ CREATE TABLE IF NOT EXISTS public.project_progress_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_project_progress_snapshots_project
   ON public.project_progress_snapshots(project_id);
+
+ALTER TABLE IF EXISTS public.project_progress_snapshots ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS project_progress_snapshots_public_select ON public.project_progress_snapshots;
+DROP POLICY IF EXISTS project_progress_snapshots_public_insert ON public.project_progress_snapshots;
+DROP POLICY IF EXISTS project_progress_snapshots_public_update ON public.project_progress_snapshots;
+DROP POLICY IF EXISTS project_progress_snapshots_public_delete ON public.project_progress_snapshots;
+
+CREATE POLICY project_progress_snapshots_public_select ON public.project_progress_snapshots
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY project_progress_snapshots_public_insert ON public.project_progress_snapshots
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+CREATE POLICY project_progress_snapshots_public_update ON public.project_progress_snapshots
+  FOR UPDATE
+  TO anon, authenticated
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY project_progress_snapshots_public_delete ON public.project_progress_snapshots
+  FOR DELETE
+  TO anon, authenticated
+  USING (true);

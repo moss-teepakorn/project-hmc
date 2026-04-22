@@ -41,10 +41,13 @@ export default function ProjectSummaryTab({ project }: Props) {
     [project.startDate, project.endDate],
   );
 
-  const baselineProgress = useMemo(
-    () => computeBaselineProgress(projectTasks, snapshotDates),
-    [projectTasks, snapshotDates],
-  );
+  const baselineProgress = useMemo(() => {
+    const computed = computeBaselineProgress(projectTasks, snapshotDates);
+    if (snapshotDates.length > 0 && snapshotDates[snapshotDates.length - 1] === project.endDate) {
+      computed[snapshotDates.length - 1] = 100;
+    }
+    return computed;
+  }, [projectTasks, snapshotDates, project.endDate]);
 
   const savedByDate = useMemo(() => {
     const map = new Map<string, ProjectProgressSnapshot>();
@@ -147,6 +150,32 @@ export default function ProjectSummaryTab({ project }: Props) {
     await fetchProjectProgressSnapshots(project.id);
   };
 
+  const graphRows = useMemo(() => {
+    const points = rows.map((row, index) => ({
+      ...row,
+      actualPercent: row.actualPercent,
+      baselinePercent: row.baselinePercent,
+      xIndex: index,
+    }));
+    return points;
+  }, [rows]);
+
+  const chartWidth = 760;
+  const chartHeight = 240;
+  const chartMargin = { top: 20, right: 24, bottom: 38, left: 44 };
+  const innerWidth = chartWidth - chartMargin.left - chartMargin.right;
+  const innerHeight = chartHeight - chartMargin.top - chartMargin.bottom;
+
+  const chartPoints = graphRows.map((row, index) => {
+    const x = chartMargin.left + (graphRows.length > 1 ? (innerWidth * index) / (graphRows.length - 1) : innerWidth / 2);
+    return {
+      ...row,
+      x,
+      baselineY: chartMargin.top + innerHeight * (1 - row.baselinePercent / 100),
+      actualY: chartMargin.top + innerHeight * (1 - row.actualPercent / 100),
+    };
+  });
+
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     doc.setFontSize(14);
@@ -212,6 +241,59 @@ export default function ProjectSummaryTab({ project }: Props) {
           </div>
         </Card>
       </div>
+
+      <Card style={{ padding: 18, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, color: C.text2 }}>Progress graph</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Baseline vs Actual</div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: C.text2 }}>
+              <span style={{ width: 12, height: 12, borderRadius: 999, background: C.primary, display: 'inline-block' }} /> Baseline
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: C.text2 }}>
+              <span style={{ width: 12, height: 12, borderRadius: 999, background: C.green, display: 'inline-block' }} /> Actual
+            </div>
+          </div>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <svg width={chartWidth} height={chartHeight} style={{ display: 'block' }}>
+            {[0, 25, 50, 75, 100].map((value) => {
+              const y = chartMargin.top + innerHeight * (1 - value / 100);
+              return (
+                <g key={value}>
+                  <line x1={chartMargin.left} y1={y} x2={chartWidth - chartMargin.right} y2={y} stroke="#E2E8F0" strokeWidth={1} />
+                  <text x={chartMargin.left - 10} y={y + 4} textAnchor="end" fontSize={10} fill={C.text2}>{value}%</text>
+                </g>
+              );
+            })}
+            <line x1={chartMargin.left} y1={chartMargin.top} x2={chartMargin.left} y2={chartHeight - chartMargin.bottom} stroke={C.text3} strokeWidth={1.4} />
+            <line x1={chartMargin.left} y1={chartHeight - chartMargin.bottom} x2={chartWidth - chartMargin.right} y2={chartHeight - chartMargin.bottom} stroke={C.text3} strokeWidth={1.4} />
+
+            <polyline
+              fill="none"
+              stroke={C.primary}
+              strokeWidth={2.5}
+              points={chartPoints.map((pt) => `${pt.x},${pt.baselineY}`).join(' ')}
+            />
+            <polyline
+              fill="none"
+              stroke={C.green}
+              strokeWidth={2.5}
+              points={chartPoints.map((pt) => `${pt.x},${pt.actualY}`).join(' ')}
+            />
+
+            {chartPoints.map((pt) => (
+              <g key={pt.snapshotDate}>
+                <circle cx={pt.x} cy={pt.baselineY} r={4} fill={C.primary} />
+                <circle cx={pt.x} cy={pt.actualY} r={4} fill={C.green} />
+                <text x={pt.x} y={chartHeight - chartMargin.bottom + 16} textAnchor="middle" fontSize={9} fill={C.text2}>{fmtDate(pt.snapshotDate)}</text>
+              </g>
+            ))}
+          </svg>
+        </div>
+      </Card>
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 760, background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
