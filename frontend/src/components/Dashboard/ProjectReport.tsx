@@ -103,6 +103,13 @@ export default function ProjectReport({ project, onClose }: Props) {
     // Two columns: Tasks | Milestones
     const cw = (W-28-3)/2;
 
+    // Section titles
+    doc.setFontSize(9);
+    doc.setFont('helvetica','bold');
+    doc.text('Main Tasks', 12, y + 2);
+    doc.text('Milestones', 12 + cw + 3, y + 2);
+    doc.setFont('helvetica','normal');
+
     // Tasks
     const summaryTaskRows = tasksForReport.slice(0,12).map(t=>[
       t.wbs, t.taskName.substring(0,36),
@@ -110,8 +117,8 @@ export default function ProjectReport({ project, onClose }: Props) {
       t.actualFinish ? fmtDate(t.actualFinish) : '-',
       `${t.percentComplete}%`,
     ]);
-    autoTable(doc,{
-      startY:y, tableWidth:cw, margin:{left:12, right:W-12-cw},
+    autoTable(doc,{ 
+      startY:y + 6, tableWidth:cw, margin:{left:12, right:W-12-cw},
       head:[['WBS','Task','Start','Finish','Actual','%']],
       body:summaryTaskRows.length?summaryTaskRows:[['','No tasks','','','','']],
       styles:{fontSize:7,cellPadding:1.5},
@@ -130,11 +137,8 @@ export default function ProjectReport({ project, onClose }: Props) {
 
     // Milestones
     const msRows = ms.slice(0, 10).map(m=>[m.phase,m.name.substring(0,26),money2(m.amount),fmtDate(m.dueDate),m.status.toUpperCase()]);
-    autoTable(doc,{
-      startY:y, tableWidth:cw, margin:{left:12+cw+3, right:12},
-      head:[['Phase','Milestone','Amount','Due','Status']],
-      body:msRows.length?msRows:[['','No milestones','','','']],
-      styles:{fontSize:7,cellPadding:1.5},
+    autoTable(doc,{ 
+      startY:y + 6, tableWidth:cw, margin:{left:12+cw+3, right:12},
       headStyles:{fillColor:[16,185,129],textColor:255,fontSize:7},
       columnStyles:{0:{cellWidth:14},1:{cellWidth:cw-68},2:{cellWidth:18},3:{cellWidth:17},4:{cellWidth:15}},
       didParseCell(d){
@@ -159,9 +163,16 @@ export default function ProjectReport({ project, onClose }: Props) {
       {rows:issRows2, title:'Issues',          head:['Date','Title','Assigned','Status'], color:[239,68,68],  left:12+sw+3},
       {rows:rskRows2, title:'Risks',           head:['Title','Prob','Impact','Status'],   color:[245,158,11], left:12+2*(sw+3)},
     ];
+    doc.setFontSize(9);
+    doc.setFont('helvetica','bold');
+    sections.forEach(({title, left}) => {
+      doc.text(title, left, midY + 2);
+    });
+    doc.setFont('helvetica','normal');
+
     sections.forEach(({rows, head, color, left}) => {
-      autoTable(doc,{
-        startY:midY, tableWidth:sw, margin:{left, right:W-left-sw},
+      autoTable(doc,{ 
+        startY:midY + 6, tableWidth:sw, margin:{left, right:W-left-sw},
         head:[head],
         body:rows.length?rows:[['','No data','','']],
         styles:{fontSize:6.5,cellPadding:1.2},
