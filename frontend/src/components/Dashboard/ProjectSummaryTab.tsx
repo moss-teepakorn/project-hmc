@@ -9,7 +9,7 @@ import { useStore } from '../../store';
 interface Props { project: Project; }
 
 interface DraftRow {
-  actualPercent: number;
+  actualPercent: string;
   note: string;
 }
 
@@ -62,18 +62,20 @@ export default function ProjectSummaryTab({ project }: Props) {
     const saved = savedByDate.get(date);
     const draft = drafts[date];
     const baselinePercent = baselineProgress[index] ?? 0;
-    const actualPercent = draft?.actualPercent ?? saved?.actualPercent ?? 0;
+    const originalActualInput = saved ? String(saved.actualPercent ?? 0) : '';
+    const actualInput = draft?.actualPercent ?? originalActualInput;
+    const actualPercent = actualInput.trim() === '' ? 0 : Number(actualInput);
     const note = draft?.note ?? saved?.note ?? '';
-    const originalActual = saved?.actualPercent ?? 0;
     const originalNote = saved?.note ?? '';
     return {
       id: saved?.id || '',
       snapshotDate: date,
       baselinePercent,
       actualPercent,
+      actualInput,
       note,
-      dirty: draft ? (draft.actualPercent !== originalActual || draft.note !== originalNote) : false,
-      canSave: saved?.id || draft,
+      dirty: draft ? (draft.actualPercent !== originalActualInput || draft.note !== originalNote) : false,
+      canSave: !!saved || !!draft,
     };
   }), [snapshotDates, baselineProgress, savedByDate, drafts]);
 
@@ -82,17 +84,16 @@ export default function ProjectSummaryTab({ project }: Props) {
   };
 
   const handleActualChange = (date: string, value: string) => {
-    const next = Math.max(0, Math.min(100, Number(value) || 0));
     const current = drafts[date] || {
-      actualPercent: savedByDate.get(date)?.actualPercent ?? 0,
+      actualPercent: savedByDate.get(date)?.actualPercent?.toString() ?? '',
       note: savedByDate.get(date)?.note ?? '',
     };
-    updateDraft(date, { ...current, actualPercent: next });
+    updateDraft(date, { ...current, actualPercent: value });
   };
 
   const handleNoteChange = (date: string, value: string) => {
     const current = drafts[date] || {
-      actualPercent: savedByDate.get(date)?.actualPercent ?? 0,
+      actualPercent: savedByDate.get(date)?.actualPercent?.toString() ?? '',
       note: savedByDate.get(date)?.note ?? '',
     };
     updateDraft(date, { ...current, note: value });
@@ -109,7 +110,9 @@ export default function ProjectSummaryTab({ project }: Props) {
         projectId: project.id,
         snapshotDate: date,
         baselinePercent: baselineProgress[snapshotDates.indexOf(date)] ?? 0,
-        actualPercent: draft?.actualPercent ?? saved?.actualPercent ?? 0,
+        actualPercent: draft?.actualPercent?.trim() === ''
+          ? 0
+          : Number(draft?.actualPercent ?? saved?.actualPercent ?? 0),
         note: draft?.note ?? saved?.note ?? '',
       });
       setDrafts((prev) => {
@@ -164,7 +167,9 @@ export default function ProjectSummaryTab({ project }: Props) {
           projectId: project.id,
           snapshotDate,
           baselinePercent: baselineProgress[index] ?? 0,
-          actualPercent: draft?.actualPercent ?? saved?.actualPercent ?? 0,
+          actualPercent: draft?.actualPercent?.trim() === ''
+            ? 0
+            : Number(draft?.actualPercent ?? saved?.actualPercent ?? 0),
           note: draft?.note ?? saved?.note ?? '',
         });
       }
@@ -209,6 +214,58 @@ export default function ProjectSummaryTab({ project }: Props) {
     doc.setFontSize(10);
     doc.text(`Snapshot count: ${rows.length} · Export date: ${fmtDate(new Date().toISOString())}`, 14, 22);
 
+    const graphX = 14;
+    const graphY = 30;
+    const graphW = 200;
+    const graphH = 80;
+    const graphBottom = graphY + graphH;
+    const graphLeft = graphX + 20;
+
+    doc.setDrawColor(226, 232, 240);
+    for (let i = 0; i <= 4; i += 1) {
+      const y = graphY + (graphH * i) / 4;
+      doc.line(graphLeft, y, graphLeft + graphW, y);
+    }
+
+    doc.setDrawColor(79, 70, 229);
+    doc.setLineWidth(1.6);
+    const baselinePoints = rows.map((row, index) => {
+      const x = graphLeft + (graphW * index) / Math.max(rows.length - 1, 1);
+      const y = graphY + graphH * (1 - row.baselinePercent / 100);
+      return { x, y };
+    });
+    baselinePoints.forEach((pt, index) => {
+      if (index > 0) {
+        const prev = baselinePoints[index - 1];
+        doc.line(prev.x, prev.y, pt.x, pt.y);
+      }
+      doc.circle(pt.x, pt.y, 1.5, 'F');
+    });
+
+    doc.setDrawColor(16, 185, 129);
+    doc.setLineWidth(1.6);
+    const actualPoints = rows.map((row, index) => {
+      const x = graphLeft + (graphW * index) / Math.max(rows.length - 1, 1);
+      const y = graphY + graphH * (1 - row.actualPercent / 100);
+      return { x, y };
+    });
+    actualPoints.forEach((pt, index) => {
+      if (index > 0) {
+        const prev = actualPoints[index - 1];
+        doc.line(prev.x, prev.y, pt.x, pt.y);
+      }
+      doc.circle(pt.x, pt.y, 1.5, 'F');
+    });
+
+    doc.setFontSize(9);
+    doc.text('0%', graphLeft - 12, graphBottom);
+    doc.text('100%', graphLeft - 12, graphY + 3);
+    rows.forEach((row, index) => {
+      const x = graphLeft + (graphW * index) / Math.max(rows.length - 1, 1);
+      doc.text(String(index + 1), x, graphBottom + 8, { align: 'center' });
+    });
+    doc.text('Snapshot', graphLeft + graphW / 2, graphBottom + 16, { align: 'center' });
+
     const body = rows.map((row) => [
       fmtDate(row.snapshotDate),
       `${row.baselinePercent}%`,
@@ -217,7 +274,7 @@ export default function ProjectSummaryTab({ project }: Props) {
     ]);
 
     autoTable(doc, {
-      startY: 28,
+      startY: graphBottom + 24,
       head: [['Snapshot', 'Baseline %', 'Actual %', 'Notes']],
       body,
       theme: 'grid',
@@ -344,8 +401,9 @@ export default function ProjectSummaryTab({ project }: Props) {
                     type="number"
                     min={0}
                     max={100}
-                    value={row.actualPercent}
+                    value={row.actualInput}
                     onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
+                    placeholder=""
                     style={{ width: 72, padding: '6px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13 }}
                   />
                 </td>
