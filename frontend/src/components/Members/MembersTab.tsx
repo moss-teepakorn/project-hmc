@@ -9,11 +9,9 @@ import { updateUserRole } from '../../services/api';
 import { supabase } from '../../services/supabase';
 
 export const ROLES = [
-  'Project Sponsor', 'Project Advisor', 'Project Leader', 'Project Manager',
-  'Project Consultants', 'Business Analyst', 'Business Process Owner',
-  'UI/UX Designer', 'Full-Stack Developer', 'Frontend Developer', 'Backend Developer',
-  'QA Engineer', 'DevOps Engineer', 'IT Support', 'HRM User', 'HRD User',
-  'Product Owner', 'IT Coordinator', 'HR Director', 'Other',
+  'Project Sponsor', 'Project Advisor', 'Project Manager', 'Project Leader',
+  'Project Coordinate', 'Project Consultant', 'Development',
+  'HRD User', 'HRM User', 'Key User', 'IT Support',
 ];
 
 interface Props { projectId: string; }
