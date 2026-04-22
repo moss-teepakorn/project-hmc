@@ -82,6 +82,7 @@ export default function TasksTab({ projectId }: Props) {
 
   // Scroll sync
   const tableBodyRef = useRef<HTMLDivElement>(null);
+  const tableHeaderRef = useRef<HTMLDivElement>(null);
   const ganttBodyRef = useRef<HTMLDivElement>(null);
   const syncing      = useRef(false);
 
@@ -180,7 +181,11 @@ export default function TasksTab({ projectId }: Props) {
 
   // Scroll sync
   const onTableScroll = useCallback(() => {
-    if (syncing.current || !tableBodyRef.current || !ganttBodyRef.current) return;
+    if (!tableBodyRef.current) return;
+    if (tableHeaderRef.current && tableHeaderRef.current.scrollLeft !== tableBodyRef.current.scrollLeft) {
+      tableHeaderRef.current.scrollLeft = tableBodyRef.current.scrollLeft;
+    }
+    if (syncing.current || !ganttBodyRef.current) return;
     syncing.current = true;
     ganttBodyRef.current.scrollTop = tableBodyRef.current.scrollTop;
     requestAnimationFrame(() => { syncing.current = false; });
@@ -190,6 +195,13 @@ export default function TasksTab({ projectId }: Props) {
     syncing.current = true;
     tableBodyRef.current.scrollTop = ganttBodyRef.current.scrollTop;
     requestAnimationFrame(() => { syncing.current = false; });
+  }, []);
+
+  const onHeaderScroll = useCallback(() => {
+    if (!tableHeaderRef.current || !tableBodyRef.current) return;
+    if (tableBodyRef.current.scrollLeft !== tableHeaderRef.current.scrollLeft) {
+      tableBodyRef.current.scrollLeft = tableHeaderRef.current.scrollLeft;
+    }
   }, []);
 
   // Resize handlers
@@ -415,10 +427,10 @@ export default function TasksTab({ projectId }: Props) {
   // ── Table content ─────────────────────────────────────────────────────────
   const tableContent = (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
-      <div style={{ flex:1, minWidth:0, overflowX:'auto' }}>
-        <div style={{ display:'flex', flexDirection:'column', minWidth:'max-content', height:'100%' }}>
+      <div style={{ flex:1, minWidth:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+        <div style={{ overflowX:'auto', overflowY:'hidden', minWidth:0 }}>
           {/* Table header — same height as Gantt header (HDR_H) */}
-          <div style={{ display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
+          <div ref={tableHeaderRef} onScroll={onHeaderScroll} style={{ minWidth:'max-content', display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
             {COLS.map(c => (
               <div key={c.label} style={{
                 width: c.label === 'Task Name' ? (isTableView ? `calc(100% - ${TABLE_FIXED_W}px)` : c.w) : c.w,
@@ -430,7 +442,7 @@ export default function TasksTab({ projectId }: Props) {
             ))}
           </div>
           <div ref={tableBodyRef} onScroll={onTableScroll}
-            style={{ flex:1, overflowY:'scroll', overflowX:'hidden' }}>
+            style={{ flex:1, overflowY:'auto', overflowX:'auto', minWidth:'max-content' }}>
         {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
         {!loading && visible.map((task, i) => {
           const isPar = hasChildren(projectTasks, task.id);
