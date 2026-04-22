@@ -1,5 +1,5 @@
 import {
-  format, parseISO, isValid, differenceInCalendarDays, addDays,
+  format, parseISO, isValid, addDays,
   startOfMonth, endOfMonth,
 } from 'date-fns';
 import type { Task } from '../types';
@@ -7,8 +7,18 @@ import type { Task } from '../types';
 // ── Date helpers — ALL display as DD/MM/YYYY ──────────────────────────────────
 export const calcDuration = (s: string, e: string): number => {
   if (!s || !e) return 0;
-  const a = parseISO(s), b = parseISO(e);
-  return (!isValid(a) || !isValid(b)) ? 0 : Math.max(0, differenceInCalendarDays(b, a));
+  const start = parseISO(s);
+  const end = parseISO(e);
+  if (!isValid(start) || !isValid(end) || end < start) return 0;
+
+  let current = new Date(start.getTime());
+  let count = 0;
+  while (current <= end) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) count += 1;
+    current = addDays(current, 1);
+  }
+  return count;
 };
 
 /** Display: 25/12/2024 */

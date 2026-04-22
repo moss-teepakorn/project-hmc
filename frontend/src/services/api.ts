@@ -591,10 +591,18 @@ function recalcParents(tasks: Task[]): Task[] {
 
 function calcDurationFromDates(task: Task): number {
   if (!task.startDate || !task.endDate) return task.duration || 0;
-  const s = new Date(task.startDate).getTime();
-  const e = new Date(task.endDate).getTime();
-  if (Number.isNaN(s) || Number.isNaN(e)) return task.duration || 0;
-  return Math.max(0, Math.round((e - s) / 86400000));
+  const start = new Date(task.startDate);
+  const end = new Date(task.endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
+
+  let count = 0;
+  const current = new Date(start.getTime());
+  while (current <= end) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) count += 1;
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
 }
 
 // ── Members ─────────────────────────────────────────────────────────────────
