@@ -120,6 +120,15 @@ export default function TasksTab({ projectId }: Props) {
     setSplitW(defaultWidth);
   }, []);
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const originalLang = document.documentElement.lang;
+    document.documentElement.lang = 'en-GB';
+    return () => {
+      document.documentElement.lang = originalLang || 'en';
+    };
+  }, []);
+
   const projectTasks = tasks.filter(t => t.projectId === projectId);
   const visible      = flattenTree(projectTasks, expanded);
   const isTableView = view === 'table';
