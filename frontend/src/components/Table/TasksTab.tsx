@@ -74,9 +74,9 @@ export default function TasksTab({ projectId }: Props) {
   const [showExport, setShowExport] = useState(false);
   const [splitW, setSplitW]     = useState<number>(() => {
     if (typeof window !== 'undefined') {
-      return Math.max(480, Math.round(window.innerWidth * 0.66));
+      return Math.max(610, Math.round(window.innerWidth * 0.66) + 130);
     }
-    return 630;
+    return 760;
   });
   const [zoomIndex, setZoomIndex] = useState(3); // default = Week
   const [colWidths, setColWidths] = useState<number[]>(COLS.map((c) => c.w));
@@ -116,7 +116,7 @@ export default function TasksTab({ projectId }: Props) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const defaultWidth = Math.max(480, Math.round(window.innerWidth * 0.66));
+    const defaultWidth = Math.max(610, Math.round(window.innerWidth * 0.66) + 130);
     setSplitW(defaultWidth);
   }, []);
 
