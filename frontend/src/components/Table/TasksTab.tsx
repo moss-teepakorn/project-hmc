@@ -140,7 +140,7 @@ export default function TasksTab({ projectId }: Props) {
       catch { toast.error('Failed to save'); }
       return;
     }
-    const iso = dmyToIso(raw);
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : dmyToIso(raw);
     if (!iso) {
       toast.error('วันที่ต้องเป็นรูปแบบ DD/MM/YYYY');
       return;
@@ -523,13 +523,13 @@ export default function TasksTab({ projectId }: Props) {
                 <EditableCell value={task.taskName} onSave={v=>handleUpdate(task.id,{taskName:v})} />
               </div>
               <div style={{ width:colWidths[2], minWidth:colWidths[2], padding:'0 6px', flexShrink:0 }}>
-                <EditableCell type="date" value={isoToDmy(task.startDate)} placeholder="—" onSave={v=>handleUpdateDate(task.id,'startDate',v)} alwaysSave style={{ color:isPar?C.text3:C.text }} />
+                <Input type="date" value={task.startDate ?? ''} onChange={v => handleUpdateDate(task.id, 'startDate', v)} style={{ minWidth: 0 }} />
               </div>
               <div style={{ width:colWidths[3], minWidth:colWidths[3], padding:'0 6px', flexShrink:0 }}>
-                <EditableCell type="date" value={isoToDmy(task.endDate)} placeholder="—" onSave={v=>handleUpdateDate(task.id,'endDate',v)} alwaysSave style={{ color:isPar?C.text3:C.text }} />
+                <Input type="date" value={task.endDate ?? ''} onChange={v => handleUpdateDate(task.id, 'endDate', v)} style={{ minWidth: 0 }} />
               </div>
               <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
-                <EditableCell type="date" value={task.actualFinish?isoToDmy(task.actualFinish):''} placeholder="—" onSave={v=>handleUpdateDate(task.id,'actualFinish',v)} alwaysSave style={{ color:task.actualFinish?C.green:C.text3 }} />
+                <Input type="date" value={task.actualFinish ?? ''} onChange={v => handleUpdateDate(task.id, 'actualFinish', v)} style={{ minWidth: 0 }} />
               </div>
               <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'monospace', flexShrink:0 }}>{task.duration}d</div>
               <div style={{ width:colWidths[6], minWidth:colWidths[6], padding:'0 6px', flexShrink:0 }}>
