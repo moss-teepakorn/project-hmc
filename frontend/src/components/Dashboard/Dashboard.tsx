@@ -10,7 +10,7 @@ import ProjectModal from './ProjectModal';
 const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care'];
 
 export default function Dashboard() {
-  const { projects, tasks, issues, risks, changeRequests, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers } = useStore();
+  const { projects, tasks, issues, risks, changeRequests, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts } = useStore();
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [selected,   setSelected]   = useState<Project | null>(null);
@@ -19,6 +19,11 @@ export default function Dashboard() {
   const [showHypercare, setShowHypercare] = useState(false);
 
   // Note: fetchProjects is called from App.tsx, not needed here
+
+  React.useEffect(() => {
+    // Load all tasks once so progress % can show for all project cards in portfolio overview.
+    fetchTasks();
+  }, [fetchTasks]);
   
   // Fetch data when project selected
   React.useEffect(() => {
@@ -28,8 +33,10 @@ export default function Dashboard() {
       fetchIssues(selected.id);
       fetchRisks(selected.id);
       fetchCRs(selected.id);
+      fetchMilestones(selected.id);
+      fetchEfforts(selected.id);
     }
-  }, [selected?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs]);
+  }, [selected?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]);
 
   // Separate normal projects from Hypercare
   const normalProjects = projects.filter(p => p.status !== 'Hyper Care').sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));

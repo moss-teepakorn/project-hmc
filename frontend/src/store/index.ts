@@ -25,7 +25,7 @@ interface Store {
   deleteProject: (id: string) => Promise<void>;
   setActiveProject: (p: Project | null) => void;
 
-  fetchTasks:      (pid: string) => Promise<void>;
+  fetchTasks:      (pid?: string) => Promise<void>;
   createTask:      (t: Partial<Task>) => Promise<void>;
   updateTask:      (id: string, t: Partial<Task>) => Promise<void>;
   deleteTask:      (id: string) => Promise<void>;
