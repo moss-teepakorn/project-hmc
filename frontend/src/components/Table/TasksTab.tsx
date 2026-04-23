@@ -19,16 +19,16 @@ export const HDR_H = 48;   // unified header height for both table and gantt
 // Columns for table view
 const COLS = [
   { label: 'WBS',           w: 52  },
-  { label: 'Task Name',     w: 240 },
+  { label: 'Task Name',     w: 320 },
   { label: 'Start',         w: 94  },
   { label: 'Finish',        w: 94  },
   { label: 'Actual Finish', w: 120 },
   { label: 'Days',          w: 46  },
   { label: '% Done',        w: 120 },
-  { label: 'Resource',      w: 140 },
+  { label: 'Resource',      w: 160 },
   { label: '',              w: 76  },
 ];
-const TABLE_FIXED_W = 52 + 94 + 94 + 120 + 46 + 120 + 140 + 76;
+const TABLE_FIXED_W = 52 + 94 + 94 + 120 + 46 + 120 + 160 + 76;
 
 // Inline % editor
 function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean; onSave: (n: number) => void }) {
@@ -74,9 +74,9 @@ export default function TasksTab({ projectId }: Props) {
   const [showExport, setShowExport] = useState(false);
   const [splitW, setSplitW]     = useState<number>(() => {
     if (typeof window !== 'undefined') {
-      return Math.max(610, Math.round(window.innerWidth * 0.66) + 130);
+      return Math.max(640, Math.round(window.innerWidth * 0.66));
     }
-    return 760;
+    return 630;
   });
   const [zoomIndex, setZoomIndex] = useState(3); // default = Week
   const [colWidths, setColWidths] = useState<number[]>(COLS.map((c) => c.w));
@@ -116,7 +116,7 @@ export default function TasksTab({ projectId }: Props) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const defaultWidth = Math.max(610, Math.round(window.innerWidth * 0.66) + 130);
+    const defaultWidth = Math.max(640, Math.round(window.innerWidth * 0.66));
     setSplitW(defaultWidth);
   }, []);
 
