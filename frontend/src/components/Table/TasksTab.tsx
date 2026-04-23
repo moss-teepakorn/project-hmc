@@ -19,16 +19,16 @@ export const HDR_H = 48;   // unified header height for both table and gantt
 // Columns for table view
 const COLS = [
   { label: 'WBS',           w: 52  },
-  { label: 'Task Name',     w: 200 },
+  { label: 'Task Name',     w: 240 },
   { label: 'Start',         w: 94  },
   { label: 'Finish',        w: 94  },
-  { label: 'Actual Finish', w: 100 },
+  { label: 'Actual Finish', w: 120 },
   { label: 'Days',          w: 46  },
-  { label: '% Done',        w: 110 },
-  { label: 'Resource',      w: 116 },
+  { label: '% Done',        w: 120 },
+  { label: 'Resource',      w: 140 },
   { label: '',              w: 76  },
 ];
-const TABLE_FIXED_W = 52 + 94 + 94 + 100 + 46 + 110 + 116 + 76;
+const TABLE_FIXED_W = 52 + 94 + 94 + 120 + 46 + 120 + 140 + 76;
 
 // Inline % editor
 function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean; onSave: (n: number) => void }) {
@@ -72,7 +72,12 @@ export default function TasksTab({ projectId }: Props) {
   const [editModal, setEditModal] = useState<Task | null>(null);
   const [loading, setLoading]   = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [splitW, setSplitW]     = useState(630);
+  const [splitW, setSplitW]     = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      return Math.max(480, Math.round(window.innerWidth * 0.66));
+    }
+    return 630;
+  });
   const [zoomIndex, setZoomIndex] = useState(3); // default = Week
   const [colWidths, setColWidths] = useState<number[]>(COLS.map((c) => c.w));
   const [addPreset, setAddPreset] = useState<{ anchorId: string | null; mode: 'main' | 'sub'; position: 'before' | 'after' | 'append' }>({
@@ -108,6 +113,12 @@ export default function TasksTab({ projectId }: Props) {
     );
     setExpanded(parentIds);
   }, [tasks.length, projectId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const defaultWidth = Math.max(480, Math.round(window.innerWidth * 0.66));
+    setSplitW(defaultWidth);
+  }, []);
 
   const projectTasks = tasks.filter(t => t.projectId === projectId);
   const visible      = flattenTree(projectTasks, expanded);
