@@ -58,6 +58,7 @@ export const Input: React.FC<{
 }> = ({ value, onChange, placeholder = '', type = 'text', style, autoFocus }) => {
   const [draft, setDraft] = useState(type === 'date' ? (value ? isoToDmy(String(value)) : '') : String(value ?? ''));
   const [focused, setFocused] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (type === 'date') {
@@ -77,12 +78,25 @@ export const Input: React.FC<{
     if (iso) onChange(iso);
   };
 
+  const handleNativeDateChange = (isoDate: string) => {
+    const text = isoDate ? isoToDmy(isoDate) : '';
+    setDraft(text);
+    onChange(isoDate);
+  };
+
   const handleDateBlur = () => {
     setFocused(false);
     if (!draft) return;
     const iso = dmyToIso(draft);
     if (!iso) {
       setDraft(value ? isoToDmy(String(value)) : '');
+    }
+  };
+
+  const openNativePicker = () => {
+    if (dateInputRef.current) {
+      dateInputRef.current.showPicker?.();
+      dateInputRef.current.focus();
     }
   };
 
@@ -96,7 +110,14 @@ export const Input: React.FC<{
           onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
           style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, padding: '8px 12px', border: `1.5px solid ${focused ? C.primary : C.border}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box', color: C.text, background: C.white, paddingRight: 40 }}
         />
-        <Calendar size={16} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.text3, pointerEvents: 'none' }} />
+        <input ref={dateInputRef} type="date" value={value ? String(value) : ''}
+          onChange={e => handleNativeDateChange(e.target.value)}
+          style={{ position: 'absolute', right: 0, top: 0, width: 36, height: '100%', opacity: 0, border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, margin: 0 }}
+        />
+        <div onClick={openNativePicker}
+          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.text3, cursor: 'pointer', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Calendar size={16} />
+        </div>
       </div>
     );
   }
