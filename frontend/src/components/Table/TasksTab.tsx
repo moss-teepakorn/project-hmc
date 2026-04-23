@@ -732,11 +732,11 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
         </div>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <FormRow label="Start Date"><input type="date" value={form.startDate??''} onChange={e=>up('startDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
-        <FormRow label="End Date"><input type="date" value={form.endDate??''} onChange={e=>up('endDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+        <FormRow label="Start Date"><Input type="date" value={form.startDate ?? ''} onChange={v => up('startDate', v)} /></FormRow>
+        <FormRow label="End Date"><Input type="date" value={form.endDate ?? ''} onChange={v => up('endDate', v)} /></FormRow>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8 }}>
-        <FormRow label="Actual Finish Date"><input type="date" value={form.actualFinish??''} onChange={e=>up('actualFinish',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.green}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+        <FormRow label="Actual Finish Date"><Input type="date" value={form.actualFinish ?? ''} onChange={v => up('actualFinish', v)} /></FormRow>
         <div />
       </div>
       {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
@@ -817,12 +817,12 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
           onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
       </FormRow>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <FormRow label="Start Date"><input type="date" value={form.startDate??''} onChange={e=>up('startDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
-        <FormRow label="End Date"><input type="date" value={form.endDate??''} onChange={e=>up('endDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+        <FormRow label="Start Date"><Input type="date" value={form.startDate ?? ''} onChange={v => up('startDate', v)} /></FormRow>
+        <FormRow label="End Date"><Input type="date" value={form.endDate ?? ''} onChange={v => up('endDate', v)} /></FormRow>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <FormRow label="Actual Finish Date">
-          <input type="date" value={form.actualFinish??''} onChange={e=>up('actualFinish',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.green}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/>
+          <Input type="date" value={form.actualFinish ?? ''} onChange={v => up('actualFinish', v)} />
         </FormRow>
         <FormRow label="% Complete">
           <input type="number" min={0} max={100} value={form.percentComplete??0} onChange={e=>up('percentComplete',Math.min(100,Math.max(0,Number(e.target.value))))}

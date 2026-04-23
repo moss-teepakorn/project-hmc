@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Calendar } from 'lucide-react';
 import { avatarColor, getInitials, dmyToIso, isoToDmy } from '../../utils';
 
 export const C = {
@@ -54,14 +55,61 @@ export const Btn: React.FC<{
 export const Input: React.FC<{
   value: string | number; onChange: (v: string) => void;
   placeholder?: string; type?: string; style?: React.CSSProperties; autoFocus?: boolean;
-}> = ({ value, onChange, placeholder = '', type = 'text', style, autoFocus }) => (
-  <input autoFocus={autoFocus} type={type} value={value ?? ''} placeholder={placeholder}
-    onChange={e => onChange(e.target.value)}
-    style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, padding: '8px 12px', border: `1.5px solid ${C.border}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box', color: C.text, background: C.white, colorScheme: type === 'date' ? 'light' : undefined, ...style }}
-    onFocus={e => (e.target.style.borderColor = C.primary)}
-    onBlur={e  => (e.target.style.borderColor = C.border)}
-  />
-);
+}> = ({ value, onChange, placeholder = '', type = 'text', style, autoFocus }) => {
+  const [draft, setDraft] = useState(type === 'date' ? (value ? isoToDmy(String(value)) : '') : String(value ?? ''));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (type === 'date') {
+      setDraft(value ? isoToDmy(String(value)) : '');
+    } else {
+      setDraft(String(value ?? ''));
+    }
+  }, [value, type]);
+
+  const handleDateChange = (next: string) => {
+    setDraft(next);
+    if (next === '') {
+      onChange('');
+      return;
+    }
+    const iso = dmyToIso(next);
+    if (iso) onChange(iso);
+  };
+
+  const handleDateBlur = () => {
+    setFocused(false);
+    if (!draft) return;
+    const iso = dmyToIso(draft);
+    if (!iso) {
+      setDraft(value ? isoToDmy(String(value)) : '');
+    }
+  };
+
+  if (type === 'date') {
+    return (
+      <div style={{ position: 'relative', width: '100%', ...style }}>
+        <input autoFocus={autoFocus} type="text" value={draft} placeholder={placeholder}
+          onChange={e => handleDateChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={handleDateBlur}
+          onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
+          style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, padding: '8px 12px', border: `1.5px solid ${focused ? C.primary : C.border}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box', color: C.text, background: C.white, paddingRight: 40 }}
+        />
+        <Calendar size={16} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.text3, pointerEvents: 'none' }} />
+      </div>
+    );
+  }
+
+  return (
+    <input autoFocus={autoFocus} type={type} value={value ?? ''} placeholder={placeholder}
+      onChange={e => onChange(e.target.value)}
+      style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, padding: '8px 12px', border: `1.5px solid ${C.border}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box', color: C.text, background: C.white, colorScheme: type === 'date' ? 'light' : undefined, ...style }}
+      onFocus={e => (e.target.style.borderColor = C.primary)}
+      onBlur={e  => (e.target.style.borderColor = C.border)}
+    />
+  );
+};
 
 export const Textarea: React.FC<{ value: string; onChange: (v: string) => void; rows?: number; placeholder?: string }> = ({ value, onChange, rows = 3, placeholder }) => (
   <textarea rows={rows} value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)}
