@@ -11,7 +11,15 @@ export default function Navbar() {
   const { activeProject, setActiveProject, projects } = useStore();
   const { user, profile, signOut, configured } = useAuth();
   const { theme, toggle } = useTheme();
+  const [isMobile, setIsMobile] = React.useState(false);
   const isDark = theme === 'dark';
+
+  React.useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const navBg = isDark ? '#1E293B' : C.white;
   const navBorder = isDark ? '#334155' : C.border;
@@ -65,12 +73,16 @@ export default function Navbar() {
 
       {/* Right: theme toggle + auth */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, fontFamily: F }}>
-        <span style={{ color: textMuted }}>
-          {projects.length} project{projects.length !== 1 ? 's' : ''}
-        </span>
-        <span style={{ color: textMuted, fontSize: 10, opacity: 0.9 }}>
-          commit {commitId}
-        </span>
+        {!isMobile && (
+          <>
+            <span style={{ color: textMuted }}>
+              {projects.length} project{projects.length !== 1 ? 's' : ''}
+            </span>
+            <span style={{ color: textMuted, fontSize: 10, opacity: 0.9 }}>
+              commit {commitId}
+            </span>
+          </>
+        )}
 
         {/* Dark/Light mode toggle */}
         <button
@@ -87,9 +99,9 @@ export default function Navbar() {
           {isDark ? <Sun size={15} /> : <Moon size={15} />}
         </button>
 
-        {/* User info + Sign out */}
+        {/* User icon only on mobile, full info on desktop */}
         {configured && user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 8 }}>
             <div style={{
               width: 30, height: 30, borderRadius: '50%',
               background: `linear-gradient(135deg, ${C.primary}, #818CF8)`,
@@ -98,26 +110,30 @@ export default function Navbar() {
             }}>
               {(profile?.fullName || user.email || '?').substring(0, 2).toUpperCase()}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: textColor, lineHeight: 1.2 }}>
-                {profile?.fullName || user.email?.split('@')[0] || 'User'}
-              </span>
-              <span style={{ fontSize: 9, color: textMuted, lineHeight: 1.2 }}>
-                {profile?.role || 'member'}
-              </span>
-            </div>
-            <button
-              onClick={signOut}
-              title="Sign out"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 28, height: 28, borderRadius: 6,
-                background: isDark ? '#7F1D1D33' : '#FEE2E2',
-                border: 'none', cursor: 'pointer', color: C.red,
-              }}
-            >
-              <LogOut size={13} />
-            </button>
+            {!isMobile && (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: textColor, lineHeight: 1.2 }}>
+                    {profile?.fullName || user.email?.split('@')[0] || 'User'}
+                  </span>
+                  <span style={{ fontSize: 9, color: textMuted, lineHeight: 1.2 }}>
+                    {profile?.role || 'member'}
+                  </span>
+                </div>
+                <button
+                  onClick={signOut}
+                  title="Sign out"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 28, height: 28, borderRadius: 6,
+                    background: isDark ? '#7F1D1D33' : '#FEE2E2',
+                    border: 'none', cursor: 'pointer', color: C.red,
+                  }}
+                >
+                  <LogOut size={13} />
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
