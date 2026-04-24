@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Printer, X } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { useStore } from '../../store';
 import { C, Badge, ProgressBar, MILESTONE_STATUS, PROJECT_STATUS } from '../Common';
 import { fmtDate, fmtMoney, compareWbs, PROCESS_STATUS_STYLE, RISK_LEVEL_COLOR } from '../../utils';
 import type { Project } from '../../types';
 import toast from 'react-hot-toast';
 
-interface Props { project: Project; onClose: () => void; }
+interface Props { project: Project; }
 
 function DonutChart({ value, size = 88, color = C.primary }: { value: number; size?: number; color?: string }) {
   const r    = size / 2 - 10;
@@ -25,7 +25,7 @@ function DonutChart({ value, size = 88, color = C.primary }: { value: number; si
   );
 }
 
-export default function ProjectReport({ project, onClose }: Props) {
+export default function ProjectReport({ project }: Props) {
   const { tasks, milestones, efforts, changeRequests, issues, risks } = useStore();
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
@@ -203,7 +203,7 @@ export default function ProjectReport({ project, onClose }: Props) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, overflowY: 'auto', padding: 24, background: 'rgba(15,23,42,0.08)', fontFamily: 'Poppins, sans-serif', zIndex: 500 }}>
+    <div style={{ width: '100%', minHeight: '100%', padding: 24, background: C.bg2, fontFamily: 'Poppins, sans-serif' }}>
       <div className="executive-report-page" style={{ background: C.white, borderRadius: 20, width: '100%', maxWidth: 1400, margin: '0 auto', boxShadow: '0 20px 60px rgba(0,0,0,0.08)', fontSize: 9 }}>
         <style>{`
           .executive-report-page table td,
@@ -221,10 +221,6 @@ export default function ProjectReport({ project, onClose }: Props) {
             <button onClick={exportPDF}
               style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 14px', background:C.primary, border:'none', borderRadius:8, color:'#fff', fontSize:9, fontWeight:600, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
               <Printer size={14}/> Export PDF
-            </button>
-            <button onClick={onClose}
-              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, color:C.text2, fontSize:9, cursor:'pointer', fontFamily:'Poppins, sans-serif' }}>
-              <X size={14}/> Close
             </button>
           </div>
         </div>

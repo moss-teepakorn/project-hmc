@@ -19,7 +19,6 @@ interface Props { project: Project; }
 
 export default function ProjectDetail({ project }: Props) {
   const [activeTab, setActiveTab]   = useState('tasks');
-  const [showReport, setShowReport] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const {
     tasks,
@@ -117,10 +116,7 @@ export default function ProjectDetail({ project }: Props) {
               </div>
             </div>
           </div>
-          <Tabs tabs={TABS} active={activeTab} onChange={id => {
-            if (id === 'report') { setShowReport(true); return; }
-            setActiveTab(id);
-          }} />
+          <Tabs tabs={TABS} active={activeTab} onChange={id => setActiveTab(id)} />
         </div>
       </div>
 
@@ -134,9 +130,8 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
         {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} /></div>}
         {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
+        {activeTab === 'report'  && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectReport project={project} /></div>}
       </div>
-
-      {showReport && <ProjectReport project={project} onClose={() => setShowReport(false)} />}
     </div>
   );
 }
