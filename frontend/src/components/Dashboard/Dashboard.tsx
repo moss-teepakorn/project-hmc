@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Menu, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
-import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, PROJECT_STATUS, MILESTONE_STATUS } from '../Common';
+import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, PROJECT_STATUS, MILESTONE_STATUS, TH, TD } from '../Common';
 import { fmtDate, fmtMoney, compareWbs } from '../../utils';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
@@ -404,19 +404,33 @@ function ProjectSummaryPanel({ project, onOpen }: { project: Project; onOpen: ()
 
       {/* Milestones payment */}
       {ms.length > 0 && (
-        <Card style={{ padding: '14px 18px', marginBottom: 16 }}>
+        <Card style={{ padding: '14px 18px', marginBottom: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 10 }}>🏁 Milestones</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {ms.map(m => {
-              const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
-              return (
-                <div key={m.id} style={{ background: ss.bg, borderRadius: 8, padding: '6px 12px', fontSize: 11 }}>
-                  <span style={{ fontWeight: 600, color: ss.color }}>{m.phase}: {m.name}</span>
-                  <span style={{ color: C.text2, marginLeft: 8 }}>฿{fmtMoney(m.amount)}</span>
-                </div>
-              );
-            })}
-          </div>
+          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px' }}>
+            <thead>
+              <tr>
+                <th style={TH}>Phase</th>
+                <th style={TH}>Milestone</th>
+                <th style={TH}>Amount (฿)</th>
+                <th style={TH}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...ms].sort((a, b) => a.phase.localeCompare(b.phase) || a.name.localeCompare(b.name)).map(m => {
+                const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
+                return (
+                  <tr key={m.id} style={{ background: C.white, borderRadius: 12, boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }}>
+                    <td style={{ ...TD, padding: '12px 12px', fontWeight: 700 }}>{m.phase}</td>
+                    <td style={{ ...TD, padding: '12px 12px' }}>{m.name}</td>
+                    <td style={{ ...TD, padding: '12px 12px', whiteSpace: 'nowrap' }}>฿{fmtMoney(m.amount)}</td>
+                    <td style={{ ...TD, padding: '12px 12px', whiteSpace: 'nowrap' }}>
+                      <span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>{ss.label}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </Card>
       )}
     </div>
