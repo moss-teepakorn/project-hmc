@@ -132,12 +132,12 @@ export default function MilestonesTab({ projectId }: Props) {
                         <div><strong>Billing</strong><br />{fmtDate(ms.billingDate)}</div>
                       </div>
                       <div style={{ fontSize: 12, color: C.text3, marginBottom: 10, minHeight: 36 }}>{ms.notes || 'No notes'}</div>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button onClick={() => setModal(ms)} style={{ flex: 1, minWidth: 0, background: C.primaryBg, border: 'none', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 700 }}>
-                          <Pencil size={12} /> Edit
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <button onClick={() => setModal(ms)} aria-label="Edit milestone" style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.primaryBg, border: 'none', borderRadius: 8, color: C.primary, cursor: 'pointer' }}>
+                          <Pencil size={16} />
                         </button>
-                        <button onClick={() => setDeleting(ms)} style={{ flex: 1, minWidth: 0, background: C.redBg, border: 'none', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 700 }}>
-                          <Trash2 size={12} /> Delete
+                        <button onClick={() => setDeleting(ms)} aria-label="Delete milestone" style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.redBg, border: 'none', borderRadius: 8, color: C.red, cursor: 'pointer' }}>
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </Card>
@@ -146,20 +146,20 @@ export default function MilestonesTab({ projectId }: Props) {
               </div>
             ) : (
               <Card>
-                <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 12, lineHeight: 1.35 }}>
                   <colgroup>
-                    <col style={{ width: '24%' }} />
+                    <col style={{ width: '26%' }} />
                     <col style={{ width: '10%' }} />
                     <col style={{ width: '16%' }} />
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '12%' }} />
                     <col style={{ width: '8%' }} />
                   </colgroup>
                   <thead>
                     <tr style={{ background: C.bg }}>
                       {['Milestone', '% Value', 'Amount (฿)', 'Due Date', 'Billing Date', 'Status', 'Actions'].map(h => (
-                        <th key={h} style={{ ...TH, padding: '10px 12px', fontSize: 11 }}>{h}</th>
+                        <th key={h} style={{ ...TH, padding: '8px 10px', fontSize: 11 }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -168,16 +168,20 @@ export default function MilestonesTab({ projectId }: Props) {
                       const ss = MILESTONE_STATUS[ms.status] ?? MILESTONE_STATUS.pending;
                       return (
                         <tr key={ms.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
-                          <td style={{ ...TD, fontWeight: 600 }}>{ms.name}</td>
-                          <td style={{ ...TD, fontWeight: 700, color: C.primary }}>{ms.percent}%</td>
-                          <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600 }}>{fmtMoney(ms.amount)}</td>
-                          <td style={{ ...TD, color: C.text2 }}>{fmtDate(ms.dueDate)}</td>
-                          <td style={{ ...TD, color: C.text2 }}>{fmtDate(ms.billingDate)}</td>
-                          <td style={TD}><Badge bg={ss.bg} color={ss.color}>{ss.label}</Badge></td>
-                          <td style={{ ...TD, padding: '8px 12px' }}>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              <button onClick={() => setModal(ms)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>Edit</button>
-                              <button onClick={() => setDeleting(ms)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}>Delete</button>
+                          <td style={{ ...TD, padding: '8px 10px', fontWeight: 600 }}>{ms.name}</td>
+                          <td style={{ ...TD, padding: '8px 10px', fontWeight: 700, color: C.primary }}>{ms.percent}%</td>
+                          <td style={{ ...TD, padding: '8px 10px', fontFamily: 'monospace', fontWeight: 600 }}>{fmtMoney(ms.amount)}</td>
+                          <td style={{ ...TD, padding: '8px 10px', color: C.text2 }}>{fmtDate(ms.dueDate)}</td>
+                          <td style={{ ...TD, padding: '8px 10px', color: C.text2 }}>{fmtDate(ms.billingDate)}</td>
+                          <td style={{ ...TD, padding: '8px 10px' }}><Badge bg={ss.bg} color={ss.color}>{ss.label}</Badge></td>
+                          <td style={{ ...TD, padding: '8px 10px' }}>
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+                              <button onClick={() => setModal(ms)} aria-label="Edit milestone" style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.primaryBg, border: 'none', borderRadius: 8, color: C.primary, cursor: 'pointer' }}>
+                                <Pencil size={16} />
+                              </button>
+                              <button onClick={() => setDeleting(ms)} aria-label="Delete milestone" style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.redBg, border: 'none', borderRadius: 8, color: C.red, cursor: 'pointer' }}>
+                                <Trash2 size={16} />
+                              </button>
                             </div>
                           </td>
                         </tr>
