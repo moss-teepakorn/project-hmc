@@ -68,6 +68,7 @@ export interface Milestone {
   name: string;
   percent: number;
   amount: number;
+  phaseAmount: number;
   dueDate: string;
   billingDate: string;
   notes: string;

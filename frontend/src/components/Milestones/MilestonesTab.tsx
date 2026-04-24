@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, Modal, FormRow, Input, Select, Textarea, ConfirmModal, ProgressBar, C, TH, TD, MILESTONE_STATUS } from '../Common';
-import { fmtDate, fmtMoney } from '../../utils';
+import { fmtDate, fmtMoney, isoToDmy, dmyToIso } from '../../utils';
 import type { Milestone } from '../../types';
 
 const PHASES = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
@@ -20,6 +20,10 @@ export default function MilestonesTab({ projectId }: Props) {
   const total  = milestones.reduce((s, m) => s + m.amount, 0);
   const paid   = milestones.filter(m => m.status === 'paid').reduce((s, m) => s + m.amount, 0);
   const billed = milestones.filter(m => m.status === 'billed').reduce((s, m) => s + m.amount, 0);
+  const phaseBudgetByPhase = milestones.reduce((acc, m) => {
+    if (m.phase && m.phaseAmount > 0 && !acc[m.phase]) acc[m.phase] = m.phaseAmount;
+    return acc;
+  }, {} as Record<string, number>);
   // Order phases by Phase 1..5 then any custom
   const phases = PHASES.filter(p => milestones.some(m => m.phase === p))
     .concat([...new Set(milestones.map(m => m.phase))].filter(p => !PHASES.includes(p)));
@@ -90,17 +94,28 @@ export default function MilestonesTab({ projectId }: Props) {
         const pTotal = pms.reduce((s, m) => s + m.amount, 0);
         return (
           <div key={phase} style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{phase}</span>
-              <div style={{ height: 1, flex: 1, background: C.border }} />
-              <span style={{ fontSize: 12, color: C.text2 }}>฿{fmtMoney(pTotal)}</span>
+              <div style={{ height: 1, flex: 1, background: C.border, minWidth: 80 }} />
+              <span style={{ fontSize: 12, color: C.text2 }}>Budget ฿{fmtMoney(phaseBudgetByPhase[phase] ?? 0)}</span>
+              <span style={{ fontSize: 12, color: C.text2 }}>Milestone Total ฿{fmtMoney(pTotal)}</span>
             </div>
             <Card>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '22%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '6%' }} />
+                </colgroup>
                 <thead>
                   <tr style={{ background: C.bg }}>
                     {['Milestone', '% Value', 'Amount (฿)', 'Due Date', 'Billing Date', 'Status', 'Notes', ''].map(h => (
-                      <th key={h} style={TH}>{h}</th>
+                      <th key={h} style={{ ...TH, padding: '10px 12px', fontSize: 11 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -136,46 +151,88 @@ export default function MilestonesTab({ projectId }: Props) {
         );
       })}
 
-      {modal !== null && <MilestoneModal data={modal} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal !== null && <MilestoneModal data={modal} phaseBudgetByPhase={phaseBudgetByPhase} onClose={() => setModal(null)} onSave={handleSave} />}
       {deleting && <ConfirmModal message={`Delete milestone "${deleting.name}"?`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
     </div>
   );
 }
 
-function MilestoneModal({ data, onClose, onSave }: { data: Partial<Milestone>; onClose: () => void; onSave: (f: Partial<Milestone>) => void }) {
-  const [form, setForm] = useState<Partial<Milestone>>({ phase: 'Phase 1', name: '', percent: 0, amount: 0, dueDate: '', billingDate: '', notes: '', status: 'pending', ...data });
+function MilestoneModal({ data, phaseBudgetByPhase, onClose, onSave }: { data: Partial<Milestone>; phaseBudgetByPhase: Record<string, number>; onClose: () => void; onSave: (f: Partial<Milestone>) => void }) {
+  const [form, setForm] = useState<Partial<Milestone>>({ phase: 'Phase 1', name: '', percent: 0, amount: 0, phaseAmount: 0, dueDate: '', billingDate: '', notes: '', status: 'pending', ...data });
   const up = (k: string, v: string | number) => setForm(p => ({ ...p, [k]: v }));
+
+  useEffect(() => {
+    const phaseKey = form.phase || '';
+    if (phaseKey && !form.phaseAmount && phaseBudgetByPhase[phaseKey]) {
+      setForm(p => ({ ...p, phaseAmount: phaseBudgetByPhase[phaseKey] }));
+    }
+  }, [form.phase, phaseBudgetByPhase]);
+
+  useEffect(() => {
+    if (typeof form.percent === 'number' && form.phaseAmount && form.phaseAmount > 0) {
+      setForm(p => ({ ...p, amount: Math.round((Number(p.phaseAmount) * Number(p.percent)) / 100) }));
+    }
+  }, [form.percent, form.phaseAmount]);
+
+  const save = () => {
+    try {
+      const payload: Partial<Milestone> = {
+        ...form,
+        percent: Number(form.percent ?? 0),
+        amount: Number(form.amount ?? 0),
+        phaseAmount: Number(form.phaseAmount ?? 0),
+      };
+      if (!payload.name?.trim() || !payload.phase?.trim()) {
+        toast.error('Please enter phase and milestone name');
+        return;
+      }
+      onSave(payload);
+    } catch (err: any) {
+      toast.error(err?.message || 'Invalid input');
+    }
+  };
+
   return (
     <Modal title={form.id ? 'Edit Milestone' : 'Add Milestone'} onClose={onClose} width={560}>
       <FormRow label="Phase" required>
-        <Select value={form.phase ?? 'Phase 1'} onChange={v => up('phase', v)}
+        <Select value={form.phase ?? 'Phase 1'} onChange={v => {
+            const budget = phaseBudgetByPhase[v] ?? 0;
+            setForm(p => ({ ...p, phase: v, phaseAmount: budget || p.phaseAmount }));
+          }}
           options={PHASES.map(p => ({ value: p, label: p }))} />
       </FormRow>
       <FormRow label="Milestone Name" required>
         <Input autoFocus value={form.name ?? ''} onChange={v => up('name', v)} placeholder="e.g. Project Kickoff" />
       </FormRow>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <FormRow label="Phase Budget (฿)">
+          <Input type="number" value={form.phaseAmount ?? 0} onChange={v => up('phaseAmount', Number(v))} placeholder="Total phase budget" />
+        </FormRow>
         <FormRow label="% Value">
-          <Input type="number" value={form.percent ?? 0} onChange={v => up('percent', Number(v))} />
+          <Input type="number" value={form.percent ?? 0} onChange={v => up('percent', Number(v))} placeholder="Percent" />
         </FormRow>
         <FormRow label="Amount (฿)">
-          <Input type="number" value={form.amount ?? 0} onChange={v => up('amount', Number(v))} />
-        </FormRow>
-        <FormRow label="Status">
-          <Select value={form.status ?? 'pending'} onChange={v => up('status', v)}
-            options={[{ value: 'pending', label: 'Pending' }, { value: 'billed', label: 'Billed' }, { value: 'paid', label: 'Paid' }]} />
+          <Input type="number" value={form.amount ?? 0} onChange={v => up('amount', Number(v))} placeholder="Auto from phase budget" />
         </FormRow>
       </div>
+      <FormRow label="Status">
+        <Select value={form.status ?? 'pending'} onChange={v => up('status', v)}
+          options={[{ value: 'pending', label: 'Pending' }, { value: 'billed', label: 'Billed' }, { value: 'paid', label: 'Paid' }]} />
+      </FormRow>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <FormRow label="Due Date"><Input type="date" value={form.dueDate ?? ''} onChange={v => up('dueDate', v)} /></FormRow>
-        <FormRow label="Billing Date"><Input type="date" value={form.billingDate ?? ''} onChange={v => up('billingDate', v)} /></FormRow>
+        <FormRow label="Due Date">
+          <Input type="date" value={form.dueDate ?? ''} onChange={v => up('dueDate', v)} placeholder="dd/mm/yyyy" />
+        </FormRow>
+        <FormRow label="Billing Date">
+          <Input type="date" value={form.billingDate ?? ''} onChange={v => up('billingDate', v)} placeholder="dd/mm/yyyy" />
+        </FormRow>
       </div>
       <FormRow label="Notes">
         <Textarea value={form.notes ?? ''} onChange={v => up('notes', v)} rows={2} placeholder="Additional notes…" />
       </FormRow>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={() => { if (!form.name?.trim() || !form.phase?.trim()) return; onSave(form); }}>Save</Btn>
+        <Btn onClick={save}>Save</Btn>
       </div>
     </Modal>
   );

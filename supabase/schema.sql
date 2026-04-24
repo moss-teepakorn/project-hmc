@@ -163,6 +163,7 @@ create table if not exists public.milestones (
   name         text not null default '',
   percent      numeric not null default 0,
   amount       numeric not null default 0,
+  phase_amount numeric not null default 0,
   due_date     text not null default '',
   billing_date text not null default '',
   notes        text not null default '',

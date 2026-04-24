@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS milestones (
   description TEXT,
   
   amount DECIMAL(15,2) DEFAULT 0,
+  phase_amount DECIMAL(15,2) DEFAULT 0,
   due_date DATE,
   
   status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'billed', 'paid')),
