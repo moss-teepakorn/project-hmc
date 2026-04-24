@@ -24,6 +24,14 @@ export default function MembersTab({ projectId }: Props) {
   const [modal, setModal]       = useState<Partial<Member> | null>(null);
   const [deleting, setDeleting] = useState<Member | null>(null);
   const [syncing, setSyncing]   = useState(false);
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchMembers(projectId);
@@ -182,72 +190,107 @@ export default function MembersTab({ projectId }: Props) {
       </div>
 
       <Card>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: C.bg }}>
-              {['Member', 'Nickname', 'Role', 'Position', 'Email', 'Tel', 'Type', 'Notes', ''].map(h => (
-                <th key={h} style={TH}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((mb, i) => (
-              <tr key={mb.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}
-                onMouseEnter={e => e.currentTarget.style.background = C.primaryBg}
-                onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? C.white : C.bg}>
-                <td style={TD}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <Avatar name={mb.name} size={30} />
-                    <span style={{ fontWeight: 600, color: C.text }}>{mb.name}</span>
+        {isMobile ? (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {shown.map((mb) => {
+              const profile = profiles.find(p => p.email === mb.email);
+              const role = profile?.role || mb.role || '—';
+              return (
+                <Card key={mb.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: '1 1 120px' }}>
+                      <Avatar name={mb.name} size={30} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mb.name}</div>
+                        <div style={{ fontSize: 10, color: C.text2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mb.email}</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', minWidth: 90 }}>
+                      <div style={{ fontSize: 9, color: C.text2 }}>Type</div>
+                      <Badge bg={mb.type === 'internal' ? C.primaryBg : C.amberBg} color={mb.type === 'internal' ? C.primary : C.amber}>{mb.type === 'internal' ? 'Internal' : 'Client'}</Badge>
+                    </div>
                   </div>
-                </td>
-                <td style={{ ...TD, color: C.text2 }}>{mb.nickname}</td>
-                <td style={TD}>
-                  {/* Show role from profile if available */}
-                  {(() => {
-                    const profile = profiles.find(p => p.email === mb.email);
-                    const role = profile?.role || mb.role || '—';
-                    if (currentUserRole === 'admin' && profile) {
-                      return (
-                        <span>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: roleColor(role), background: roleColor(role) + '18', padding: '3px 10px', borderRadius: 20, marginRight: 6 }}>{role}</span>
-                          <select
-                            value={role}
-                            onChange={e => handlePatchRole(profile.id, e.target.value as UserRole)}
-                            style={{ fontSize: 11, borderRadius: 6, border: '1px solid #ddd', padding: '2px 6px' }}
-                          >
-                            <option value="admin">admin</option>
-                            <option value="member">member</option>
-                            <option value="client">client</option>
-                          </select>
-                        </span>
-                      );
-                    } else {
-                      return (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: roleColor(role), background: roleColor(role) + '18', padding: '3px 10px', borderRadius: 20 }}>{role}</span>
-                      );
-                    }
-                  })()}
-                </td>
-                <td style={{ ...TD, color: C.text2, fontSize: 11 }}>{mb.position || '—'}</td>
-                <td style={{ ...TD, color: C.blue }}>{mb.email}</td>
-                <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontSize: 12 }}>{mb.tel}</td>
-                <td style={TD}>
-                  <Badge bg={mb.type === 'internal' ? C.primaryBg : C.amberBg} color={mb.type === 'internal' ? C.primary : C.amber}>
-                    {mb.type === 'internal' ? 'Internal' : 'Client'}
-                  </Badge>
-                </td>
-                <td style={{ ...TD, color: C.text3, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{mb.notes || '—'}</td>
-                <td style={TD}>
-                  <div style={{ display: 'flex', gap: 5 }}>
-                    <button onClick={() => setModal(mb)} style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', background: C.primaryBg, border: 'none', borderRadius: 8, padding: '8px', minWidth: 34, minHeight: 34, fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={16} /></button>
-                    <button onClick={() => setDeleting(mb)} style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', background: C.redBg, border: 'none', borderRadius: 8, padding: '8px', minWidth: 34, minHeight: 34, fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={16} /></button>
+                  <div style={{ display: 'grid', gap: 6, marginTop: 10, fontSize: 10, color: C.text2 }}>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Role:</strong> <span style={{ color: roleColor(role) }}>{role}</span></div>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Position:</strong> {mb.position || '—'}</div>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Tel:</strong> {mb.tel || '—'}</div>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Notes:</strong> {mb.notes || '—'}</div>
                   </div>
-                </td>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
+                    <button onClick={() => setModal(mb)} style={{ background: C.primaryBg, border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={14} /></button>
+                    <button onClick={() => setDeleting(mb)} style={{ background: C.redBg, border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={14} /></button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                {['Member', 'Nickname', 'Role', 'Position', 'Email', 'Tel', 'Type', 'Notes', ''].map(h => (
+                  <th key={h} style={TH}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {shown.map((mb, i) => (
+                <tr key={mb.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}
+                  onMouseEnter={e => e.currentTarget.style.background = C.primaryBg}
+                  onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? C.white : C.bg}>
+                  <td style={TD}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Avatar name={mb.name} size={30} />
+                      <span style={{ fontWeight: 600, color: C.text }}>{mb.name}</span>
+                    </div>
+                  </td>
+                  <td style={{ ...TD, color: C.text2 }}>{mb.nickname}</td>
+                  <td style={TD}>
+                    {(() => {
+                      const profile = profiles.find(p => p.email === mb.email);
+                      const role = profile?.role || mb.role || '—';
+                      if (currentUserRole === 'admin' && profile) {
+                        return (
+                          <span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: roleColor(role), background: roleColor(role) + '18', padding: '3px 10px', borderRadius: 20, marginRight: 6 }}>{role}</span>
+                            <select
+                              value={role}
+                              onChange={e => handlePatchRole(profile.id, e.target.value as UserRole)}
+                              style={{ fontSize: 11, borderRadius: 6, border: '1px solid #ddd', padding: '2px 6px' }}
+                            >
+                              <option value="admin">admin</option>
+                              <option value="member">member</option>
+                              <option value="client">client</option>
+                            </select>
+                          </span>
+                        );
+                      } else {
+                        return (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: roleColor(role), background: roleColor(role) + '18', padding: '3px 10px', borderRadius: 20 }}>{role}</span>
+                        );
+                      }
+                    })()}
+                  </td>
+                  <td style={{ ...TD, color: C.text2, fontSize: 11 }}>{mb.position || '—'}</td>
+                  <td style={{ ...TD, color: C.blue }}>{mb.email}</td>
+                  <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontSize: 12 }}>{mb.tel}</td>
+                  <td style={TD}>
+                    <Badge bg={mb.type === 'internal' ? C.primaryBg : C.amberBg} color={mb.type === 'internal' ? C.primary : C.amber}>
+                      {mb.type === 'internal' ? 'Internal' : 'Client'}
+                    </Badge>
+                  </td>
+                  <td style={{ ...TD, color: C.text3, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{mb.notes || '—'}</td>
+                  <td style={TD}>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <button onClick={() => setModal(mb)} style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', background: C.primaryBg, border: 'none', borderRadius: 8, padding: '8px', minWidth: 34, minHeight: 34, fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={16} /></button>
+                      <button onClick={() => setDeleting(mb)} style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', background: C.redBg, border: 'none', borderRadius: 8, padding: '8px', minWidth: 34, minHeight: 34, fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={16} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
         {shown.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: C.text3 }}>No members yet.</div>}
       </Card>
 

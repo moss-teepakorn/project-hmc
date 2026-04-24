@@ -15,8 +15,19 @@ export default function RiskRegisterTab({ projectId }: Props) {
   const { risks, members, fetchRisks, fetchMembers, createRisk, updateRisk, deleteRisk } = useStore();
   const [modal, setModal]       = useState<Partial<Risk> | null>(null);
   const [deleting, setDeleting] = useState<Risk | null>(null);
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
 
-  useEffect(() => { fetchRisks(projectId); fetchMembers(projectId); }, [projectId]);
+  useEffect(() => {
+    fetchRisks(projectId);
+    fetchMembers(projectId);
+  }, [projectId]);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const memberOptions = [{ value: '', label: '— Select —' }, ...members.map(m => ({ value: m.name, label: m.name }))];
 
@@ -64,48 +75,79 @@ export default function RiskRegisterTab({ projectId }: Props) {
       </div>
 
       <Card>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: C.bg }}>
-              {['Date', 'Title', 'Probability', 'Impact', 'Score', 'Owner', 'Status', 'Mitigation', ''].map(h => (
-                <th key={h} style={TH}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {risks.map((risk, i) => {
+        {isMobile ? (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {risks.map((risk) => {
               const score = riskScore(risk);
               return (
-                <tr key={risk.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
-                  <td style={{ ...TD, fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(risk.riskDate)}</td>
-                  <td style={{ ...TD, fontWeight: 600, minWidth: 120 }}>{risk.title}</td>
-                  <td style={{ ...TD }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: RISK_LEVEL_COLOR[risk.probability] || C.text2 }}>{risk.probability}</span>
-                  </td>
-                  <td style={{ ...TD }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: RISK_LEVEL_COLOR[risk.impact] || C.text2 }}>{risk.impact}</span>
-                  </td>
-                  <td style={{ ...TD }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: RISK_LEVEL_COLOR[score], background: RISK_LEVEL_COLOR[score] + '18', padding: '2px 8px', borderRadius: 12 }}>{score}</span>
-                  </td>
-                  <td style={{ ...TD, fontSize: 11 }}>{risk.owner || '—'}</td>
-                  <td style={{ ...TD }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: risk.status === 'Monitoring' ? C.red : risk.status === 'Mitigating' ? C.amber : C.green, background: (risk.status === 'Monitoring' ? C.red : risk.status === 'Mitigating' ? C.amber : C.green) + '18', padding: '2px 8px', borderRadius: 12 }}>
-                      {risk.status}
-                    </span>
-                  </td>
-                  <td style={{ ...TD, color: C.text2, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{risk.mitigation || '—'}</td>
-                  <td style={TD}>
-                    <div style={{ display: 'flex', gap: 5 }}>
-                      <button onClick={() => setModal(risk)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={11} /></button>
-                      <button onClick={() => setDeleting(risk)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={11} /></button>
+                <Card key={risk.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    <div style={{ minWidth: 0, flex: '1 1 140px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{risk.title}</div>
+                      <div style={{ fontSize: 10, color: C.text2, marginTop: 4 }}>{fmtDate(risk.riskDate)} · {risk.owner || 'No owner'}</div>
                     </div>
-                  </td>
-                </tr>
+                    <div style={{ textAlign: 'right', minWidth: 90 }}>
+                      <Badge bg={RISK_LEVEL_COLOR[score] + '18'} color={RISK_LEVEL_COLOR[score]}>{score}</Badge>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gap: 6, marginTop: 10, fontSize: 10, color: C.text2 }}>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Probability:</strong> <span style={{ color: RISK_LEVEL_COLOR[risk.probability] || C.text2 }}>{risk.probability}</span></div>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Impact:</strong> <span style={{ color: RISK_LEVEL_COLOR[risk.impact] || C.text2 }}>{risk.impact}</span></div>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Status:</strong> {risk.status}</div>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Mitigation:</strong> {risk.mitigation || '—'}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
+                    <button onClick={() => setModal(risk)} style={{ background: C.primaryBg, border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={14} /></button>
+                    <button onClick={() => setDeleting(risk)} style={{ background: C.redBg, border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={14} /></button>
+                  </div>
+                </Card>
               );
             })}
-          </tbody>
-        </table>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                {['Date', 'Title', 'Probability', 'Impact', 'Score', 'Owner', 'Status', 'Mitigation', ''].map(h => (
+                  <th key={h} style={TH}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {risks.map((risk, i) => {
+                const score = riskScore(risk);
+                return (
+                  <tr key={risk.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
+                    <td style={{ ...TD, fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(risk.riskDate)}</td>
+                    <td style={{ ...TD, fontWeight: 600, minWidth: 120 }}>{risk.title}</td>
+                    <td style={{ ...TD }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: RISK_LEVEL_COLOR[risk.probability] || C.text2 }}>{risk.probability}</span>
+                    </td>
+                    <td style={{ ...TD }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: RISK_LEVEL_COLOR[risk.impact] || C.text2 }}>{risk.impact}</span>
+                    </td>
+                    <td style={{ ...TD }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: RISK_LEVEL_COLOR[score], background: RISK_LEVEL_COLOR[score] + '18', padding: '2px 8px', borderRadius: 12 }}>{score}</span>
+                    </td>
+                    <td style={{ ...TD, fontSize: 11 }}>{risk.owner || '—'}</td>
+                    <td style={{ ...TD }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: risk.status === 'Monitoring' ? C.red : risk.status === 'Mitigating' ? C.amber : C.green, background: (risk.status === 'Monitoring' ? C.red : risk.status === 'Mitigating' ? C.amber : C.green) + '18', padding: '2px 8px', borderRadius: 12 }}>
+                        {risk.status}
+                      </span>
+                    </td>
+                    <td style={{ ...TD, color: C.text2, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{risk.mitigation || '—'}</td>
+                    <td style={TD}>
+                      <div style={{ display: 'flex', gap: 5 }}>
+                        <button onClick={() => setModal(risk)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={11} /></button>
+                        <button onClick={() => setDeleting(risk)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={11} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
         {risks.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: C.text3 }}>No risks registered.</div>}
       </Card>
 

@@ -15,6 +15,14 @@ export default function IssuesTab({ projectId }: Props) {
   const [modal, setModal]       = useState<Partial<Issue> | null>(null);
   const [deleting, setDeleting] = useState<Issue | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => { fetchIssues(projectId); fetchMembers(projectId); }, [projectId]);
 
@@ -70,37 +78,65 @@ export default function IssuesTab({ projectId }: Props) {
 
       {/* Table */}
       <Card>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: C.bg }}>
-              {['Date', 'Title', 'Description', 'Reported By', 'Assigned To', 'Status', 'Resolved', ''].map(h => (
-                <th key={h} style={TH}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((issue, i) => {
+        {isMobile ? (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {shown.map((issue) => {
               const ss = PROCESS_STATUS_STYLE[issue.status] ?? PROCESS_STATUS_STYLE['N/A'];
               return (
-                <tr key={issue.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
-                  <td style={{ ...TD, fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(issue.issueDate)}</td>
-                  <td style={{ ...TD, fontWeight: 600, minWidth: 120 }}>{issue.title}</td>
-                  <td style={{ ...TD, color: C.text2, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.description || '—'}</td>
-                  <td style={{ ...TD, fontSize: 11 }}>{issue.reportedBy || '—'}</td>
-                  <td style={{ ...TD, fontSize: 11 }}>{issue.assignedTo || '—'}</td>
-                  <td style={TD}><span style={{ fontSize: 11, fontWeight: 600, color: ss.color, background: ss.bg, padding: '3px 10px', borderRadius: 20 }}>{issue.status}</span></td>
-                  <td style={{ ...TD, fontSize: 11 }}>{issue.resolvedDate ? fmtDate(issue.resolvedDate) : '—'}</td>
-                  <td style={TD}>
-                    <div style={{ display: 'flex', gap: 5 }}>
-                      <button onClick={() => setModal(issue)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={11} /></button>
-                      <button onClick={() => setDeleting(issue)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={11} /></button>
+                <Card key={issue.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div style={{ minWidth: 0, flex: '1 1 160px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{issue.title}</div>
+                      <div style={{ fontSize: 10, color: C.text2, marginTop: 4 }}>{fmtDate(issue.issueDate)} · {issue.reportedBy || '—'}</div>
                     </div>
-                  </td>
-                </tr>
+                    <Badge bg={ss.bg} color={ss.color}>{issue.status}</Badge>
+                  </div>
+                  <div style={{ display: 'grid', gap: 6, marginTop: 8, fontSize: 10, color: C.text2 }}>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Assigned</strong>: {issue.assignedTo || '—'}</div>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Resolved</strong>: {issue.resolvedDate ? fmtDate(issue.resolvedDate) : '—'}</div>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Description</strong>: {issue.description || '—'}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
+                    <button onClick={() => setModal(issue)} style={{ background: C.primaryBg, border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={14} /></button>
+                    <button onClick={() => setDeleting(issue)} style={{ background: C.redBg, border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={14} /></button>
+                  </div>
+                </Card>
               );
             })}
-          </tbody>
-        </table>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                {['Date', 'Title', 'Description', 'Reported By', 'Assigned To', 'Status', 'Resolved', ''].map(h => (
+                  <th key={h} style={TH}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((issue, i) => {
+                const ss = PROCESS_STATUS_STYLE[issue.status] ?? PROCESS_STATUS_STYLE['N/A'];
+                return (
+                  <tr key={issue.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
+                    <td style={{ ...TD, fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(issue.issueDate)}</td>
+                    <td style={{ ...TD, fontWeight: 600, minWidth: 120 }}>{issue.title}</td>
+                    <td style={{ ...TD, color: C.text2, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.description || '—'}</td>
+                    <td style={{ ...TD, fontSize: 11 }}>{issue.reportedBy || '—'}</td>
+                    <td style={{ ...TD, fontSize: 11 }}>{issue.assignedTo || '—'}</td>
+                    <td style={TD}><span style={{ fontSize: 11, fontWeight: 600, color: ss.color, background: ss.bg, padding: '3px 10px', borderRadius: 20 }}>{issue.status}</span></td>
+                    <td style={{ ...TD, fontSize: 11 }}>{issue.resolvedDate ? fmtDate(issue.resolvedDate) : '—'}</td>
+                    <td style={TD}>
+                      <div style={{ display: 'flex', gap: 5 }}>
+                        <button onClick={() => setModal(issue)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={11} /></button>
+                        <button onClick={() => setDeleting(issue)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={11} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
         {shown.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: C.text3 }}>No issues.</div>}
       </Card>
 
