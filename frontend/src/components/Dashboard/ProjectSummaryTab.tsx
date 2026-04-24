@@ -475,11 +475,11 @@ export default function ProjectSummaryTab({ project }: Props) {
             {rows.map((row) => (
               <Card key={row.snapshotDate} style={{ padding: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-                  <div style={{ minWidth: 0, flex: '1 1 140px' }}>
+                  <div style={{ minWidth: 0, flex: '1 1 120px' }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.text }}>{fmtDate(row.snapshotDate)}</div>
-                    <div style={{ marginTop: 4, fontSize: 9, color: C.text2, lineHeight: 1.3, maxWidth: 200, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.note || 'No notes yet'}</div>
+                    <div style={{ marginTop: 4, fontSize: 9, color: C.text2, lineHeight: 1.3, maxWidth: 160, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.note || 'No notes yet'}</div>
                   </div>
-                  <div style={{ display: 'grid', gap: 4, minWidth: 90, textAlign: 'right' }}>
+                  <div style={{ display: 'grid', gap: 4, minWidth: 80, textAlign: 'right' }}>
                     <div style={{ fontSize: 9, color: C.text2 }}>Baseline</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.primary }}>{row.baselinePercent}%</div>
                     <div style={{ fontSize: 9, color: C.text2 }}>Actual</div>
