@@ -55,7 +55,7 @@ export default function Navbar() {
       </div>
 
       {/* Breadcrumb */}
-      {activeProject && (
+      {!isMobile && activeProject && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontFamily: F }}>
           <span
             style={{ color: C.primary, fontWeight: 600, cursor: 'pointer' }}

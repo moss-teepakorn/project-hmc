@@ -195,22 +195,53 @@ export const FormRow: React.FC<{ label: string; children: React.ReactNode; requi
 export const Tabs: React.FC<{
   tabs: { id: string; label: string; icon?: string; count?: number }[];
   active: string; onChange: (id: string) => void;
-}> = ({ tabs, active, onChange }) => (
-  <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, overflowX: 'auto' }}>
-    {tabs.map(t => (
-      <button key={t.id} onClick={() => onChange(t.id)}
-        style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, fontWeight: active === t.id ? 600 : 500, padding: '10px 16px', border: 'none', background: 'none', cursor: 'pointer', color: active === t.id ? C.primary : C.text2, borderBottom: active === t.id ? `2px solid ${C.primary}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
-        {t.icon && <span>{t.icon}</span>}
-        {t.label}
-        {t.count != null && (
-          <span style={{ background: active === t.id ? C.primaryBg : C.bg2, color: active === t.id ? C.primary : C.text3, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>
-            {t.count}
-          </span>
-        )}
-      </button>
-    ))}
-  </div>
-);
+}> = ({ tabs, active, onChange }) => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth < 768);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  if (isMobile) {
+    return (
+      <div style={{ padding: '0 14px 12px' }}>
+        <select
+          value={active}
+          onChange={e => onChange(e.target.value)}
+          style={{
+            width: '100%', fontFamily: 'Poppins, sans-serif', fontSize: 13, padding: '10px 12px', borderRadius: 10,
+            border: `1px solid ${C.border}`, background: C.white, color: C.text, appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', cursor: 'pointer', boxSizing: 'border-box',
+          }}>
+          {tabs.map(t => (
+            <option key={t.id} value={t.id}>
+              {t.icon ? `${t.icon} ` : ''}{t.label}{t.count != null ? ` (${t.count})` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, overflowX: 'auto' }}>
+      {tabs.map(t => (
+        <button key={t.id} onClick={() => onChange(t.id)}
+          style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, fontWeight: active === t.id ? 600 : 500, padding: '10px 16px', border: 'none', background: 'none', cursor: 'pointer', color: active === t.id ? C.primary : C.text2, borderBottom: active === t.id ? `2px solid ${C.primary}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+          {t.icon && <span>{t.icon}</span>}
+          {t.label}
+          {t.count != null && (
+            <span style={{ background: active === t.id ? C.primaryBg : C.bg2, color: active === t.id ? C.primary : C.text3, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>
+              {t.count}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+};
 
 export const EditableCell: React.FC<{
   value: string; onSave: (v: string) => void;
