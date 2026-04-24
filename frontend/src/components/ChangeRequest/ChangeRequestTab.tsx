@@ -17,8 +17,19 @@ export default function ChangeRequestTab({ projectId }: Props) {
   const [modal, setModal]       = useState<Partial<CRWithItems> | null>(null);
   const [deleting, setDeleting] = useState<CRWithItems | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
 
-  useEffect(() => { fetchCRs(projectId); fetchMembers(projectId); }, [projectId]);
+  useEffect(() => {
+    fetchCRs(projectId);
+    fetchMembers(projectId);
+  }, [projectId]);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const toggle = (id: string) => setExpanded(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
@@ -44,7 +55,7 @@ export default function ChangeRequestTab({ projectId }: Props) {
   return (
     <div style={{ padding: 24 }}>
       {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 12, marginBottom: 18 }}>
         {[
           { label: 'Total CRs',       value: changeRequests.length, color: C.primary, bg: C.primaryBg, icon: '📝' },
           { label: 'Total Manday',    value: `${totalMD} MD`,       color: C.amber,   bg: C.amberBg,   icon: '⚡' },
@@ -72,7 +83,7 @@ export default function ChangeRequestTab({ projectId }: Props) {
         return (
           <Card key={cr.id} style={{ marginBottom: 14, overflow: 'hidden' }}>
             {/* CR Header */}
-            <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', background: i % 2 === 0 ? C.white : C.bg, gap: 12, cursor: 'pointer' }}
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', padding: '12px 16px', background: i % 2 === 0 ? C.white : C.bg, gap: 12, cursor: 'pointer' }}
               onClick={() => toggle(cr.id)}>
               <div style={{ width: 28, height: 28, borderRadius: 8, background: C.primaryBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: C.primary, flexShrink: 0 }}>
                 {cr.crId || `CR${i + 1}`}
@@ -147,18 +158,18 @@ function CRModal({ data, onClose, onSave }: { data: Partial<CRWithItems>; onClos
 
   return (
     <Modal title={form.id ? 'Edit Change Request' : 'New Change Request'} onClose={onClose} width={640}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         <FormRow label="CR ID" required><Input autoFocus value={form.crId ?? ''} onChange={v => up('crId', v)} placeholder="CR-001" /></FormRow>
         <FormRow label="Title" required><Input value={form.title ?? ''} onChange={v => up('title', v)} placeholder="Short description of the change" /></FormRow>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         <FormRow label="Requested By"><Select value={form.requestedBy ?? ''} onChange={v => up('requestedBy', v)} options={memberOptions} /></FormRow>
         <FormRow label="Request Date"><Input type="date" value={form.requestDate ?? ''} onChange={v => up('requestDate', v)} /></FormRow>
         <FormRow label="Status">
           <Select value={form.status ?? 'Draft'} onChange={v => up('status', v)} options={STATUSES.map(s => ({ value: s, label: s }))} />
         </FormRow>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         <FormRow label="Approved By"><Select value={form.approvedBy ?? ''} onChange={v => up('approvedBy', v)} options={memberOptions} /></FormRow>
         <FormRow label="Approval Date"><Input type="date" value={form.approvalDate ?? ''} onChange={v => up('approvalDate', v)} /></FormRow>
         <FormRow label="Discount (฿)"><Input type="number" value={form.discount ?? 0} onChange={v => up('discount', Number(v))} /></FormRow>
@@ -173,7 +184,7 @@ function CRModal({ data, onClose, onSave }: { data: Partial<CRWithItems>; onClos
           <Btn onClick={addItem} small variant="outline"><Plus size={12} /> Add Item</Btn>
         </div>
         {items.map((item, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 80px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
             <Input value={item.detail ?? ''} onChange={v => updateItem(i, 'detail', v)} placeholder={`Item ${i + 1} detail…`} />
             <Input type="number" value={item.manday ?? 0} onChange={v => updateItem(i, 'manday', Number(v))} />
             <button onClick={() => removeItem(i)}
