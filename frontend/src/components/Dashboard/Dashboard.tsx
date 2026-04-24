@@ -404,15 +404,15 @@ function ProjectSummaryPanel({ project, onOpen }: { project: Project; onOpen: ()
 
       {/* Milestones payment */}
       {ms.length > 0 && (
-        <Card style={{ padding: '14px 18px', marginBottom: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 10 }}>🏁 Milestones</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <Card style={{ padding: '12px 14px', marginBottom: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.text, marginBottom: 8 }}>🏁 Milestones</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr>
-                <th style={{ ...TH, padding: '10px 8px', background: C.bg, borderBottom: `1px solid ${C.border}` }}>Phase</th>
-                <th style={{ ...TH, padding: '10px 8px', background: C.bg, borderBottom: `1px solid ${C.border}` }}>Milestone</th>
-                <th style={{ ...TH, padding: '10px 8px', background: C.bg, borderBottom: `1px solid ${C.border}` }}>Amount (฿)</th>
-                <th style={{ ...TH, padding: '10px 8px', background: C.bg, borderBottom: `1px solid ${C.border}` }}>Status</th>
+                <th style={{ ...TH, padding: '8px 10px', fontSize: 11, background: C.bg, borderBottom: `1px solid ${C.border}` }}>Phase</th>
+                <th style={{ ...TH, padding: '8px 10px', fontSize: 11, background: C.bg, borderBottom: `1px solid ${C.border}` }}>Milestone</th>
+                <th style={{ ...TH, padding: '8px 10px', fontSize: 11, background: C.bg, borderBottom: `1px solid ${C.border}`, textAlign: 'right' }}>Amount (฿)</th>
+                <th style={{ ...TH, padding: '8px 10px', fontSize: 11, background: C.bg, borderBottom: `1px solid ${C.border}` }}>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -420,11 +420,11 @@ function ProjectSummaryPanel({ project, onOpen }: { project: Project; onOpen: ()
                 const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
                 return (
                   <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <td style={{ ...TD, padding: '10px 8px', fontWeight: 700, color: C.text }}>{m.phase}</td>
-                    <td style={{ ...TD, padding: '10px 8px', color: C.text2 }}>{m.name}</td>
-                    <td style={{ ...TD, padding: '10px 8px', whiteSpace: 'nowrap', color: C.text }}>{`฿${fmtMoney(m.amount)}`}</td>
-                    <td style={{ ...TD, padding: '10px 8px', whiteSpace: 'nowrap' }}>
-                      <span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>{ss.label}</span>
+                    <td style={{ ...TD, padding: '8px 10px', fontSize: 12, fontWeight: 600, color: C.text }}>{m.phase}</td>
+                    <td style={{ ...TD, padding: '8px 10px', fontSize: 12, color: C.text2 }}>{m.name}</td>
+                    <td style={{ ...TD, padding: '8px 10px', fontSize: 12, color: C.text, whiteSpace: 'nowrap', textAlign: 'right' }}>{`฿${fmtMoney(m.amount)}`}</td>
+                    <td style={{ ...TD, padding: '8px 10px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                      <span style={{ background: ss.bg, color: ss.color, padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
                     </td>
                   </tr>
                 );
