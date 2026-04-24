@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Printer } from 'lucide-react';
 import { useStore } from '../../store';
-import { C, Badge, ProgressBar, MILESTONE_STATUS, PROJECT_STATUS } from '../Common';
+import { C, Badge, Card, ProgressBar, MILESTONE_STATUS, PROJECT_STATUS } from '../Common';
 import { fmtDate, fmtMoney, compareWbs, PROCESS_STATUS_STYLE, RISK_LEVEL_COLOR } from '../../utils';
 import type { Project } from '../../types';
 import toast from 'react-hot-toast';
@@ -264,53 +264,94 @@ export default function ProjectReport({ project }: Props) {
             {/* Tasks */}
             <div>
               <div style={{ fontSize:11, fontWeight:700, color:C.text, marginBottom:6 }}>Main Tasks ({tasksForReport.length})</div>
-              <div style={{ background:C.bg, borderRadius:10, overflow:'hidden', maxHeight:260, overflowY:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:8 }}>
-                  <thead><tr style={{ background:C.primary }}>
-                    {['WBS','Task','Start','Finish','Actual','%'].map(h=>(
-                      <th key={h} style={{ padding:'5px 7px', color:'#fff', textAlign:'left', fontSize:8, fontWeight:600 }}>{h}</th>
-                    ))}
-                  </tr></thead>
-                  <tbody>
-                    {tasksForReport.map((t,i)=>(
-                      <tr key={t.id} style={{ background:i%2===0?C.white:C.bg }}>
-                        <td style={{ padding:'4px 7px', fontSize:8, color:C.text3 }}>{t.wbs}</td>
-                        <td style={{ padding:'4px 7px', fontSize:8, fontWeight:500 }}>{t.taskName}</td>
-                        <td style={{ padding:'4px 7px', fontSize:8, color:C.text2 }}>{fmtDate(t.startDate)}</td>
-                        <td style={{ padding:'4px 7px', fontSize:8, color:C.text2 }}>{fmtDate(t.endDate)}</td>
-                        <td style={{ padding:'4px 7px', fontSize:8, color:t.actualFinish?C.green:C.text3 }}>{t.actualFinish?fmtDate(t.actualFinish):'-'}</td>
-                        <td style={{ padding:'4px 7px', fontSize:8, fontWeight:700, color:t.percentComplete>=100?C.green:t.percentComplete>=60?C.blue:C.primary }}>{t.percentComplete}%</td>
-                      </tr>
-                    ))}
-                    {tasksForReport.length===0&&<tr><td colSpan={6} style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No tasks</td></tr>}
-                  </tbody>
-                </table>
-              </div>
+              {isMobile ? (
+                <div style={{ display:'grid', gap:8 }}>
+                  {tasksForReport.map((t) => (
+                    <Card key={t.id} style={{ padding: 10, marginBottom: 0, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px', border: `1px solid ${C.border}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: C.text }}>{t.taskName}</div>
+                          <div style={{ fontSize: 9, color: C.text2, marginTop: 2 }}>{t.wbs}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 10, color: C.text2 }}>Progress</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: t.percentComplete >= 100 ? C.green : t.percentComplete >= 60 ? C.blue : C.primary }}>{t.percentComplete}%</div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ background:C.bg, borderRadius:10, overflow:'hidden', maxHeight:260, overflowY:'auto' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:8 }}>
+                    <thead><tr style={{ background:C.primary }}>
+                      {['WBS','Task','Start','Finish','Actual','%'].map(h=>(
+                        <th key={h} style={{ padding:'5px 7px', color:'#fff', textAlign:'left', fontSize:8, fontWeight:600 }}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {tasksForReport.map((t,i)=>(
+                        <tr key={t.id} style={{ background:i%2===0?C.white:C.bg }}>
+                          <td style={{ padding:'4px 7px', fontSize:8, color:C.text3 }}>{t.wbs}</td>
+                          <td style={{ padding:'4px 7px', fontSize:8, fontWeight:500 }}>{t.taskName}</td>
+                          <td style={{ padding:'4px 7px', fontSize:8, color:C.text2 }}>{fmtDate(t.startDate)}</td>
+                          <td style={{ padding:'4px 7px', fontSize:8, color:C.text2 }}>{fmtDate(t.endDate)}</td>
+                          <td style={{ padding:'4px 7px', fontSize:8, color:t.actualFinish?C.green:C.text3 }}>{t.actualFinish?fmtDate(t.actualFinish):'-'}</td>
+                          <td style={{ padding:'4px 7px', fontSize:8, fontWeight:700, color:t.percentComplete>=100?C.green:t.percentComplete>=60?C.blue:C.primary }}>{t.percentComplete}%</td>
+                        </tr>
+                      ))}
+                      {tasksForReport.length===0&&<tr><td colSpan={6} style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No tasks</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
             {/* Milestones */}
             <div>
               <div style={{ fontSize:11, fontWeight:700, color:C.text, marginBottom:6 }}>Milestones ({ms.length})</div>
-              <div style={{ background:C.bg, borderRadius:10, overflow:'hidden', maxHeight:260, overflowY:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:8 }}>
-                  <thead><tr style={{ background:C.green }}>
-                    {['Phase','Name','Amount','Due','Status'].map(h=>(
-                      <th key={h} style={{ padding:'5px 7px', color:'#fff', textAlign:'left', fontSize:8, fontWeight:600 }}>{h}</th>
-                    ))}
-                  </tr></thead>
-                  <tbody>
-                    {ms.map((m,i)=>{const ss=MILESTONE_STATUS[m.status]??MILESTONE_STATUS.pending;return(
-                      <tr key={m.id} style={{ background:i%2===0?C.white:C.bg }}>
-                        <td style={{ padding:'4px 7px', fontSize:8, color:C.text3 }}>{m.phase}</td>
-                        <td style={{ padding:'4px 7px', fontSize:8, fontWeight:500 }}>{m.name}</td>
-                        <td style={{ padding:'4px 7px', fontSize:8, fontFamily:'Poppins, sans-serif', color:C.primary }}>{money2(m.amount)}</td>
-                        <td style={{ padding:'4px 7px', fontSize:8, color:C.text2 }}>{fmtDate(m.dueDate)}</td>
-                        <td style={{ padding:'4px 7px' }}><span style={{ fontSize:8, fontWeight:600, color:ss.color, background:ss.bg, padding:'2px 8px', borderRadius:10 }}>{ss.label}</span></td>
-                      </tr>
-                    );})}
-                    {ms.length===0&&<tr><td colSpan={5} style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No milestones</td></tr>}
-                  </tbody>
-                </table>
-              </div>
+              {isMobile ? (
+                <div style={{ display:'grid', gap:8 }}>
+                  {ms.map((m) => {
+                    const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
+                    return (
+                      <Card key={m.id} style={{ padding: 10, marginBottom: 0, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px', border: `1px solid ${C.border}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: C.text }}>{m.phase}</div>
+                            <div style={{ fontSize: 9, color: C.text2, marginTop: 2 }}>{m.name}</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 9, color: C.text2 }}>Due {fmtDate(m.dueDate)}</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color:ss.color }}>{ss.label}</div>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ background:C.bg, borderRadius:10, overflow:'hidden', maxHeight:260, overflowY:'auto' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:8 }}>
+                    <thead><tr style={{ background:C.green }}>
+                      {['Phase','Name','Amount','Due','Status'].map(h=>(
+                        <th key={h} style={{ padding:'5px 7px', color:'#fff', textAlign:'left', fontSize:8, fontWeight:600 }}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {ms.map((m,i)=>{const ss=MILESTONE_STATUS[m.status]??MILESTONE_STATUS.pending;return(
+                        <tr key={m.id} style={{ background:i%2===0?C.white:C.bg }}>
+                          <td style={{ padding:'4px 7px', fontSize:8, color:C.text3 }}>{m.phase}</td>
+                          <td style={{ padding:'4px 7px', fontSize:8, fontWeight:500 }}>{m.name}</td>
+                          <td style={{ padding:'4px 7px', fontSize:8, fontFamily:'Poppins, sans-serif', color:C.primary }}>{money2(m.amount)}</td>
+                          <td style={{ padding:'4px 7px', fontSize:8, color:C.text2 }}>{fmtDate(m.dueDate)}</td>
+                          <td style={{ padding:'4px 7px' }}><span style={{ fontSize:8, fontWeight:600, color:ss.color, background:ss.bg, padding:'2px 8px', borderRadius:10 }}>{ss.label}</span></td>
+                        </tr>
+                      );})}
+                      {ms.length===0&&<tr><td colSpan={5} style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No milestones</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
 
@@ -319,56 +360,114 @@ export default function ProjectReport({ project }: Props) {
             {/* CRs */}
             <div>
               <div style={{ fontSize:10, fontWeight:700, color:C.text, marginBottom:8 }}>📝 Change Requests ({crs.length})</div>
-              <div style={{ background:C.bg, borderRadius:10, overflow:'hidden' }}>
-                {crs.length===0&&<div style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No CRs</div>}
-                {crs.map((c,i)=>{const ss=PROCESS_STATUS_STYLE[c.status]??PROCESS_STATUS_STYLE['N/A'];return(
-                  <div key={c.id} className="report-list-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
-                    <div>
-                      <div style={{ fontSize:8, fontWeight:600, color:C.primary }}>{c.crId}</div>
-                      <div style={{ fontSize:8, color:C.text2 }}>{c.title.substring(0,28)} · {c.totalManday}MD</div>
+              {isMobile ? (
+                <div style={{ display:'grid', gap:8 }}>
+                  {crs.map((c) => {
+                    const ss = PROCESS_STATUS_STYLE[c.status] ?? PROCESS_STATUS_STYLE['N/A'];
+                    return (
+                      <Card key={c.id} style={{ padding: 10, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px', border: `1px solid ${C.border}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: C.primary }}>{c.crId}</div>
+                            <div style={{ fontSize: 9, color: C.text2, marginTop: 2 }}>{c.title.substring(0,30)}</div>
+                          </div>
+                          <span style={{ fontSize: 8, fontWeight: 600, color: ss.color, background: ss.bg, padding: '2px 8px', borderRadius: 10 }}>{c.status}</span>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ background:C.bg, borderRadius:10, overflow:'hidden' }}>
+                  {crs.length===0&&<div style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No CRs</div>}
+                  {crs.map((c,i)=>{const ss=PROCESS_STATUS_STYLE[c.status]??PROCESS_STATUS_STYLE['N/A'];return(
+                    <div key={c.id} className="report-list-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
+                      <div>
+                        <div style={{ fontSize:8, fontWeight:600, color:C.primary }}>{c.crId}</div>
+                        <div style={{ fontSize:8, color:C.text2 }}>{c.title.substring(0,28)} · {c.totalManday}MD</div>
+                      </div>
+                      <span style={{ fontSize:8, fontWeight:600, color:ss.color, background:ss.bg, padding:'2px 8px', borderRadius:10, flexShrink:0, marginLeft:8 }}>{c.status}</span>
                     </div>
-                    <span style={{ fontSize:8, fontWeight:600, color:ss.color, background:ss.bg, padding:'2px 8px', borderRadius:10, flexShrink:0, marginLeft:8 }}>{c.status}</span>
-                  </div>
-                );})}
-              </div>
+                  );})}
+                </div>
+              )}
             </div>
             {/* Issues */}
             <div>
               <div style={{ fontSize:10, fontWeight:700, color:C.text, marginBottom:8 }}>🔴 Issues ({iss.length})</div>
-              <div style={{ background:C.bg, borderRadius:10, overflow:'hidden' }}>
-                {iss.length===0&&<div style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No issues</div>}
-                {iss.map((issue,i)=>{const ss=PROCESS_STATUS_STYLE[issue.status]??PROCESS_STATUS_STYLE['N/A'];return(
-                  <div key={issue.id} className="report-list-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
-                    <div>
-                      <div style={{ fontSize:8, fontWeight:600, color:C.text }}>{issue.title.substring(0,28)}</div>
-                      <div style={{ fontSize:8, color:C.text2 }}>{fmtDate(issue.issueDate)} · {issue.assignedTo||'—'}</div>
+              {isMobile ? (
+                <div style={{ display:'grid', gap:8 }}>
+                  {iss.map((issue) => {
+                    const ss = PROCESS_STATUS_STYLE[issue.status] ?? PROCESS_STATUS_STYLE['N/A'];
+                    return (
+                      <Card key={issue.id} style={{ padding: 10, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px', border: `1px solid ${C.border}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: C.text }}>{issue.title.substring(0,30)}</div>
+                            <div style={{ fontSize: 9, color: C.text2, marginTop: 2 }}>{fmtDate(issue.issueDate)} · {issue.assignedTo||'—'}</div>
+                          </div>
+                          <span style={{ fontSize: 8, fontWeight: 600, color:ss.color, background:ss.bg, padding: '2px 8px', borderRadius: 10 }}>{issue.status}</span>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ background:C.bg, borderRadius:10, overflow:'hidden' }}>
+                  {iss.length===0&&<div style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No issues</div>}
+                  {iss.map((issue,i)=>{const ss=PROCESS_STATUS_STYLE[issue.status]??PROCESS_STATUS_STYLE['N/A'];return(
+                    <div key={issue.id} className="report-list-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
+                      <div>
+                        <div style={{ fontSize:8, fontWeight:600, color:C.text }}>{issue.title.substring(0,28)}</div>
+                        <div style={{ fontSize:8, color:C.text2 }}>{fmtDate(issue.issueDate)} · {issue.assignedTo||'—'}</div>
+                      </div>
+                      <span style={{ fontSize:8, fontWeight:600, color:ss.color, background:ss.bg, padding:'2px 8px', borderRadius:10, flexShrink:0, marginLeft:8 }}>{issue.status}</span>
                     </div>
-                    <span style={{ fontSize:8, fontWeight:600, color:ss.color, background:ss.bg, padding:'2px 8px', borderRadius:10, flexShrink:0, marginLeft:8 }}>{issue.status}</span>
-                  </div>
-                );})}
-              </div>
+                  );})}
+                </div>
+              )}
             </div>
             {/* Risks */}
             <div>
               <div style={{ fontSize:10, fontWeight:700, color:C.text, marginBottom:8 }}>🎯 Risks ({rks.length})</div>
-              <div style={{ background:C.bg, borderRadius:10, overflow:'hidden' }}>
-                {rks.length===0&&<div style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No risks</div>}
-                {rks.map((r,i)=>{
-                  const rc=RISK_LEVEL_COLOR[r.impact]||C.text2;
-                  const sc=r.status==='Monitoring'?C.red:r.status==='Mitigating'?C.amber:C.green;
-                  return(
-                  <div key={r.id} className="report-list-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
-                    <div>
-                      <div style={{ fontSize:8, fontWeight:600, color:C.text }}>{r.title.substring(0,28)}</div>
-                      <div style={{ fontSize:8 }}>
-                        <span style={{ color:rc, fontWeight:600 }}>P:{r.probability} / I:{r.impact}</span>
-                        <span style={{ color:C.text3 }}> · {r.owner||'—'}</span>
+              {isMobile ? (
+                <div style={{ display:'grid', gap:8 }}>
+                  {rks.map((r) => {
+                    const rc = RISK_LEVEL_COLOR[r.impact] || C.text2;
+                    const sc = r.status === 'Monitoring' ? C.red : r.status === 'Mitigating' ? C.amber : C.green;
+                    return (
+                      <Card key={r.id} style={{ padding: 10, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px', border: `1px solid ${C.border}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: C.text }}>{r.title.substring(0,30)}</div>
+                            <div style={{ fontSize: 9, color: C.text2, marginTop: 2 }}>P:{r.probability} / I:{r.impact}</div>
+                          </div>
+                          <span style={{ fontSize: 8, fontWeight: 600, color: sc, background: sc + '18', padding: '2px 8px', borderRadius: 10 }}>{r.status}</span>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ background:C.bg, borderRadius:10, overflow:'hidden' }}>
+                  {rks.length===0&&<div style={{ padding:16, textAlign:'center', fontSize:8, color:C.text3 }}>No risks</div>}
+                  {rks.map((r,i)=>{
+                    const rc=RISK_LEVEL_COLOR[r.impact]||C.text2;
+                    const sc=r.status==='Monitoring'?C.red:r.status==='Mitigating'?C.amber:C.green;
+                    return(
+                    <div key={r.id} className="report-list-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:i%2===0?C.white:C.bg, borderBottom:`1px solid ${C.border}` }}>
+                      <div>
+                        <div style={{ fontSize:8, fontWeight:600, color:C.text }}>{r.title.substring(0,28)}</div>
+                        <div style={{ fontSize:8 }}>
+                          <span style={{ color:rc, fontWeight:600 }}>P:{r.probability} / I:{r.impact}</span>
+                          <span style={{ color:C.text3 }}> · {r.owner||'—'}</span>
+                        </div>
                       </div>
+                      <span style={{ fontSize:8, fontWeight:600, color:sc, background:sc+'18', padding:'2px 8px', borderRadius:10, flexShrink:0, marginLeft:8 }}>{r.status}</span>
                     </div>
-                    <span style={{ fontSize:8, fontWeight:600, color:sc, background:sc+'18', padding:'2px 8px', borderRadius:10, flexShrink:0, marginLeft:8 }}>{r.status}</span>
-                  </div>
-                );})}
-              </div>
+                  );})}
+                </div>
+              )}
             </div>
           </div>
         </div>
