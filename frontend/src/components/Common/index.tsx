@@ -54,8 +54,8 @@ export const Btn: React.FC<{
 
 export const Input: React.FC<{
   value: string | number; onChange: (v: string) => void;
-  placeholder?: string; type?: string; style?: React.CSSProperties; autoFocus?: boolean;
-}> = ({ value, onChange, placeholder = '', type = 'text', style, autoFocus }) => {
+  placeholder?: string; type?: string; style?: React.CSSProperties; autoFocus?: boolean; list?: string;
+}> = ({ value, onChange, placeholder = '', type = 'text', style, autoFocus, list }) => {
   const [draft, setDraft] = useState(type === 'date' ? (value ? isoToDmy(String(value)) : '') : String(value ?? ''));
   const [focused, setFocused] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -103,7 +103,7 @@ export const Input: React.FC<{
   if (type === 'date') {
     return (
       <div style={{ position: 'relative', width: '100%', ...style }}>
-        <input autoFocus={autoFocus} type="text" value={draft} placeholder={placeholder}
+        <input autoFocus={autoFocus} type="text" value={draft} placeholder={placeholder} list={list}
           onChange={e => handleDateChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={handleDateBlur}
@@ -123,7 +123,7 @@ export const Input: React.FC<{
   }
 
   return (
-    <input autoFocus={autoFocus} type={type} value={value ?? ''} placeholder={placeholder}
+    <input autoFocus={autoFocus} type={type} value={value ?? ''} placeholder={placeholder} list={list}
       onChange={e => onChange(e.target.value)}
       style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, padding: '8px 12px', border: `1.5px solid ${C.border}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box', color: C.text, background: C.white, colorScheme: type === 'date' ? 'light' : undefined, ...style }}
       onFocus={e => (e.target.style.borderColor = C.primary)}

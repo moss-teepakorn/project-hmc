@@ -179,9 +179,14 @@ function RiskForm({ data, memberOptions, onClose, onSave }: { data: Partial<Risk
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         <FormRow label="Probability"><Select value={form.probability ?? 'Medium'} onChange={v => up('probability', v)} options={LEVELS.map(l => ({ value: l, label: l }))} /></FormRow>
         <FormRow label="Impact"><Select value={form.impact ?? 'Medium'} onChange={v => up('impact', v)} options={LEVELS.map(l => ({ value: l, label: l }))} /></FormRow>
-        <FormRow label="Owner"><Select value={form.owner ?? ''} onChange={v => up('owner', v)} options={memberOptions} /></FormRow>
+        <FormRow label="Owner"><>
+          <Input value={form.owner ?? ''} onChange={v => up('owner', v)} placeholder="Owner name" list="risk-owner-options" />
+          <datalist id="risk-owner-options">
+            {memberOptions.map(option => <option key={option.value} value={option.label} />)}
+          </datalist>
+        </></FormRow>
       </div>
-      <FormRow label="Mitigation Plan"><Textarea value={form.mitigation ?? ''} onChange={v => up('mitigation', v)} rows={2} placeholder="How to mitigate this risk…" /></FormRow>
+      <FormRow label="Mitigation Plan"><Textarea value={form.mitigation ?? ''} onChange={v => up('mitigation', v)} rows={4} placeholder="How to mitigate this risk…" /></FormRow>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={() => { if (!form.title?.trim()) return; onSave(form); }}>Save</Btn>
