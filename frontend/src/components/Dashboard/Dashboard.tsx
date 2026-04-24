@@ -17,6 +17,14 @@ export default function Dashboard() {
   const [showAdd,    setShowAdd]    = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showHypercare, setShowHypercare] = useState(false);
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
+
+  React.useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Note: fetchProjects is called from App.tsx, not needed here
 
@@ -114,9 +122,9 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', flexDirection: isMobile ? 'column' : 'row' }}>
       {/* Mobile hamburger menu */}
-      {window.innerWidth < 768 && (
+      {isMobile && (
         <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', background: C.primary, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <button onClick={() => setSidebarOpen(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', padding: 4, display: 'flex', alignItems: 'center' }}>
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
@@ -127,7 +135,7 @@ export default function Dashboard() {
 
       {/* ── Left panel: project list ─────────────────────────────────────── */}
       {sidebarOpen && (
-        <div style={{ width: window.innerWidth < 768 ? '100%' : 280, minWidth: window.innerWidth < 768 ? 'auto' : 240, maxWidth: window.innerWidth < 768 ? '100%' : 320, borderRight: window.innerWidth < 768 ? 'none' : `1px solid ${C.border}`, borderBottom: window.innerWidth < 768 ? `1px solid ${C.border}` : 'none', display: 'flex', flexDirection: 'column', background: C.bg, overflow: 'hidden', maxHeight: window.innerWidth < 768 ? '50vh' : '100%' }}>
+        <div style={{ width: isMobile ? '100%' : 280, minWidth: isMobile ? 'auto' : 240, maxWidth: isMobile ? '100%' : 320, borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none', display: 'flex', flexDirection: 'column', background: C.bg, overflow: 'hidden', maxHeight: isMobile ? '50vh' : '100%' }}>
         <div style={{ padding: '14px 14px 10px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>Projects</div>
@@ -165,11 +173,12 @@ export default function Dashboard() {
       {/* ── Right panel: summary or welcome ─────────────────────────────── */}
       <div style={{ flex: 1, overflow: 'auto', background: C.bg }}>
         {!selected ? (
-          <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} />
+          <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} isMobile={isMobile} />
         ) : (
           <ProjectSummaryPanel
             project={selected}
             onOpen={() => setActiveProject(selected)}
+            isMobile={isMobile}
           />
         )}
       </div>
@@ -188,7 +197,7 @@ export default function Dashboard() {
 }
 
 // ── Welcome / global summary ──────────────────────────────────────────────────
-function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void }) {
+function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void; isMobile: boolean }) {
   const [showHC, setShowHC] = useState(false);
   const normalProjects = projects.filter(p => p.status !== 'Hyper Care');
   const hypercareProjects = projects.filter(p => p.status === 'Hyper Care');
@@ -243,11 +252,11 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
   };
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 900, margin: '0 auto' }}>
-      <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 6 }}>Portfolio Overview</h2>
+    <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', maxWidth: 900, margin: '0 auto' }}>
+      <h2 style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: C.text, marginBottom: 6 }}>Portfolio Overview</h2>
       <p style={{ color: C.text2, fontSize: 13, marginBottom: 24 }}>Select a project on the left to view its executive summary.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 14, marginBottom: 28 }}>
         {[
           { label: 'Planning',     value: planning.length,          color: C.amber,   bg: C.amberBg,   icon: '📋' },
           { label: 'Req & Design', value: reqDesign.length,         color: C.primary, bg: C.primaryBg, icon: '🚀' },
@@ -264,7 +273,7 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px,1fr))', gap: 14 }}>
         {normalProjects.map(p => renderOverviewProjectCard(p, C.primary))}
       </div>
 
@@ -278,7 +287,7 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
             🛡️ Hyper Care Projects ({hypercareProjects.length})
           </button>
           {showHC && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: 14, marginTop: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px,1fr))', gap: 14, marginTop: 12 }}>
               {hypercareProjects.map(p => renderOverviewProjectCard(p, C.amber))}
             </div>
           )}
@@ -289,7 +298,7 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
 }
 
 // ── Per-project summary panel ─────────────────────────────────────────────────
-function ProjectSummaryPanel({ project, onOpen }: { project: Project; onOpen: () => void }) {
+function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; onOpen: () => void; isMobile: boolean }) {
   const { tasks, milestones, members, efforts, changeRequests, issues, risks } = useStore();
   const s = PROJECT_STATUS[project.status] ?? PROJECT_STATUS['Planning'];
 
@@ -326,10 +335,10 @@ function ProjectSummaryPanel({ project, onOpen }: { project: Project; onOpen: ()
   );
 
   return (
-    <div style={{ padding: '24px 28px', maxWidth: 900 }}>
+    <div style={{ padding: isMobile ? '18px 14px' : '24px 28px', maxWidth: 900 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? 16 : 0, marginBottom: 20 }}>
+        <div style={{ display: 'flex', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 14, alignItems: 'flex-start' }}>
           <div style={{ width: 10, height: 48, borderRadius: 5, background: project.color || C.primary, flexShrink: 0 }} />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -340,11 +349,11 @@ function ProjectSummaryPanel({ project, onOpen }: { project: Project; onOpen: ()
             <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>{fmtDate(project.startDate)} – {fmtDate(project.endDate)}</div>
           </div>
         </div>
-        <Btn onClick={onOpen} style={{ flexShrink: 0 }}>Open Project →</Btn>
+        <Btn onClick={onOpen} style={{ flexShrink: 0, marginTop: isMobile ? 10 : 0 }}>Open Project →</Btn>
       </div>
 
       {/* KPI grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         <KPI label="Progress" value={`${prog}%`} sub={`${doneTasks}/${pt.length} tasks done`} color={C.primary} bg={C.primaryBg} icon="📋" />
         <KPI label="Payment" value={`${payPct}%`} sub={`฿${fmtMoney(paidAmt)} collected`} color={C.green} bg={C.greenBg} icon="💰" />
         <KPI label="Manday" value={`${tUsedMD}/${tBudMD}`} sub="MD used vs budget" color={C.amber} bg={C.amberBg} icon="⚡" />
@@ -361,7 +370,7 @@ function ProjectSummaryPanel({ project, onOpen }: { project: Project; onOpen: ()
       </Card>
 
       {/* Task summary + Recent issues */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Root tasks */}
         <Card style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 700, color: C.text }}>📋 Main Tasks ({rootTasksSorted.length})</div>
