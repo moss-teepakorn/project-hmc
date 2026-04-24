@@ -67,7 +67,7 @@ export default function TasksTab({ projectId }: Props) {
   const { tasks, fetchTasks, createTask, updateTask, deleteTask } = useStore();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
-  const [view, setView]         = useState<ViewMode>('split');
+  const [view, setView]         = useState<ViewMode>(() => typeof window !== 'undefined' && window.innerWidth < 768 ? 'table' : 'split');
   const [addModal, setAddModal] = useState(false);
   const [editModal, setEditModal] = useState<Task | null>(null);
   const [loading, setLoading]   = useState(false);
@@ -131,6 +131,11 @@ export default function TasksTab({ projectId }: Props) {
   const projectTasks = tasks.filter(t => t.projectId === projectId);
   const visible      = flattenTree(projectTasks, expanded);
   const isTableView = view === 'table';
+  const viewModes: ViewMode[] = isMobile ? ['table'] : ['table', 'split', 'gantt'];
+
+  useEffect(() => {
+    if (isMobile && view !== 'table') setView('table');
+  }, [isMobile, view]);
 
   const toggle = (id: string) => setExpanded(p => {
     const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s;
@@ -640,7 +645,7 @@ export default function TasksTab({ projectId }: Props) {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 16px', borderBottom:`1px solid ${C.border}`, flexShrink:0, background:C.white }}>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <div style={{ display:'flex', gap:3, background:C.bg, borderRadius:8, padding:3 }}>
-            {(['table','split','gantt'] as ViewMode[]).map(m => (
+            {viewModes.map(m => (
               <button key={m} onClick={()=>setView(m)}
                 style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif', background:view===m?C.white:C.bg, color:view===m?C.primary:C.text2, boxShadow:view===m?C.shadow:'none', transition:'all 0.15s' }}>
                 {m==='table'?'☰ Table':m==='split'?'⊟ Split':'▦ Gantt'}
@@ -692,13 +697,13 @@ export default function TasksTab({ projectId }: Props) {
 
       {/* Content */}
       <div style={{ flex:1, overflow:'hidden', display:'flex' }}>
-        {(view==='table'||view==='split') && (
+        {((view==='table') || (!isMobile && view==='split')) && (
           <div style={{ width:view==='split'?splitW:undefined, flex:view==='table'?1:undefined, minWidth:300, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column', flexShrink:0 }}>
             {tableContent}
           </div>
         )}
         {/* Resizable divider */}
-        {view==='split' && (
+        {!isMobile && view==='split' && (
           <div onMouseDown={onResizeStart}
             style={{ width:6, cursor:'col-resize', background:'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}
             onMouseEnter={e=>e.currentTarget.style.background=C.primaryBg}
@@ -706,7 +711,7 @@ export default function TasksTab({ projectId }: Props) {
             <div style={{ width:2, height:40, background:C.border2, borderRadius:2 }} />
           </div>
         )}
-        {(view==='gantt'||view==='split') && (
+        {!isMobile && (view==='gantt'||view==='split') && (
           <div style={{ flex:1, minHeight:0, overflow:'hidden', minWidth:200, display:'flex', flexDirection:'column' }}>
             <GanttChart tasks={projectTasks} visibleTasks={visible} selectedId={selected}
               onSelect={setSelected} ganttBodyRef={ganttBodyRef} onGanttScroll={onGanttScroll}

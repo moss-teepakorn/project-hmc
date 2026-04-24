@@ -428,21 +428,51 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
           {phaseOrder.map(phase => (
             <div key={phase} style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>{phase}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-                {milestonesByPhase[phase].sort((a, b) => a.name.localeCompare(b.name)).map(m => {
-                  const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
-                  return (
-                    <div key={m.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px', minWidth: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
-                        <span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
+              {isMobile ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+                  {milestonesByPhase[phase].sort((a, b) => a.name.localeCompare(b.name)).map(m => {
+                    const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
+                    return (
+                      <div key={m.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px', minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
+                          <span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: C.text2, marginBottom: 6, whiteSpace: 'nowrap' }}>฿{fmtMoney(m.amount)}</div>
+                        {m.dueDate && <div style={{ fontSize: 11, color: C.text2 }}>{fmtDate(m.dueDate)}</div>}
                       </div>
-                      <div style={{ fontSize: 11, color: C.text2, marginBottom: 6, whiteSpace: 'nowrap' }}>฿{fmtMoney(m.amount)}</div>
-                      {m.dueDate && <div style={{ fontSize: 11, color: C.text2 }}>{fmtDate(m.dueDate)}</div>}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: C.bg }}>
+                        {['Milestone', 'Amount', 'Due Date', 'Billing Date', 'Status'].map(h => (
+                          <th key={h} style={TH}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {milestonesByPhase[phase].sort((a, b) => a.name.localeCompare(b.name)).map((m, idx) => {
+                        const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
+                        return (
+                          <tr key={m.id} style={{ background: idx % 2 === 0 ? C.white : C.bg }}>
+                            <td style={TD}>{m.name}</td>
+                            <td style={TD}>฿{fmtMoney(m.amount)}</td>
+                            <td style={TD}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
+                            <td style={TD}>{m.billingDate ? fmtDate(m.billingDate) : '—'}</td>
+                            <td style={TD}>
+                              <span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           ))}
         </Card>
