@@ -471,24 +471,23 @@ export default function ProjectSummaryTab({ project }: Props) {
 
       <div>
         {isMobile ? (
-          <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gap: 8 }}>
             {rows.map((row) => (
-              <Card key={row.snapshotDate} style={{ padding: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{fmtDate(row.snapshotDate)}</div>
-                    <div style={{ marginTop: 8, fontSize: 12, color: C.text2 }}>{row.note || 'No notes yet'}</div>
+              <Card key={row.snapshotDate} style={{ padding: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                  <div style={{ minWidth: 0, flex: '1 1 160px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{fmtDate(row.snapshotDate)}</div>
+                    <div style={{ marginTop: 6, fontSize: 10, color: C.text2, lineHeight: 1.4, maxWidth: 220 }}>{row.note || 'No notes yet'}</div>
                   </div>
-                  <div style={{ display: 'grid', gap: 8, minWidth: 120, textAlign: 'right' }}>
-                    <div style={{ fontSize: 11, color: C.text2 }}>Baseline</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: C.primary }}>{row.baselinePercent}%</div>
-                    <div style={{ fontSize: 11, color: C.text2 }}>Actual</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: C.green }}>{row.actualPercent}%</div>
+                  <div style={{ display: 'grid', gap: 6, minWidth: 100, textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: C.text2 }}>Baseline</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: C.primary }}>{row.baselinePercent}%</div>
+                    <div style={{ fontSize: 10, color: C.text2 }}>Actual</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: C.green }}>{row.actualPercent}%</div>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gap: 12, marginBottom: 14 }}>
+                <div style={{ display: 'grid', gap: 10, marginBottom: 10 }}>
                   <div>
-                    <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>Actual progress</div>
                     <input
                       type="number"
                       min={0}
@@ -496,20 +495,19 @@ export default function ProjectSummaryTab({ project }: Props) {
                       value={row.actualInput}
                       onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
                       placeholder="0-100"
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: 'Poppins, sans-serif' }}
                     />
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>Notes</div>
                     <textarea
                       rows={2}
                       value={row.note}
                       onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
-                      style={{ width: '100%', minWidth: 0, padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif', resize: 'vertical' }}
+                      style={{ width: '100%', minWidth: 0, padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: 'Poppins, sans-serif', resize: 'vertical', lineHeight: 1.4 }}
                     />
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <Btn variant={row.dirty ? 'primary' : 'outline'} small onClick={() => handleSave(row.snapshotDate)} disabled={!row.dirty || savingSnapshot === row.snapshotDate}>
                     {savingSnapshot === row.snapshotDate ? 'Saving…' : row.dirty ? 'Save' : 'Saved'}
                   </Btn>
