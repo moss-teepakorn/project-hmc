@@ -13,8 +13,16 @@ export default function EffortTab({ projectId }: Props) {
   const { efforts, fetchEfforts, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
   const [modal, setModal]       = useState<Partial<Effort> | null>(null);
   const [deleting, setDeleting] = useState<Effort | null>(null);
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
 
   useEffect(() => { fetchEfforts(projectId); }, [projectId]);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Build month columns: from 3 months before earliest entry to 3 months ahead
   const getMonths = (): string[] => {
@@ -72,7 +80,7 @@ export default function EffortTab({ projectId }: Props) {
   return (
     <div style={{ padding: 24 }}>
       {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4,1fr)', gap: 12, marginBottom: 18 }}>
         {[
           { label: 'Budget Amount', value: `฿${fmtMoney(tBudAmt)}`, color: C.primary, bg: C.primaryBg,                 icon: '💼' },
           { label: 'Budget Manday', value: `${tBudMD} MD`,            color: C.blue,    bg: C.blueBg,                    icon: '📅' },
@@ -98,106 +106,163 @@ export default function EffortTab({ projectId }: Props) {
         <ProgressBar value={pct} color={pct > 90 ? C.red : pct > 70 ? C.amber : C.primary} height={10} />
       </Card>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <Btn onClick={() => setModal({})} small><Plus size={14} /> Add Module</Btn>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
+        <Btn onClick={() => setModal({})} small style={{ width: isMobile ? '100%' : 'auto' }}><Plus size={14} /> Add Module</Btn>
       </div>
 
       {/* Effort grid */}
-      <Card style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
-          <thead>
-            <tr style={{ background: C.bg }}>
-              <th style={{ ...TH, minWidth: 160 }}>Module</th>
-              <th style={{ ...TH, minWidth: 110 }}>Budget (฿)</th>
-              <th style={{ ...TH, textAlign: 'center', minWidth: 80 }}>Budget MD</th>
-              {months.map(mo => (
-                <th key={mo} style={{ ...TH, background: C.primaryBg, color: C.primary, textAlign: 'center', minWidth: 72 }}>
-                  {fmtMonth(mo)}
-                </th>
-              ))}
-              <th style={{ ...TH, background: '#FFFBEB', color: C.amber,  textAlign: 'center', minWidth: 80 }}>Used MD</th>
-              <th style={{ ...TH, background: '#F0FDF4', color: C.green,  textAlign: 'center', minWidth: 90 }}>Remaining</th>
-              <th style={{ ...TH, minWidth: 80 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {efforts.map((e, i) => {
-              const used = Object.values(e.monthly || {}).reduce((s, v) => s + v, 0);
-              const rem  = e.budgetManday - used;
-              return (
-                <tr key={e.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
-                  <td style={{ ...TD, fontWeight: 600 }}>{e.module}</td>
-                  <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', color: C.primary, fontWeight: 600 }}>฿{fmtMoney(e.budgetAmount)}</td>
-                  <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.blue }}>{e.budgetManday}</td>
+      {isMobile ? (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {efforts.length > 0 ? efforts.map((e, i) => {
+            const used = Object.values(e.monthly || {}).reduce((s, v) => s + v, 0);
+            const rem  = e.budgetManday - used;
+            return (
+              <Card key={e.id} style={{ padding: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>{e.module}</div>
+                    <div style={{ fontSize: 12, color: C.text2 }}>{e.budgetManday} MD • ฿{fmtMoney(e.budgetAmount)}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setModal(e)} style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.primaryBg, border: 'none', borderRadius: 8, color: C.primary, cursor: 'pointer' }}>
+                      <Pencil size={16} />
+                    </button>
+                    <button onClick={() => setDeleting(e)} style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.redBg, border: 'none', borderRadius: 8, color: C.red, cursor: 'pointer' }}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                  <div style={{ background: C.bg2, borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 11, color: C.text2, marginBottom: 4 }}>Used MD</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.amber }}>{used}</div>
+                  </div>
+                  <div style={{ background: C.bg2, borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 11, color: C.text2, marginBottom: 4 }}>Remaining</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: rem < 0 ? C.red : C.green }}>{rem}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}>
                   {months.map(mo => (
-                    <td key={mo} style={{ ...TD, textAlign: 'center', padding: '6px 6px' }}>
+                    <div key={mo} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, minHeight: 72 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: C.text2, marginBottom: 6 }}>{fmtMonth(mo)}</div>
                       <input
                         type="number" min={0}
                         value={(e.monthly || {})[mo] || ''}
                         onChange={ev => handleMonthly(e.id, mo, ev.target.value)}
                         placeholder="—"
-                        style={{
-                          width: 54, textAlign: 'center', border: `1px solid ${C.border}`, borderRadius: 6,
-                          padding: '4px 4px', fontFamily: 'Poppins, sans-serif', fontSize: 12, color: C.text,
-                          background: ((e.monthly || {})[mo] > 0) ? C.amberBg : C.white, outline: 'none',
-                        }}
+                        style={{ width: '100%', textAlign: 'center', border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 6px', fontFamily: 'Poppins, sans-serif', fontSize: 12, color: C.text, background: ((e.monthly || {})[mo] > 0) ? C.amberBg : C.white, outline: 'none' }}
                         onFocus={ev => ev.target.style.borderColor = C.primary}
                         onBlur={ev  => ev.target.style.borderColor = C.border}
                       />
-                    </td>
-                  ))}
-                  <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.amber, background: '#FFFBEB' }}>{used}</td>
-                  <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: rem < 0 ? C.red : C.green, background: rem < 0 ? '#FFF1F2' : '#F0FDF4' }}>{rem}</td>
-                  <td style={TD}>
-                    <div style={{ display: 'flex', gap: 5 }}>
-                      <button onClick={() => setModal(e)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>
-                        <Pencil size={11} />
-                      </button>
-                      <button onClick={() => setDeleting(e)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}>
-                        <Trash2 size={11} />
-                      </button>
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-
-            {/* Total row */}
-            {efforts.length > 0 && (
-              <tr style={{ background: C.bg2, borderTop: `2px solid ${C.border2}` }}>
-                <td style={{ ...TD, fontWeight: 800 }}>TOTAL</td>
-                <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontWeight: 700, color: C.primary }}>฿{fmtMoney(tBudAmt)}</td>
-                <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.blue }}>{tBudMD}</td>
-                {months.map(mo => {
-                  const sum = efforts.reduce((s, e) => s + ((e.monthly || {})[mo] || 0), 0);
-                  return (
-                    <td key={mo} style={{ ...TD, textAlign: 'center', fontWeight: 700, color: sum > 0 ? C.amber : C.text3 }}>
-                      {sum || '—'}
-                    </td>
-                  );
-                })}
-                <td style={{ ...TD, textAlign: 'center', fontWeight: 800, color: C.amber }}>{tUsedMD}</td>
-                <td style={{ ...TD, textAlign: 'center', fontWeight: 800, color: tRem < 0 ? C.red : C.green }}>{tRem}</td>
-                <td style={TD} />
+                  ))}
+                </div>
+              </Card>
+            );
+          }) : (
+            <Card style={{ padding: 24, textAlign: 'center', color: C.text3 }}>
+              No modules yet. Click <strong>Add Module</strong> to start tracking effort.
+            </Card>
+          )}
+        </div>
+      ) : (
+        <Card style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                <th style={{ ...TH, minWidth: 160 }}>Module</th>
+                <th style={{ ...TH, minWidth: 110 }}>Budget (฿)</th>
+                <th style={{ ...TH, textAlign: 'center', minWidth: 80 }}>Budget MD</th>
+                {months.map(mo => (
+                  <th key={mo} style={{ ...TH, background: C.primaryBg, color: C.primary, textAlign: 'center', minWidth: 72 }}>
+                    {fmtMonth(mo)}
+                  </th>
+                ))}
+                <th style={{ ...TH, background: '#FFFBEB', color: C.amber, textAlign: 'center', minWidth: 80 }}>Used MD</th>
+                <th style={{ ...TH, background: '#F0FDF4', color: C.green, textAlign: 'center', minWidth: 90 }}>Remaining</th>
+                <th style={{ ...TH, minWidth: 80 }}></th>
               </tr>
-            )}
-          </tbody>
-        </table>
-        {efforts.length === 0 && (
-          <div style={{ padding: 40, textAlign: 'center', color: C.text3 }}>
-            No modules yet. Click <strong>"Add Module"</strong> to start tracking effort.
-          </div>
-        )}
-      </Card>
+            </thead>
+            <tbody>
+              {efforts.map((e, i) => {
+                const used = Object.values(e.monthly || {}).reduce((s, v) => s + v, 0);
+                const rem  = e.budgetManday - used;
+                return (
+                  <tr key={e.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
+                    <td style={{ ...TD, fontWeight: 600 }}>{e.module}</td>
+                    <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', color: C.primary, fontWeight: 600 }}>฿{fmtMoney(e.budgetAmount)}</td>
+                    <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.blue }}>{e.budgetManday}</td>
+                    {months.map(mo => (
+                      <td key={mo} style={{ ...TD, textAlign: 'center', padding: '6px 6px' }}>
+                        <input
+                          type="number" min={0}
+                          value={(e.monthly || {})[mo] || ''}
+                          onChange={ev => handleMonthly(e.id, mo, ev.target.value)}
+                          placeholder="—"
+                          style={{
+                            width: 54, textAlign: 'center', border: `1px solid ${C.border}`, borderRadius: 6,
+                            padding: '4px 4px', fontFamily: 'Poppins, sans-serif', fontSize: 12, color: C.text,
+                            background: ((e.monthly || {})[mo] > 0) ? C.amberBg : C.white, outline: 'none',
+                          }}
+                          onFocus={ev => ev.target.style.borderColor = C.primary}
+                          onBlur={ev  => ev.target.style.borderColor = C.border}
+                        />
+                      </td>
+                    ))}
+                    <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.amber, background: '#FFFBEB' }}>{used}</td>
+                    <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: rem < 0 ? C.red : C.green, background: rem < 0 ? '#FFF1F2' : '#F0FDF4' }}>{rem}</td>
+                    <td style={TD}>
+                      <div style={{ display: 'flex', gap: 5 }}>
+                        <button onClick={() => setModal(e)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>
+                          <Pencil size={11} />
+                        </button>
+                        <button onClick={() => setDeleting(e)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}>
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
 
-      {modal !== null && <EffortModal data={modal} onClose={() => setModal(null)} onSave={handleSave} />}
+              {efforts.length > 0 && (
+                <tr style={{ background: C.bg2, borderTop: `2px solid ${C.border2}` }}>
+                  <td style={{ ...TD, fontWeight: 800 }}>TOTAL</td>
+                  <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontWeight: 700, color: C.primary }}>฿{fmtMoney(tBudAmt)}</td>
+                  <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.blue }}>{tBudMD}</td>
+                  {months.map(mo => {
+                    const sum = efforts.reduce((s, e) => s + ((e.monthly || {})[mo] || 0), 0);
+                    return (
+                      <td key={mo} style={{ ...TD, textAlign: 'center', fontWeight: 700, color: sum > 0 ? C.amber : C.text3 }}>
+                        {sum || '—'}
+                      </td>
+                    );
+                  })}
+                  <td style={{ ...TD, textAlign: 'center', fontWeight: 800, color: C.amber }}>{tUsedMD}</td>
+                  <td style={{ ...TD, textAlign: 'center', fontWeight: 800, color: tRem < 0 ? C.red : C.green }}>{tRem}</td>
+                  <td style={TD} />
+                </tr>
+              )}
+            </tbody>
+          </table>
+          {efforts.length === 0 && (
+            <div style={{ padding: 40, textAlign: 'center', color: C.text3 }}>
+              No modules yet. Click <strong>"Add Module"</strong> to start tracking effort.
+            </div>
+          )}
+        </Card>
+      )}
+
+      {modal !== null && <EffortModal data={modal} isMobile={isMobile} onClose={() => setModal(null)} onSave={handleSave} />}
       {deleting && <ConfirmModal message={`Delete module "${deleting.module}"?`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
     </div>
+
   );
 }
 
 // ── Effort Modal ──────────────────────────────────────────────────────────────
-function EffortModal({ data, onClose, onSave }: { data: Partial<Effort>; onClose: () => void; onSave: (f: Partial<Effort>) => void }) {
+function EffortModal({ data, isMobile, onClose, onSave }: { data: Partial<Effort>; isMobile: boolean; onClose: () => void; onSave: (f: Partial<Effort>) => void }) {
   const [form, setForm] = useState<Partial<Effort>>({ module: '', budgetAmount: 0, budgetManday: 0, ...data });
   const up = (k: string, v: string | number) => setForm(p => ({ ...p, [k]: v }));
   return (
@@ -205,12 +270,15 @@ function EffortModal({ data, onClose, onSave }: { data: Partial<Effort>; onClose
       <FormRow label="Module Name" required>
         <Input autoFocus value={form.module ?? ''} onChange={v => up('module', v)} placeholder="e.g. Frontend Development" />
       </FormRow>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+        <FormRow label="Budget Manday">
+          <Input type="number" value={form.budgetManday ?? 0} onChange={v => {
+              const md = Number(v) || 0;
+              setForm(p => ({ ...p, budgetManday: md, budgetAmount: md * 15000 }));
+            }} />
+        </FormRow>
         <FormRow label="Budget Amount (฿)">
           <Input type="number" value={form.budgetAmount ?? 0} onChange={v => up('budgetAmount', Number(v))} />
-        </FormRow>
-        <FormRow label="Budget Manday">
-          <Input type="number" value={form.budgetManday ?? 0} onChange={v => up('budgetManday', Number(v))} />
         </FormRow>
       </div>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
