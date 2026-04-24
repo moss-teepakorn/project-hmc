@@ -191,9 +191,35 @@ export default function ProjectEnvironmentTab({ project }: Props) {
                       </button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button onClick={() => setModal(row)} style={{ flex: 1, minWidth: 0, borderRadius: 8, border: '1px solid '+C.primary, background: C.primaryBg, color: C.primary, padding: '8px 12px', fontWeight: 600, cursor: 'pointer' }}><Pencil size={14} /> Edit</button>
-                    <button onClick={() => setDeleting(row)} style={{ flex: 1, minWidth: 0, borderRadius: 8, border: '1px solid '+C.red, background: C.redBg, color: C.red, padding: '8px 12px', fontWeight: 600, cursor: 'pointer' }}><Trash2 size={14} /> Delete</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => revealed ? setRevealedPasswords((prev) => ({ ...prev, [row.id]: false })) : requestPasswordReveal(row)}
+                        style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid '+C.border, background: C.white, cursor: 'pointer', color: C.text2 }}
+                        aria-label={revealed ? 'Hide password' : 'Reveal password'}>
+                        {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                      <button
+                        onClick={() => openUrl(row.url)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.primaryBg, color: C.primary, cursor: row.url?.trim() ? 'pointer' : 'not-allowed', opacity: row.url?.trim() ? 1 : 0.6 }}
+                        disabled={!row.url?.trim()}>
+                        <ExternalLink size={14} /> Open
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => setModal(row)}
+                        style={{ width: 38, height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid '+C.primary, background: C.primaryBg, color: C.primary, cursor: 'pointer' }}
+                        aria-label="Edit environment">
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() => setDeleting(row)}
+                        style={{ width: 38, height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid '+C.red, background: C.redBg, color: C.red, cursor: 'pointer' }}
+                        aria-label="Delete environment">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </Card>
               );
