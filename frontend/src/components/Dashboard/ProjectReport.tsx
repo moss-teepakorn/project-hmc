@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Printer, X } from 'lucide-react';
@@ -27,6 +27,14 @@ function DonutChart({ value, size = 88, color = C.primary }: { value: number; si
 
 export default function ProjectReport({ project, onClose }: Props) {
   const { tasks, milestones, efforts, changeRequests, issues, risks } = useStore();
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const pt  = tasks.filter(t => t.projectId === project.id);
   const ms  = milestones.filter(m => m.projectId === project.id);
@@ -195,14 +203,15 @@ export default function ProjectReport({ project, onClose }: Props) {
   };
 
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:400, background:'rgba(15,23,42,0.6)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-start', justifyContent:'center', overflowY:'auto', padding:'20px 16px' }}>
-      <div className="executive-report-modal" style={{ background:C.white, borderRadius:16, width:'100%', maxWidth:1020, boxShadow:'0 32px 80px rgba(0,0,0,0.25)', fontFamily:'Poppins, sans-serif', fontSize:9 }}>
+    <div style={{ width:'100%', minHeight:'100%', padding:'24px', background:C.bg2, fontFamily:'Poppins, sans-serif' }}>
+      <div className="executive-report-page" style={{ background:C.white, borderRadius:20, width:'100%', maxWidth:1400, margin:'0 auto', boxShadow:'0 20px 60px rgba(0,0,0,0.08)', fontSize:9 }}>
         <style>{`
-          .executive-report-modal table td,
-          .executive-report-modal table th,
-          .executive-report-modal .report-list-row div,
-          .executive-report-modal .report-list-row span {
-            font-size: 8px !important;
+          .executive-report-page table td,
+          .executive-report-page table th,
+          .executive-report-page .report-list-row div,
+          .executive-report-page .report-list-row span {
+            font-size: 9px !important;
+            font-family: Poppins, sans-serif !important;
           }
         `}</style>
         {/* Toolbar */}
@@ -235,7 +244,7 @@ export default function ProjectReport({ project, onClose }: Props) {
           </div>
 
           {/* KPI row */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:isMobile ? '1fr' : 'repeat(4,1fr)', gap:10, marginBottom:12 }}>
             {[
               { label:'Overall Progress', value:prog,   color:C.primary, sub:`${done} done · ${inProg} in progress` },
               { label:'Payment',          value:payPct, color:C.green,   sub:`${money2(paidAmt)} collected` },
@@ -255,7 +264,7 @@ export default function ProjectReport({ project, onClose }: Props) {
           </div>
 
           {/* Tasks + Milestones */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:isMobile ? '1fr' : '1fr 1fr', gap:10, marginBottom:10 }}>
             {/* Tasks */}
             <div>
               <div style={{ fontSize:11, fontWeight:700, color:C.text, marginBottom:6 }}>Main Tasks ({tasksForReport.length})</div>
@@ -310,7 +319,7 @@ export default function ProjectReport({ project, onClose }: Props) {
           </div>
 
           {/* CR + Issues + Risks summary */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14 }}>
+          <div style={{ display:'grid', gridTemplateColumns:isMobile ? '1fr' : '1fr 1fr 1fr', gap:14 }}>
             {/* CRs */}
             <div>
               <div style={{ fontSize:10, fontWeight:700, color:C.text, marginBottom:8 }}>📝 Change Requests ({crs.length})</div>
