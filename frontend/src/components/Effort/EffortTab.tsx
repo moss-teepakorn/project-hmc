@@ -127,7 +127,7 @@ export default function EffortTab({ projectId }: Props) {
               return (
                 <tr key={e.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
                   <td style={{ ...TD, fontWeight: 600 }}>{e.module}</td>
-                  <td style={{ ...TD, fontFamily: 'monospace', color: C.primary, fontWeight: 600 }}>฿{fmtMoney(e.budgetAmount)}</td>
+                  <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', color: C.primary, fontWeight: 600 }}>฿{fmtMoney(e.budgetAmount)}</td>
                   <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.blue }}>{e.budgetManday}</td>
                   {months.map(mo => (
                     <td key={mo} style={{ ...TD, textAlign: 'center', padding: '6px 6px' }}>
@@ -166,7 +166,7 @@ export default function EffortTab({ projectId }: Props) {
             {efforts.length > 0 && (
               <tr style={{ background: C.bg2, borderTop: `2px solid ${C.border2}` }}>
                 <td style={{ ...TD, fontWeight: 800 }}>TOTAL</td>
-                <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 700, color: C.primary }}>฿{fmtMoney(tBudAmt)}</td>
+                <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontWeight: 700, color: C.primary }}>฿{fmtMoney(tBudAmt)}</td>
                 <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.blue }}>{tBudMD}</td>
                 {months.map(mo => {
                   const sum = efforts.reduce((s, e) => s + ((e.monthly || {})[mo] || 0), 0);

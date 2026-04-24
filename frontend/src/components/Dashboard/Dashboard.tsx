@@ -76,7 +76,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
           <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.35, whiteSpace: 'normal', wordBreak: 'break-word' }}>
             <span style={{ color: C.text2 }}>Project ID : </span>
-            <span style={{ color: C.primary, fontFamily: 'monospace' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
+            <span style={{ color: C.primary, fontFamily: 'Poppins, sans-serif' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
           </div>
           <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
 
@@ -221,7 +221,7 @@ function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Proje
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
           <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.35, whiteSpace: 'normal', wordBreak: 'break-word' }}>
             <span style={{ color: C.text2 }}>Project ID : </span>
-            <span style={{ color: C.primary, fontFamily: 'monospace' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
+            <span style={{ color: C.primary, fontFamily: 'Poppins, sans-serif' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
           </div>
           <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
         </div>

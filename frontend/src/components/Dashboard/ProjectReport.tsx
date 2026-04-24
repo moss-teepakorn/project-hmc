@@ -297,7 +297,7 @@ export default function ProjectReport({ project, onClose }: Props) {
                       <tr key={m.id} style={{ background:i%2===0?C.white:C.bg }}>
                         <td style={{ padding:'4px 7px', fontSize:8, color:C.text3 }}>{m.phase}</td>
                         <td style={{ padding:'4px 7px', fontSize:8, fontWeight:500 }}>{m.name}</td>
-                        <td style={{ padding:'4px 7px', fontSize:8, fontFamily:'monospace', color:C.primary }}>{money2(m.amount)}</td>
+                        <td style={{ padding:'4px 7px', fontSize:8, fontFamily:'Poppins, sans-serif', color:C.primary }}>{money2(m.amount)}</td>
                         <td style={{ padding:'4px 7px', fontSize:8, color:C.text2 }}>{fmtDate(m.dueDate)}</td>
                         <td style={{ padding:'4px 7px' }}><span style={{ fontSize:8, fontWeight:600, color:ss.color, background:ss.bg, padding:'2px 8px', borderRadius:10 }}>{ss.label}</span></td>
                       </tr>

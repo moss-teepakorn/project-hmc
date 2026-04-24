@@ -502,7 +502,7 @@ export default function TasksTab({ projectId }: Props) {
           return (
             <div key={task.id} onClick={() => setSelected(task.id)}
               style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isSel?C.primaryBg:i%2===0?C.white:C.bg, borderLeft: isSel?`3px solid ${C.primary}`:'3px solid transparent', cursor:'pointer', flexShrink:0 }}>
-              <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'monospace', flexShrink:0 }}>{task.wbs}</div>
+              <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{task.wbs}</div>
               <div style={{
                 width: colWidths[1],
                 minWidth: colWidths[1],
@@ -531,7 +531,7 @@ export default function TasksTab({ projectId }: Props) {
               <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
                 <EditableCell type="date" value={task.actualFinish?isoToDmy(task.actualFinish):''} placeholder="—" onSave={v=>handleUpdateDate(task.id,'actualFinish',v)} alwaysSave style={{ color:task.actualFinish?C.green:C.text3 }} />
               </div>
-              <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'monospace', flexShrink:0 }}>{task.duration}d</div>
+              <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{task.duration}d</div>
               <div style={{ width:colWidths[6], minWidth:colWidths[6], padding:'0 6px', flexShrink:0 }}>
                 <PctCell value={task.percentComplete} isParent={isPar} onSave={n=>handlePct(task.id,n)} />
               </div>

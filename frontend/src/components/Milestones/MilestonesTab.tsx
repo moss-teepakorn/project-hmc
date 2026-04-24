@@ -170,7 +170,7 @@ export default function MilestonesTab({ projectId }: Props) {
                         <tr key={ms.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
                           <td style={{ ...TD, padding: '8px 10px', fontWeight: 600 }}>{ms.name}</td>
                           <td style={{ ...TD, padding: '8px 10px', fontWeight: 700, color: C.primary }}>{ms.percent}%</td>
-                          <td style={{ ...TD, padding: '8px 10px', fontFamily: 'monospace', fontWeight: 600 }}>{fmtMoney(ms.amount)}</td>
+                          <td style={{ ...TD, padding: '8px 10px', fontFamily: 'Poppins, sans-serif', fontWeight: 600 }}>{fmtMoney(ms.amount)}</td>
                           <td style={{ ...TD, padding: '8px 10px', color: C.text2 }}>{fmtDate(ms.dueDate)}</td>
                           <td style={{ ...TD, padding: '8px 10px', color: C.text2 }}>{fmtDate(ms.billingDate)}</td>
                           <td style={{ ...TD, padding: '8px 10px' }}><Badge bg={ss.bg} color={ss.color}>{ss.label}</Badge></td>

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Badge, Tabs, C, PROJECT_STATUS } from '../Common';
 import { fmtDate } from '../../utils';
 import type { Project } from '../../types';
@@ -19,6 +20,7 @@ interface Props { project: Project; }
 export default function ProjectDetail({ project }: Props) {
   const [activeTab, setActiveTab]   = useState('tasks');
   const [showReport, setShowReport] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const {
     tasks,
     members,
@@ -37,6 +39,7 @@ export default function ProjectDetail({ project }: Props) {
     fetchIssues,
     fetchRisks,
     fetchProjectEnvironments,
+    setActiveProject,
   } = useStore();
 
   const s = PROJECT_STATUS[project.status] ?? PROJECT_STATUS['Planning'];
@@ -53,6 +56,13 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'env',      label: 'Program URL', icon: '🌐', count: projectEnvironments.filter((e) => e.projectId === project.id).length },
     { id: 'report',   label: 'Report',     icon: '📊' },
   ];
+
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   React.useEffect(() => {
     if (!project?.id) return;
@@ -83,8 +93,18 @@ export default function ProjectDetail({ project }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {isMobile && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.primary, borderBottom: `1px solid ${C.border}`, color: '#fff', flexShrink: 0 }}>
+          <button
+            onClick={() => setActiveProject(null)}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, border: 'none', background: '#fff', color: C.primary, cursor: 'pointer' }}>
+            <ChevronLeft size={18} />
+          </button>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Project Details</span>
+        </div>
+      )}
       <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-        <div style={{ padding: '14px 24px 0' }}>
+        <div style={{ padding: isMobile ? '12px 16px 0' : '14px 24px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
             <div style={{ width: 10, height: 42, borderRadius: 5, background: project.color || C.primary, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>

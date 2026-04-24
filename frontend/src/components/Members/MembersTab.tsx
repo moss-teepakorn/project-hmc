@@ -231,7 +231,7 @@ export default function MembersTab({ projectId }: Props) {
                 </td>
                 <td style={{ ...TD, color: C.text2, fontSize: 11 }}>{mb.position || '—'}</td>
                 <td style={{ ...TD, color: C.blue }}>{mb.email}</td>
-                <td style={{ ...TD, fontFamily: 'monospace', fontSize: 12 }}>{mb.tel}</td>
+                <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontSize: 12 }}>{mb.tel}</td>
                 <td style={TD}>
                   <Badge bg={mb.type === 'internal' ? C.primaryBg : C.amberBg} color={mb.type === 'internal' ? C.primary : C.amber}>
                     {mb.type === 'internal' ? 'Internal' : 'Client'}
