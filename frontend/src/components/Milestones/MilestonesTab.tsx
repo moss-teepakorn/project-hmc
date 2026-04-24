@@ -54,7 +54,7 @@ export default function MilestonesTab({ projectId }: Props) {
   };
 
   return (
-    <div style={{ padding: isMobile ? 16 : 24, maxWidth: 1160, margin: '0 auto' }}>
+    <div style={{ padding: isMobile ? 16 : 24, width: '100%', margin: '0 auto' }}>
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 18 }}>
         {[

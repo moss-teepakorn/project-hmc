@@ -97,7 +97,7 @@ export default function ProjectReport({ project }: Props) {
 
   return (
     <div style={{ width: '100%', minHeight: '100%', padding: 24, background: C.bg2, fontFamily: 'Poppins, sans-serif' }}>
-      <div className="executive-report-page" style={{ background: C.white, borderRadius: 20, width: '100%', maxWidth: 1400, margin: '0 auto', boxShadow: '0 20px 60px rgba(0,0,0,0.08)', fontSize: 9 }}>
+      <div className="executive-report-page" style={{ background: C.white, borderRadius: 20, width: '100%', margin: '0 auto', boxShadow: '0 20px 60px rgba(0,0,0,0.08)', fontSize: 9 }}>
         <style>{`
           .executive-report-page table td,
           .executive-report-page table th,

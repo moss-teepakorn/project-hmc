@@ -252,7 +252,7 @@ function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Proje
   };
 
   return (
-    <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', width: '100%' }}>
       <h2 style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: C.text, marginBottom: 6 }}>Portfolio Overview</h2>
       <p style={{ color: C.text2, fontSize: 13, marginBottom: 24 }}>Select a project on the left to view its executive summary.</p>
 
@@ -343,7 +343,7 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
   );
 
   return (
-    <div style={{ padding: isMobile ? '18px 14px' : '24px 28px', maxWidth: 900 }}>
+    <div style={{ padding: isMobile ? '18px 14px' : '24px 28px', width: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: isMobile ? 16 : 0, marginBottom: 20 }}>
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 14, alignItems: 'flex-start' }}>
