@@ -406,24 +406,24 @@ function ProjectSummaryPanel({ project, onOpen }: { project: Project; onOpen: ()
       {ms.length > 0 && (
         <Card style={{ padding: '14px 18px', marginBottom: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 10 }}>🏁 Milestones</div>
-          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr>
-                <th style={TH}>Phase</th>
-                <th style={TH}>Milestone</th>
-                <th style={TH}>Amount (฿)</th>
-                <th style={TH}>Status</th>
+                <th style={{ ...TH, padding: '10px 8px', background: C.bg, borderBottom: `1px solid ${C.border}` }}>Phase</th>
+                <th style={{ ...TH, padding: '10px 8px', background: C.bg, borderBottom: `1px solid ${C.border}` }}>Milestone</th>
+                <th style={{ ...TH, padding: '10px 8px', background: C.bg, borderBottom: `1px solid ${C.border}` }}>Amount (฿)</th>
+                <th style={{ ...TH, padding: '10px 8px', background: C.bg, borderBottom: `1px solid ${C.border}` }}>Status</th>
               </tr>
             </thead>
             <tbody>
               {[...ms].sort((a, b) => a.phase.localeCompare(b.phase) || a.name.localeCompare(b.name)).map(m => {
                 const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
                 return (
-                  <tr key={m.id} style={{ background: C.white, borderRadius: 12, boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }}>
-                    <td style={{ ...TD, padding: '12px 12px', fontWeight: 700 }}>{m.phase}</td>
-                    <td style={{ ...TD, padding: '12px 12px' }}>{m.name}</td>
-                    <td style={{ ...TD, padding: '12px 12px', whiteSpace: 'nowrap' }}>฿{fmtMoney(m.amount)}</td>
-                    <td style={{ ...TD, padding: '12px 12px', whiteSpace: 'nowrap' }}>
+                  <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ ...TD, padding: '10px 8px', fontWeight: 700, color: C.text }}>{m.phase}</td>
+                    <td style={{ ...TD, padding: '10px 8px', color: C.text2 }}>{m.name}</td>
+                    <td style={{ ...TD, padding: '10px 8px', whiteSpace: 'nowrap', color: C.text }}>{`฿${fmtMoney(m.amount)}`}</td>
+                    <td style={{ ...TD, padding: '10px 8px', whiteSpace: 'nowrap' }}>
                       <span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>{ss.label}</span>
                     </td>
                   </tr>
