@@ -6,7 +6,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
-import { Btn, EditableCell, Avatar, Modal, FormRow, Input, Select, C } from '../Common';
+import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C } from '../Common';
 import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth, compareWbs, isoToDmy, dmyToIso } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import type { Task, ViewMode } from '../../types';
@@ -72,6 +72,8 @@ export default function TasksTab({ projectId }: Props) {
   const [editModal, setEditModal] = useState<Task | null>(null);
   const [loading, setLoading]   = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
   const [splitW, setSplitW]     = useState<number>(() => {
     if (typeof window !== 'undefined') {
       return Math.max(640, Math.round(window.innerWidth * 0.66));
@@ -118,6 +120,12 @@ export default function TasksTab({ projectId }: Props) {
     if (typeof window === 'undefined') return;
     const defaultWidth = Math.max(640, Math.round(window.innerWidth * 0.66));
     setSplitW(defaultWidth);
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const projectTasks = tasks.filter(t => t.projectId === projectId);
@@ -472,93 +480,157 @@ export default function TasksTab({ projectId }: Props) {
   };
 
   // ── Table content ─────────────────────────────────────────────────────────
-  const tableContent = (
-    <div style={{ display:'flex', flex:1, flexDirection:'column', height:'100%', overflow:'hidden', minHeight:0 }}>
-      <div style={{ flex:1, minWidth:0, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
-        <div style={{ overflowX:'auto', overflowY:'hidden', minWidth:0 }}>
-          {/* Table header — same height as Gantt header (HDR_H) */}
-          <div ref={tableHeaderRef} onScroll={onHeaderScroll} style={{ minWidth:'max-content', display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
-            {COLS.map((c, i) => (
-              <div key={c.label} style={{
-                position:'relative',
-                width: colWidths[i],
-                minWidth: colWidths[i],
-                padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center'
-              }}>
-                {c.label}
-                <div onMouseDown={e => onColumnResizeStart(i, e)}
-                  style={{ position:'absolute', right:0, top:0, width:8, height:'100%', cursor:'col-resize', zIndex:2 }} />
+  const taskCardContent = (
+    <div style={{ flex:1, minHeight:0, overflowY:'auto', padding: 12 }}>
+      {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
+      {!loading && visible.map((task, i) => {
+        const isPar = hasChildren(projectTasks, task.id);
+        const isSel = selected === task.id;
+        return (
+          <Card key={task.id} style={{
+            padding: 14,
+            marginBottom: 12,
+            background: isSel ? C.primaryBg : i % 2 === 0 ? C.white : C.bg,
+            border: isSel ? `1px solid ${C.primary}` : `1px solid transparent`,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+            cursor: 'pointer'
+          }} onClick={() => setSelected(task.id)}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.text, minWidth: 70 }}>{task.wbs || '—'}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{task.taskName || 'Untitled task'}</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: C.text2 }}>
+                  <span>Resource: {task.resource || '—'}</span>
+                  <span>Level: {task.level ?? 0}</span>
+                </div>
               </div>
-            ))}
-          </div>
-          <div ref={tableBodyRef} onScroll={onTableScroll}
-            style={{ height:`calc(100% - ${HDR_H}px)`, minHeight:0, overflowY:'scroll', overflowX:'auto', minWidth:'max-content' }}>
-        {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
-        {!loading && visible.map((task, i) => {
-          const isPar = hasChildren(projectTasks, task.id);
-          const isExp = expanded.has(task.id);
-          const isSel = selected === task.id;
-          const isChild = !!task.parentId;
-          return (
-            <div key={task.id} onClick={() => setSelected(task.id)}
-              style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isSel?C.primaryBg:i%2===0?C.white:C.bg, borderLeft: isSel?`3px solid ${C.primary}`:'3px solid transparent', cursor:'pointer', flexShrink:0 }}>
-              <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{task.wbs}</div>
-              <div style={{
-                width: colWidths[1],
-                minWidth: colWidths[1],
-                padding:`0 4px 0 ${8+task.level*20}px`,
-                display:'flex', alignItems:'center', gap:4, flexShrink:0
-              }}>
-                {isPar ? (
-                  <button onClick={e=>{ e.stopPropagation(); toggle(task.id); }}
-                    style={{ width:18, height:18, background:C.primaryBg, border:`1px solid ${C.primary}33`, borderRadius:4, cursor:'pointer', color:C.primary, padding:0, fontSize:11, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    {isExp?'▾':'▸'}
-                  </button>
-                ) : (
-                  <span style={{ width:18, flexShrink:0, display:'inline-flex', justifyContent:'center' }}>
-                    {isChild && <span style={{ color:C.border2, fontSize:10 }}>└</span>}
-                  </span>
-                )}
-                {isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
-                <EditableCell value={task.taskName} onSave={v=>handleUpdate(task.id,{taskName:v})} />
-              </div>
-              <div style={{ width:colWidths[2], minWidth:colWidths[2], padding:'0 6px', flexShrink:0 }}>
-                <EditableCell type="date" value={isoToDmy(task.startDate)} placeholder="—" onSave={v=>handleUpdateDate(task.id,'startDate',v)} alwaysSave style={{ color:isPar?C.text3:C.text }} />
-              </div>
-              <div style={{ width:colWidths[3], minWidth:colWidths[3], padding:'0 6px', flexShrink:0 }}>
-                <EditableCell type="date" value={isoToDmy(task.endDate)} placeholder="—" onSave={v=>handleUpdateDate(task.id,'endDate',v)} alwaysSave style={{ color:isPar?C.text3:C.text }} />
-              </div>
-              <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
-                <EditableCell type="date" value={task.actualFinish?isoToDmy(task.actualFinish):''} placeholder="—" onSave={v=>handleUpdateDate(task.id,'actualFinish',v)} alwaysSave style={{ color:task.actualFinish?C.green:C.text3 }} />
-              </div>
-              <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{task.duration}d</div>
-              <div style={{ width:colWidths[6], minWidth:colWidths[6], padding:'0 6px', flexShrink:0 }}>
-                <PctCell value={task.percentComplete} isParent={isPar} onSave={n=>handlePct(task.id,n)} />
-              </div>
-              <div style={{ width:colWidths[7], minWidth:colWidths[7], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
-                {task.resource && <Avatar name={task.resource} size={20} />}
-                <EditableCell value={task.resource} onSave={v=>handleUpdate(task.id,{resource:v})} placeholder="Assign..." />
-              </div>
-              <div style={{ width:colWidths[8], minWidth:colWidths[8], padding:'0 5px', flexShrink:0, display:'flex', gap:4 }}>
-                <button onClick={e=>{ e.stopPropagation(); setEditModal(task); }}
-                  style={{ height:22, padding:'0 7px', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary, fontSize:11, fontWeight:600 }}>Edit</button>
-                <button onClick={e=>{ e.stopPropagation(); handleDelete(task.id); }}
-                  style={{ width:22, height:22, background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red, fontSize:11 }}>✕</button>
+              <div style={{ minWidth: 100, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                <PctCell value={task.percentComplete} isParent={isPar} onSave={n => handlePct(task.id, n)} />
               </div>
             </div>
-          );
-        })}
-        {!loading && visible.length===0 && (
-          <div style={{ padding:40, textAlign:'center', color:C.text3 }}>No tasks. Click "+ Add Task".</div>
-        )}
-      </div>
-      <div style={{ flexShrink:0, padding:'5px 12px', borderTop:`1px solid ${C.border}`, display:'flex', gap:16, fontSize:11, color:C.text3 }}>
-        <span>{projectTasks.filter(t=>!t.parentId).length} root</span>
-        <span>{projectTasks.length} total</span>
-        <span>{Math.round(projectTasks.reduce((s,t)=>s+t.percentComplete,0)/Math.max(projectTasks.length,1))}% avg</span>
-      </div>
-        </div>
-      </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginTop: 12, fontSize: 11, color: C.text2 }}>
+              <div><strong style={{ color: C.text, fontWeight: 600 }}>Start:</strong> {task.startDate ? isoToDmy(task.startDate) : '—'}</div>
+              <div><strong style={{ color: C.text, fontWeight: 600 }}>Finish:</strong> {task.endDate ? isoToDmy(task.endDate) : '—'}</div>
+              <div><strong style={{ color: C.text, fontWeight: 600 }}>Actual:</strong> {task.actualFinish ? isoToDmy(task.actualFinish) : '—'}</div>
+              <div><strong style={{ color: C.text, fontWeight: 600 }}>Days:</strong> {task.duration}d</div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 11, color: C.text2 }}>
+                {isPar ? 'Parent task' : task.parentId ? 'Sub task' : 'Root task'}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={e => { e.stopPropagation(); setEditModal(task); }}
+                  style={{ height: 32, background: C.primaryBg, border: 'none', borderRadius: 8, padding: '0 14px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>
+                  Edit
+                </button>
+                <button onClick={e => { e.stopPropagation(); handleDelete(task.id); }}
+                  style={{ height: 32, background: C.redBg, border: 'none', borderRadius: 8, padding: '0 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+      {!loading && visible.length === 0 && (
+        <div style={{ padding: 40, textAlign: 'center', color: C.text3 }}>No tasks. Click "+ Add Task".</div>
+      )}
+    </div>
+  );
+
+  const tableContent = (
+    <div style={{ display:'flex', flex:1, flexDirection:'column', height:'100%', overflow:'hidden', minHeight:0 }}>
+      {isMobile ? taskCardContent : (
+        <>
+          <div style={{ flex:1, minWidth:0, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+            <div style={{ overflowX:'auto', overflowY:'hidden', minWidth:0 }}>
+              {/* Table header — same height as Gantt header (HDR_H) */}
+              <div ref={tableHeaderRef} onScroll={onHeaderScroll} style={{ minWidth:'max-content', display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
+                {COLS.map((c, i) => (
+                  <div key={c.label} style={{
+                    position:'relative',
+                    width: colWidths[i],
+                    minWidth: colWidths[i],
+                    padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center'
+                  }}>
+                    {c.label}
+                    <div onMouseDown={e => onColumnResizeStart(i, e)}
+                      style={{ position:'absolute', right:0, top:0, width:8, height:'100%', cursor:'col-resize', zIndex:2 }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div ref={tableBodyRef} onScroll={onTableScroll}
+              style={{ height:`calc(100% - ${HDR_H}px)`, minHeight:0, overflowY:'scroll', overflowX:'auto', minWidth:'max-content' }}>
+              {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
+              {!loading && visible.map((task, i) => {
+                const isPar = hasChildren(projectTasks, task.id);
+                const isExp = expanded.has(task.id);
+                const isSel = selected === task.id;
+                const isChild = !!task.parentId;
+                return (
+                  <div key={task.id} onClick={() => setSelected(task.id)}
+                    style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isSel ? C.primaryBg : i % 2 === 0 ? C.white : C.bg, borderLeft: isSel ? `3px solid ${C.primary}` : '3px solid transparent', cursor:'pointer', flexShrink:0 }}>
+                    <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{task.wbs}</div>
+                    <div style={{
+                      width: colWidths[1],
+                      minWidth: colWidths[1],
+                      padding:`0 4px 0 ${8 + task.level * 20}px`,
+                      display:'flex', alignItems:'center', gap:4, flexShrink:0
+                    }}>
+                      {isPar ? (
+                        <button onClick={e => { e.stopPropagation(); toggle(task.id); }}
+                          style={{ width:18, height:18, background:C.primaryBg, border:`1px solid ${C.primary}33`, borderRadius:4, cursor:'pointer', color:C.primary, padding:0, fontSize:11, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          {isExp ? '▾' : '▸'}
+                        </button>
+                      ) : (
+                        <span style={{ width:18, flexShrink:0, display:'inline-flex', justifyContent:'center' }}>
+                          {isChild && <span style={{ color:C.border2, fontSize:10 }}>└</span>}
+                        </span>
+                      )}
+                      {isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
+                      <EditableCell value={task.taskName} onSave={v => handleUpdate(task.id, { taskName: v })} />
+                    </div>
+                    <div style={{ width:colWidths[2], minWidth:colWidths[2], padding:'0 6px', flexShrink:0 }}>
+                      <EditableCell type="date" value={isoToDmy(task.startDate)} placeholder="—" onSave={v => handleUpdateDate(task.id, 'startDate', v)} alwaysSave style={{ color:isPar ? C.text3 : C.text }} />
+                    </div>
+                    <div style={{ width:colWidths[3], minWidth:colWidths[3], padding:'0 6px', flexShrink:0 }}>
+                      <EditableCell type="date" value={isoToDmy(task.endDate)} placeholder="—" onSave={v => handleUpdateDate(task.id, 'endDate', v)} alwaysSave style={{ color:isPar ? C.text3 : C.text }} />
+                    </div>
+                    <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
+                      <EditableCell type="date" value={task.actualFinish ? isoToDmy(task.actualFinish) : ''} placeholder="—" onSave={v => handleUpdateDate(task.id, 'actualFinish', v)} alwaysSave style={{ color:task.actualFinish ? C.green : C.text3 }} />
+                    </div>
+                    <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{task.duration}d</div>
+                    <div style={{ width:colWidths[6], minWidth:colWidths[6], padding:'0 6px', flexShrink:0 }}>
+                      <PctCell value={task.percentComplete} isParent={isPar} onSave={n => handlePct(task.id, n)} />
+                    </div>
+                    <div style={{ width:colWidths[7], minWidth:colWidths[7], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+                      {task.resource && <Avatar name={task.resource} size={20} />}
+                      <EditableCell value={task.resource} onSave={v => handleUpdate(task.id, { resource: v })} placeholder="Assign..." />
+                    </div>
+                    <div style={{ width:colWidths[8], minWidth:colWidths[8], padding:'0 5px', flexShrink:0, display:'flex', gap:4 }}>
+                      <button onClick={e => { e.stopPropagation(); setEditModal(task); }}
+                        style={{ height:22, padding:'0 7px', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary, fontSize:11, fontWeight:600 }}>Edit</button>
+                      <button onClick={e => { e.stopPropagation(); handleDelete(task.id); }}
+                        style={{ width:22, height:22, background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red, fontSize:11 }}>✕</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {!loading && visible.length === 0 && (
+                <div style={{ padding:40, textAlign:'center', color:C.text3 }}>No tasks. Click "+ Add Task".</div>
+              )}
+            </div>
+            <div style={{ flexShrink:0, padding:'5px 12px', borderTop:`1px solid ${C.border}`, display:'flex', gap:16, fontSize:11, color:C.text3 }}>
+              <span>{projectTasks.filter(t => !t.parentId).length} root</span>
+              <span>{projectTasks.length} total</span>
+              <span>{Math.round(projectTasks.reduce((s,t)=>s+t.percentComplete,0)/Math.max(projectTasks.length,1))}% avg</span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 
