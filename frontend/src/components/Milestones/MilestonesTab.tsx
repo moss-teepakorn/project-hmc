@@ -54,9 +54,9 @@ export default function MilestonesTab({ projectId }: Props) {
   };
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: isMobile ? 16 : 24, maxWidth: 1160, margin: '0 auto' }}>
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 18 }}>
         {[
           { label: 'Total Contract', value: `฿${fmtMoney(total)}`,             color: C.primary, bg: C.primaryBg, icon: '💰' },
           { label: 'Paid',           value: `฿${fmtMoney(paid)}`,              color: C.green,   bg: C.greenBg,   icon: '✅' },
@@ -73,7 +73,7 @@ export default function MilestonesTab({ projectId }: Props) {
 
       {/* Payment progress */}
       <Card style={{ padding: 16, marginBottom: 18 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', fontSize: 13, gap: 10, marginBottom: 8 }}>
           <span style={{ fontWeight: 600, color: C.text }}>Payment Progress</span>
           <span style={{ color: C.text2 }}>{total > 0 ? Math.round((paid / total) * 100) : 0}% Collected</span>
         </div>
@@ -91,8 +91,8 @@ export default function MilestonesTab({ projectId }: Props) {
         </div>
       </Card>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
-        <Btn onClick={() => setModal({})} small><Plus size={14} /> Add Milestone</Btn>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0, alignItems: isMobile ? 'stretch' : 'center' }}>
+        <Btn onClick={() => setModal({})} small style={{ width: isMobile ? '100%' : 'auto' }}><Plus size={14} /> Add Milestone</Btn>
       </div>
 
       {milestones.length === 0 && (
@@ -104,15 +104,15 @@ export default function MilestonesTab({ projectId }: Props) {
         const pTotal = pms.reduce((s, m) => s + m.amount, 0);
         const phaseBudget = phaseBudgetByPhase[phase] ?? 0;
         return (
-          <div key={phase} style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
+          <div key={phase} style={{ marginBottom: isMobile ? 18 : 24 }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{phase}</span>
               <div style={{ height: 1, flex: 1, background: C.border, minWidth: 80 }} />
               <span style={{ fontSize: 12, color: C.text2 }}>Phase Budget ฿{fmtMoney(phaseBudget)}</span>
               <span style={{ fontSize: 12, color: C.text2 }}>Milestone Total ฿{fmtMoney(pTotal)}</span>
             </div>
             {isMobile ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
                 {pms.map(ms => {
                   const ss = MILESTONE_STATUS[ms.status] ?? MILESTONE_STATUS.pending;
                   return (
@@ -195,13 +195,13 @@ export default function MilestonesTab({ projectId }: Props) {
         );
       })}
 
-      {modal !== null && <MilestoneModal data={modal} phaseBudgetByPhase={phaseBudgetByPhase} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal !== null && <MilestoneModal data={modal} phaseBudgetByPhase={phaseBudgetByPhase} isMobile={isMobile} onClose={() => setModal(null)} onSave={handleSave} />}
       {deleting && <ConfirmModal message={`Delete milestone "${deleting.name}"?`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
     </div>
   );
 }
 
-function MilestoneModal({ data, phaseBudgetByPhase, onClose, onSave }: { data: Partial<Milestone>; phaseBudgetByPhase: Record<string, number>; onClose: () => void; onSave: (f: Partial<Milestone>) => void }) {
+function MilestoneModal({ data, phaseBudgetByPhase, isMobile, onClose, onSave }: { data: Partial<Milestone>; phaseBudgetByPhase: Record<string, number>; isMobile: boolean; onClose: () => void; onSave: (f: Partial<Milestone>) => void }) {
   const [form, setForm] = useState<Partial<Milestone>>({ phase: 'Phase 1', name: '', percent: 0, amount: 0, phaseAmount: 0, dueDate: '', billingDate: '', notes: '', status: 'pending', ...data });
   const up = (k: string, v: string | number) => setForm(p => ({ ...p, [k]: v }));
 
@@ -250,7 +250,7 @@ function MilestoneModal({ data, phaseBudgetByPhase, onClose, onSave }: { data: P
       <FormRow label="Milestone Name" required>
         <Input autoFocus value={form.name ?? ''} onChange={v => up('name', v)} placeholder="e.g. Project Kickoff" />
       </FormRow>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12 }}>
         {phaseBudgetByPhase[form.phase ?? ''] ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: C.text2 }}>Phase Budget (฿)</label>
@@ -272,7 +272,7 @@ function MilestoneModal({ data, phaseBudgetByPhase, onClose, onSave }: { data: P
         <Select value={form.status ?? 'pending'} onChange={v => up('status', v)}
           options={[{ value: 'pending', label: 'Pending' }, { value: 'billed', label: 'Billed' }, { value: 'paid', label: 'Paid' }]} />
       </FormRow>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
         <FormRow label="Due Date">
           <Input type="date" value={form.dueDate ?? ''} onChange={v => up('dueDate', v)} placeholder="dd/mm/yyyy" />
         </FormRow>
