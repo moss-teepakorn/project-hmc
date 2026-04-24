@@ -29,7 +29,9 @@ export default function ProjectSummaryTab({ project }: Props) {
   const [savingSnapshot, setSavingSnapshot] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [chartWidth, setChartWidth] = useState<number>(typeof window !== 'undefined' ? Math.max(window.innerWidth - 56, 760) : 760);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const chartWrapperRef = useRef<HTMLDivElement | null>(null);
   const isMobile = windowWidth < 768;
 
   useEffect(() => {
@@ -38,6 +40,18 @@ export default function ProjectSummaryTab({ project }: Props) {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  useEffect(() => {
+    if (!chartWrapperRef.current) return;
+    const updateWidth = () => {
+      const width = chartWrapperRef.current?.clientWidth ?? window.innerWidth - 56;
+      setChartWidth(Math.max(320, width));
+    };
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(chartWrapperRef.current);
+    return () => observer.disconnect();
+  }, [windowWidth]);
 
   useEffect(() => {
     if (!project?.id) return;
@@ -203,7 +217,6 @@ export default function ProjectSummaryTab({ project }: Props) {
     return points;
   }, [rows]);
 
-  const chartWidth = isMobile ? Math.max(windowWidth - 56, 320) : 760;
   const chartHeight = isMobile ? 220 : 240;
   const chartMargin = { top: 20, right: 24, bottom: 38, left: 44 };
   const innerWidth = chartWidth - chartMargin.left - chartMargin.right;
@@ -429,7 +442,7 @@ export default function ProjectSummaryTab({ project }: Props) {
             </div>
           </div>
         </div>
-        <div style={{ overflowX: isMobile ? 'hidden' : 'auto' }}>
+        <div ref={chartWrapperRef} style={{ overflowX: isMobile ? 'hidden' : 'auto' }}>
           <svg ref={svgRef} width={chartWidth} height={chartHeight} style={{ display: 'block', fontFamily: 'Poppins, sans-serif', width: '100%', maxWidth: '100%' }}>
             {[0, 25, 50, 75, 100].map((value) => {
               const y = chartMargin.top + innerHeight * (1 - value / 100);
