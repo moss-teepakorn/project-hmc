@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import toast from 'react-hot-toast';
 import { Btn, Card, C, FormRow, TH, TD } from '../Common';
 import { fmtDate, getHalfMonthSnapshotDates, computeBaselineProgress } from '../../utils';
 import type { Project, ProjectProgressSnapshot } from '../../types';
@@ -26,6 +28,16 @@ export default function ProjectSummaryTab({ project }: Props) {
   const [drafts, setDrafts] = useState<Record<string, DraftRow>>({});
   const [savingSnapshot, setSavingSnapshot] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const isMobile = windowWidth < 768;
+
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     if (!project?.id) return;
@@ -207,17 +219,83 @@ export default function ProjectSummaryTab({ project }: Props) {
     };
   });
 
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportXLSX = () => {
+    const data = [
+      ['Snapshot date', 'Baseline %', 'Actual %', 'Notes'],
+      ...rows.map((row) => [fmtDate(row.snapshotDate), row.baselinePercent, row.actualPercent, row.note || '']),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Summary');
+    XLSX.writeFile(wb, `${project.code || project.name}-summary.xlsx`);
+  };
+
+  const exportGraphImage = () => {
+    const svgElement = svgRef.current;
+    if (!svgElement) return;
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svgElement);
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      const scale = 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = svgElement.clientWidth * scale;
+      canvas.height = svgElement.clientHeight * scale;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        toast.error('Unable to export graph image');
+        return;
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((result) => {
+        if (result) {
+          downloadBlob(result, `${project.code || project.name}-summary-graph.png`);
+          toast.success('Graph image exported');
+        } else {
+          toast.error('Unable to export graph image');
+        }
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast.error('Unable to export graph image');
+    };
+    image.src = url;
+  };
+
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    doc.setFont('helvetica');
     doc.setFontSize(14);
-    doc.text(`${project.name} · Project Summary`, 14, 16);
+    doc.setFillColor(241, 245, 255);
+    doc.rect(14, 10, 268, 20, 'F');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${project.name} · Project Summary`, 16, 24);
     doc.setFontSize(10);
-    doc.text(`Snapshot count: ${rows.length} · Export date: ${fmtDate(new Date().toISOString())}`, 14, 22);
+    doc.text(`Snapshot count: ${rows.length} · Export date: ${fmtDate(new Date().toISOString())}`, 16, 30);
 
     const graphX = 14;
-    const graphY = 30;
-    const graphW = 200;
-    const graphH = 80;
+    const graphY = 36;
+    const graphW = 240;
+    const graphH = 90;
     const graphBottom = graphY + graphH;
     const graphLeft = graphX + 20;
 
@@ -232,7 +310,7 @@ export default function ProjectSummaryTab({ project }: Props) {
     const baselinePoints = rows.map((row, index) => {
       const x = graphLeft + (graphW * index) / Math.max(rows.length - 1, 1);
       const y = graphY + graphH * (1 - row.baselinePercent / 100);
-      return { x, y };
+      return { x, y, percent: row.baselinePercent };
     });
     baselinePoints.forEach((pt, index) => {
       if (index > 0) {
@@ -240,6 +318,9 @@ export default function ProjectSummaryTab({ project }: Props) {
         doc.line(prev.x, prev.y, pt.x, pt.y);
       }
       doc.circle(pt.x, pt.y, 1.5, 'F');
+      doc.setFontSize(7);
+      doc.setTextColor(79, 70, 229);
+      doc.text(`${pt.percent}%`, pt.x, pt.y - 4, { align: 'center' });
     });
 
     doc.setDrawColor(16, 185, 129);
@@ -247,7 +328,7 @@ export default function ProjectSummaryTab({ project }: Props) {
     const actualPoints = rows.map((row, index) => {
       const x = graphLeft + (graphW * index) / Math.max(rows.length - 1, 1);
       const y = graphY + graphH * (1 - row.actualPercent / 100);
-      return { x, y };
+      return { x, y, percent: row.actualPercent };
     });
     actualPoints.forEach((pt, index) => {
       if (index > 0) {
@@ -255,14 +336,18 @@ export default function ProjectSummaryTab({ project }: Props) {
         doc.line(prev.x, prev.y, pt.x, pt.y);
       }
       doc.circle(pt.x, pt.y, 1.5, 'F');
+      doc.setFontSize(7);
+      doc.setTextColor(16, 185, 129);
+      doc.text(`${pt.percent}%`, pt.x, pt.y + 6, { align: 'center' });
     });
 
     doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
     doc.text('0%', graphLeft - 12, graphBottom);
     doc.text('100%', graphLeft - 12, graphY + 3);
     rows.forEach((row, index) => {
       const x = graphLeft + (graphW * index) / Math.max(rows.length - 1, 1);
-      doc.text(String(index + 1), x, graphBottom + 8, { align: 'center' });
+      doc.text(fmtDate(row.snapshotDate), x, graphBottom + 8, { align: 'center' });
     });
     doc.text('Snapshot', graphLeft + graphW / 2, graphBottom + 16, { align: 'center' });
 
@@ -285,14 +370,16 @@ export default function ProjectSummaryTab({ project }: Props) {
   };
 
   return (
-    <div style={{ padding: 24, background: C.bg2, minHeight: '100%' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 18, alignItems: 'center' }}>
+    <div style={{ padding: 24, background: C.bg2, minHeight: '100%', fontFamily: 'Poppins, sans-serif' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 18, alignItems: 'center', padding: 18, borderRadius: 18, background: '#EFF6FF' }}>
         <h3 style={{ margin: 0, fontSize: 18, color: C.text }}>Project Summary</h3>
         <span style={{ color: C.text2, fontSize: 12 }}>15-day baseline progress with actual tracking and snapshot persistence.</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <Btn variant="outline" onClick={refreshBaseline} small disabled={refreshing || savingSnapshot !== null}>
             {refreshing ? 'Recalculating…' : 'Recalculate baseline'}
           </Btn>
+          <Btn variant="ghost" onClick={exportXLSX} small>Export Excel</Btn>
+          <Btn variant="ghost" onClick={exportGraphImage} small>Export Image</Btn>
           <Btn variant="ghost" onClick={exportPDF} small>Export PDF</Btn>
           <Btn variant="primary" onClick={saveAll} small disabled={!rows.some((r) => r.dirty) || refreshing || savingSnapshot !== null}>Save all</Btn>
         </div>
@@ -343,7 +430,7 @@ export default function ProjectSummaryTab({ project }: Props) {
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <svg width={chartWidth} height={chartHeight} style={{ display: 'block' }}>
+          <svg ref={svgRef} width={chartWidth} height={chartHeight} style={{ display: 'block', fontFamily: 'Poppins, sans-serif' }}>
             {[0, 25, 50, 75, 100].map((value) => {
               const y = chartMargin.top + innerHeight * (1 - value / 100);
               return (
@@ -372,7 +459,9 @@ export default function ProjectSummaryTab({ project }: Props) {
             {chartPoints.map((pt) => (
               <g key={pt.snapshotDate}>
                 <circle cx={pt.x} cy={pt.baselineY} r={4} fill={C.primary} />
+                <text x={pt.x} y={pt.baselineY - 8} textAnchor="middle" fontSize={8} fill={C.primary}>{pt.baselinePercent}%</text>
                 <circle cx={pt.x} cy={pt.actualY} r={4} fill={C.green} />
+                <text x={pt.x} y={pt.actualY + 16} textAnchor="middle" fontSize={8} fill={C.green}>{pt.actualPercent}%</text>
                 <text x={pt.x} y={chartHeight - chartMargin.bottom + 16} textAnchor="middle" fontSize={9} fill={C.text2}>{fmtDate(pt.snapshotDate)}</text>
               </g>
             ))}
@@ -380,57 +469,113 @@ export default function ProjectSummaryTab({ project }: Props) {
         </div>
       </Card>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 760, background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-          <thead style={{ background: C.bg2 }}>
-            <tr>
-              <th style={TH}>Snapshot date</th>
-              <th style={TH}>Baseline %</th>
-              <th style={TH}>Actual %</th>
-              <th style={TH}>Notes</th>
-              <th style={TH}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div>
+        {isMobile ? (
+          <div style={{ display: 'grid', gap: 12 }}>
             {rows.map((row) => (
-              <tr key={row.snapshotDate} style={{ background: row.dirty ? '#FEFBF7' : undefined }}>
-                <td style={TD}>{fmtDate(row.snapshotDate)}</td>
-                <td style={TD}>{row.baselinePercent}%</td>
-                <td style={TD}>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={row.actualInput}
-                    onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
-                    placeholder=""
-                    style={{ width: 72, padding: '6px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13 }}
-                  />
-                </td>
-                <td style={TD}>
-                  <textarea
-                    rows={1}
-                    value={row.note}
-                    onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
-                    style={{ width: '100%', minWidth: 220, padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, resize: 'vertical' }}
-                  />
-                </td>
-                <td style={TD}>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <Btn variant={row.dirty ? 'primary' : 'outline'} small onClick={() => handleSave(row.snapshotDate)} disabled={!row.dirty || savingSnapshot === row.snapshotDate}>
-                      {savingSnapshot === row.snapshotDate ? 'Saving…' : row.dirty ? 'Save' : 'Saved'}
-                    </Btn>
-                    {row.id && (
-                      <Btn variant="danger" small onClick={() => handleDelete(row.id, row.snapshotDate)} disabled={savingSnapshot === row.snapshotDate}>
-                        Delete
-                      </Btn>
-                    )}
+              <Card key={row.snapshotDate} style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{fmtDate(row.snapshotDate)}</div>
+                    <div style={{ marginTop: 8, fontSize: 12, color: C.text2 }}>{row.note || 'No notes yet'}</div>
                   </div>
-                </td>
-              </tr>
+                  <div style={{ display: 'grid', gap: 8, minWidth: 120, textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, color: C.text2 }}>Baseline</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: C.primary }}>{row.baselinePercent}%</div>
+                    <div style={{ fontSize: 11, color: C.text2 }}>Actual</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: C.green }}>{row.actualPercent}%</div>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gap: 12, marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>Actual progress</div>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={row.actualInput}
+                      onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
+                      placeholder="0-100"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}
+                    />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>Notes</div>
+                    <textarea
+                      rows={2}
+                      value={row.note}
+                      onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
+                      style={{ width: '100%', minWidth: 0, padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif', resize: 'vertical' }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <Btn variant={row.dirty ? 'primary' : 'outline'} small onClick={() => handleSave(row.snapshotDate)} disabled={!row.dirty || savingSnapshot === row.snapshotDate}>
+                    {savingSnapshot === row.snapshotDate ? 'Saving…' : row.dirty ? 'Save' : 'Saved'}
+                  </Btn>
+                  {row.id && (
+                    <Btn variant="danger" small onClick={() => handleDelete(row.id, row.snapshotDate)} disabled={savingSnapshot === row.snapshotDate}>
+                      Delete
+                    </Btn>
+                  )}
+                </div>
+              </Card>
             ))}
-          </tbody>
-        </table>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 760, background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+              <thead style={{ background: C.bg2 }}>
+                <tr>
+                  <th style={TH}>Snapshot date</th>
+                  <th style={TH}>Baseline %</th>
+                  <th style={TH}>Actual %</th>
+                  <th style={TH}>Notes</th>
+                  <th style={TH}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.snapshotDate} style={{ background: row.dirty ? '#FEFBF7' : undefined }}>
+                    <td style={TD}>{fmtDate(row.snapshotDate)}</td>
+                    <td style={TD}>{row.baselinePercent}%</td>
+                    <td style={TD}>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={row.actualInput}
+                        onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
+                        placeholder=""
+                        style={{ width: 72, padding: '6px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <textarea
+                        rows={1}
+                        value={row.note}
+                        onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
+                        style={{ width: '100%', minWidth: 220, padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif', resize: 'vertical' }}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <Btn variant={row.dirty ? 'primary' : 'outline'} small onClick={() => handleSave(row.snapshotDate)} disabled={!row.dirty || savingSnapshot === row.snapshotDate}>
+                          {savingSnapshot === row.snapshotDate ? 'Saving…' : row.dirty ? 'Save' : 'Saved'}
+                        </Btn>
+                        {row.id && (
+                          <Btn variant="danger" small onClick={() => handleDelete(row.id, row.snapshotDate)} disabled={savingSnapshot === row.snapshotDate}>
+                            Delete
+                          </Btn>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
