@@ -471,43 +471,39 @@ export default function ProjectSummaryTab({ project }: Props) {
 
       <div>
         {isMobile ? (
-          <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ display: 'grid', gap: 6 }}>
             {rows.map((row) => (
-              <Card key={row.snapshotDate} style={{ padding: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                  <div style={{ minWidth: 0, flex: '1 1 160px' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{fmtDate(row.snapshotDate)}</div>
-                    <div style={{ marginTop: 6, fontSize: 10, color: C.text2, lineHeight: 1.4, maxWidth: 220 }}>{row.note || 'No notes yet'}</div>
+              <Card key={row.snapshotDate} style={{ padding: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                  <div style={{ minWidth: 0, flex: '1 1 140px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.text }}>{fmtDate(row.snapshotDate)}</div>
+                    <div style={{ marginTop: 4, fontSize: 9, color: C.text2, lineHeight: 1.3, maxWidth: 200, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.note || 'No notes yet'}</div>
                   </div>
-                  <div style={{ display: 'grid', gap: 6, minWidth: 100, textAlign: 'right' }}>
-                    <div style={{ fontSize: 10, color: C.text2 }}>Baseline</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: C.primary }}>{row.baselinePercent}%</div>
-                    <div style={{ fontSize: 10, color: C.text2 }}>Actual</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: C.green }}>{row.actualPercent}%</div>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gap: 10, marginBottom: 10 }}>
-                  <div>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={row.actualInput}
-                      onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
-                      placeholder="0-100"
-                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: 'Poppins, sans-serif' }}
-                    />
-                  </div>
-                  <div>
-                    <textarea
-                      rows={2}
-                      value={row.note}
-                      onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
-                      style={{ width: '100%', minWidth: 0, padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: 'Poppins, sans-serif', resize: 'vertical', lineHeight: 1.4 }}
-                    />
+                  <div style={{ display: 'grid', gap: 4, minWidth: 90, textAlign: 'right' }}>
+                    <div style={{ fontSize: 9, color: C.text2 }}>Baseline</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.primary }}>{row.baselinePercent}%</div>
+                    <div style={{ fontSize: 9, color: C.text2 }}>Actual</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.green }}>{row.actualPercent}%</div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'grid', gap: 8, marginBottom: 8 }}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={row.actualInput}
+                    onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
+                    placeholder="0-100"
+                    style={{ width: '100%', padding: '6px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: 'Poppins, sans-serif' }}
+                  />
+                  <textarea
+                    rows={1}
+                    value={row.note}
+                    onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
+                    style={{ width: '100%', minWidth: 0, padding: '6px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: 'Poppins, sans-serif', resize: 'vertical', lineHeight: 1.3, maxHeight: 48, overflow: 'hidden' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <Btn variant={row.dirty ? 'primary' : 'outline'} small onClick={() => handleSave(row.snapshotDate)} disabled={!row.dirty || savingSnapshot === row.snapshotDate}>
                     {savingSnapshot === row.snapshotDate ? 'Saving…' : row.dirty ? 'Save' : 'Saved'}
                   </Btn>
