@@ -167,38 +167,21 @@ export default function ProjectEnvironmentTab({ project }: Props) {
             {rows.length > 0 ? rows.map((row) => {
               const revealed = Boolean(revealedPasswords[row.id]);
               return (
-                <Card key={row.id} style={{ padding: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>{row.environment}</div>
-                      <div style={{ fontSize: 12, color: C.text2, marginBottom: 4 }}>{row.url || '—'}</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, color: C.text2 }}>
-                        <div><strong>User</strong><br />{row.username || '—'}</div>
-                        <div><strong>Password</strong><br />{row.password ? (revealed ? row.password : '••••••••') : '—'}</div>
-                      </div>
+                <Card key={row.id} style={{ padding: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <div style={{ minWidth: 0, flex: '1 1 180px' }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 8 }}>{row.environment}</div>
+                      <div style={{ fontSize: 12, color: C.text2, marginBottom: 12, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{row.url || '—'}</div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-                      <button
-                        onClick={() => revealed ? setRevealedPasswords((prev) => ({ ...prev, [row.id]: false })) : requestPasswordReveal(row)}
-                        style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: '1px solid '+C.border, background: C.white, cursor: 'pointer', color: C.text2 }}>
-                        {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                      <button
-                        onClick={() => openUrl(row.url)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.primaryBg, color: C.primary, cursor: row.url?.trim() ? 'pointer' : 'not-allowed', opacity: row.url?.trim() ? 1 : 0.6 }}
-                        disabled={!row.url?.trim()}>
-                        <ExternalLink size={14} /> Open
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        onClick={() => revealed ? setRevealedPasswords((prev) => ({ ...prev, [row.id]: false })) : requestPasswordReveal(row)}
-                        style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid '+C.border, background: C.white, cursor: 'pointer', color: C.text2 }}
-                        aria-label={revealed ? 'Hide password' : 'Reveal password'}>
-                        {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {row.password ? (
+                        <button
+                          onClick={() => revealed ? setRevealedPasswords((prev) => ({ ...prev, [row.id]: false })) : requestPasswordReveal(row)}
+                          style={{ width: 38, height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid '+C.border, background: C.white, cursor: 'pointer', color: C.text2 }}
+                          aria-label={revealed ? 'Hide password' : 'Reveal password'}>
+                          {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      ) : null}
                       <button
                         onClick={() => openUrl(row.url)}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.primaryBg, color: C.primary, cursor: row.url?.trim() ? 'pointer' : 'not-allowed', opacity: row.url?.trim() ? 1 : 0.6 }}
@@ -206,20 +189,30 @@ export default function ProjectEnvironmentTab({ project }: Props) {
                         <ExternalLink size={14} /> Open
                       </button>
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        onClick={() => setModal(row)}
-                        style={{ width: 38, height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid '+C.primary, background: C.primaryBg, color: C.primary, cursor: 'pointer' }}
-                        aria-label="Edit environment">
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        onClick={() => setDeleting(row)}
-                        style={{ width: 38, height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid '+C.red, background: C.redBg, color: C.red, cursor: 'pointer' }}
-                        aria-label="Delete environment">
-                        <Trash2 size={16} />
-                      </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, color: C.text2, fontSize: 12 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, marginBottom: 6 }}>User</div>
+                      <div>{row.username || '—'}</div>
                     </div>
+                    <div>
+                      <div style={{ fontWeight: 700, marginBottom: 6 }}>Password</div>
+                      <div>{row.password ? (revealed ? row.password : '••••••••') : '—'}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => setModal(row)}
+                      style={{ width: 40, height: 40, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid '+C.primary, background: C.primaryBg, color: C.primary, cursor: 'pointer' }}
+                      aria-label="Edit environment">
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => setDeleting(row)}
+                      style={{ width: 40, height: 40, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid '+C.red, background: C.redBg, color: C.red, cursor: 'pointer' }}
+                      aria-label="Delete environment">
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </Card>
               );
