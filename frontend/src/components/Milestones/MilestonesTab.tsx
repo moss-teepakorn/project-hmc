@@ -14,8 +14,18 @@ export default function MilestonesTab({ projectId }: Props) {
   const { milestones, fetchMilestones, createMilestone, updateMilestone, deleteMilestone } = useStore();
   const [modal, setModal]       = useState<Partial<Milestone> | null>(null);
   const [deleting, setDeleting] = useState<Milestone | null>(null);
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
 
-  useEffect(() => { fetchMilestones(projectId); }, [projectId]);
+  useEffect(() => {
+    fetchMilestones(projectId);
+  }, [projectId]);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const total  = milestones.reduce((s, m) => s + m.amount, 0);
   const paid   = milestones.filter(m => m.status === 'paid').reduce((s, m) => s + m.amount, 0);
@@ -101,38 +111,82 @@ export default function MilestonesTab({ projectId }: Props) {
               <span style={{ fontSize: 12, color: C.text2 }}>Phase Budget ฿{fmtMoney(phaseBudget)}</span>
               <span style={{ fontSize: 12, color: C.text2 }}>Milestone Total ฿{fmtMoney(pTotal)}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-              {pms.map(ms => {
-                const ss = MILESTONE_STATUS[ms.status] ?? MILESTONE_STATUS.pending;
-                return (
-                  <Card key={ms.id} style={{ padding: 14, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10, alignItems: 'flex-start' }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ms.name}</div>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: C.text2, fontSize: 12 }}>
-                          <span>{ms.percent}%</span>
-                          <span>฿{fmtMoney(ms.amount)}</span>
+            {isMobile ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+                {pms.map(ms => {
+                  const ss = MILESTONE_STATUS[ms.status] ?? MILESTONE_STATUS.pending;
+                  return (
+                    <Card key={ms.id} style={{ padding: 14, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10, alignItems: 'flex-start' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ms.name}</div>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: C.text2, fontSize: 12 }}>
+                            <span>{ms.percent}%</span>
+                            <span>฿{fmtMoney(ms.amount)}</span>
+                          </div>
                         </div>
+                        <Badge bg={ss.bg} color={ss.color}>{ss.label}</Badge>
                       </div>
-                      <Badge bg={ss.bg} color={ss.color}>{ss.label}</Badge>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10, fontSize: 12, color: C.text2 }}>
-                      <div><strong>Due</strong><br />{fmtDate(ms.dueDate)}</div>
-                      <div><strong>Billing</strong><br />{fmtDate(ms.billingDate)}</div>
-                    </div>
-                    <div style={{ fontSize: 12, color: C.text3, marginBottom: 10, minHeight: 36 }}>{ms.notes || 'No notes'}</div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button onClick={() => setModal(ms)} style={{ flex: 1, minWidth: 0, background: C.primaryBg, border: 'none', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 700 }}>
-                        <Pencil size={12} /> Edit
-                      </button>
-                      <button onClick={() => setDeleting(ms)} style={{ flex: 1, minWidth: 0, background: C.redBg, border: 'none', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 700 }}>
-                        <Trash2 size={12} /> Delete
-                      </button>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10, fontSize: 12, color: C.text2 }}>
+                        <div><strong>Due</strong><br />{fmtDate(ms.dueDate)}</div>
+                        <div><strong>Billing</strong><br />{fmtDate(ms.billingDate)}</div>
+                      </div>
+                      <div style={{ fontSize: 12, color: C.text3, marginBottom: 10, minHeight: 36 }}>{ms.notes || 'No notes'}</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button onClick={() => setModal(ms)} style={{ flex: 1, minWidth: 0, background: C.primaryBg, border: 'none', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 700 }}>
+                          <Pencil size={12} /> Edit
+                        </button>
+                        <button onClick={() => setDeleting(ms)} style={{ flex: 1, minWidth: 0, background: C.redBg, border: 'none', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 700 }}>
+                          <Trash2 size={12} /> Delete
+                        </button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <Card>
+                <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '24%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '8%' }} />
+                  </colgroup>
+                  <thead>
+                    <tr style={{ background: C.bg }}>
+                      {['Milestone', '% Value', 'Amount (฿)', 'Due Date', 'Billing Date', 'Status', 'Actions'].map(h => (
+                        <th key={h} style={{ ...TH, padding: '10px 12px', fontSize: 11 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pms.map((ms, i) => {
+                      const ss = MILESTONE_STATUS[ms.status] ?? MILESTONE_STATUS.pending;
+                      return (
+                        <tr key={ms.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
+                          <td style={{ ...TD, fontWeight: 600 }}>{ms.name}</td>
+                          <td style={{ ...TD, fontWeight: 700, color: C.primary }}>{ms.percent}%</td>
+                          <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600 }}>{fmtMoney(ms.amount)}</td>
+                          <td style={{ ...TD, color: C.text2 }}>{fmtDate(ms.dueDate)}</td>
+                          <td style={{ ...TD, color: C.text2 }}>{fmtDate(ms.billingDate)}</td>
+                          <td style={TD}><Badge bg={ss.bg} color={ss.color}>{ss.label}</Badge></td>
+                          <td style={{ ...TD, padding: '8px 12px' }}>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <button onClick={() => setModal(ms)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>Edit</button>
+                              <button onClick={() => setDeleting(ms)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}>Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </Card>
+            )}
           </div>
         );
       })}
