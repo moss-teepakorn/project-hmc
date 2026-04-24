@@ -203,8 +203,8 @@ export default function ProjectSummaryTab({ project }: Props) {
     return points;
   }, [rows]);
 
-  const chartWidth = 760;
-  const chartHeight = 240;
+  const chartWidth = isMobile ? Math.max(windowWidth - 56, 320) : 760;
+  const chartHeight = isMobile ? 220 : 240;
   const chartMargin = { top: 20, right: 24, bottom: 38, left: 44 };
   const innerWidth = chartWidth - chartMargin.left - chartMargin.right;
   const innerHeight = chartHeight - chartMargin.top - chartMargin.bottom;
@@ -429,8 +429,8 @@ export default function ProjectSummaryTab({ project }: Props) {
             </div>
           </div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <svg ref={svgRef} width={chartWidth} height={chartHeight} style={{ display: 'block', fontFamily: 'Poppins, sans-serif' }}>
+        <div style={{ overflowX: isMobile ? 'hidden' : 'auto' }}>
+          <svg ref={svgRef} width={chartWidth} height={chartHeight} style={{ display: 'block', fontFamily: 'Poppins, sans-serif', width: '100%', maxWidth: chartWidth }}>
             {[0, 25, 50, 75, 100].map((value) => {
               const y = chartMargin.top + innerHeight * (1 - value / 100);
               return (
