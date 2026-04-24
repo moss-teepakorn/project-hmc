@@ -318,6 +318,14 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
   const paidAmt       = ms.filter(m => m.status === 'paid').reduce((s, m) => s + m.amount, 0);
   const payPct        = totalContract > 0 ? Math.round((paidAmt / totalContract) * 100) : 0;
 
+  const milestonesByPhase = ms.reduce((acc, m) => {
+    const phase = m.phase || 'Unspecified';
+    if (!acc[phase]) acc[phase] = [];
+    acc[phase].push(m);
+    return acc;
+  }, {} as Record<string, typeof ms>);
+  const phaseOrder = Object.keys(milestonesByPhase).sort((a, b) => a.localeCompare(b));
+
   const tBudMD  = ef.reduce((s, e) => s + e.budgetManday, 0);
   const tUsedMD = ef.reduce((s, e) => s + Object.values(e.monthly || {}).reduce((a, v) => a + v, 0), 0);
 
@@ -337,16 +345,18 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
   return (
     <div style={{ padding: isMobile ? '18px 14px' : '24px 28px', maxWidth: 900 }}>
       {/* Header */}
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? 16 : 0, marginBottom: 20 }}>
-        <div style={{ display: 'flex', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 14, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: isMobile ? 16 : 0, marginBottom: 20 }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 14, alignItems: 'flex-start' }}>
           <div style={{ width: 10, height: 48, borderRadius: 5, background: project.color || C.primary, flexShrink: 0 }} />
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
               <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: 0 }}>{project.name}</h2>
               <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
             </div>
-            <div style={{ fontSize: 12, color: C.text3, marginTop: 3 }}>{project.code} · {project.client}</div>
-            <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>{fmtDate(project.startDate)} – {fmtDate(project.endDate)}</div>
+            {!isMobile && (
+              <div style={{ fontSize: 12, color: C.text3, marginTop: 3 }}>{project.code} · {project.client}</div>
+            )}
+            <div style={{ fontSize: 11, color: C.text2, marginTop: isMobile ? 8 : 2 }}>{fmtDate(project.startDate)} – {fmtDate(project.endDate)}</div>
           </div>
         </div>
         <Btn onClick={onOpen} style={{ flexShrink: 0, marginTop: isMobile ? 10 : 0 }}>Open Project →</Btn>
@@ -413,33 +423,28 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
 
       {/* Milestones payment */}
       {ms.length > 0 && (
-        <Card style={{ padding: '12px 14px', marginBottom: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.text, marginBottom: 8 }}>🏁 Milestones</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr>
-                <th style={{ ...TH, padding: '8px 10px', fontSize: 11, background: C.bg, borderBottom: `1px solid ${C.border}` }}>Phase</th>
-                <th style={{ ...TH, padding: '8px 10px', fontSize: 11, background: C.bg, borderBottom: `1px solid ${C.border}` }}>Milestone</th>
-                <th style={{ ...TH, padding: '8px 10px', fontSize: 11, background: C.bg, borderBottom: `1px solid ${C.border}`, textAlign: 'right' }}>Amount (฿)</th>
-                <th style={{ ...TH, padding: '8px 10px', fontSize: 11, background: C.bg, borderBottom: `1px solid ${C.border}` }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...ms].sort((a, b) => a.phase.localeCompare(b.phase) || a.name.localeCompare(b.name)).map(m => {
-                const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
-                return (
-                  <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <td style={{ ...TD, padding: '8px 10px', fontSize: 12, fontWeight: 600, color: C.text }}>{m.phase}</td>
-                    <td style={{ ...TD, padding: '8px 10px', fontSize: 12, color: C.text2 }}>{m.name}</td>
-                    <td style={{ ...TD, padding: '8px 10px', fontSize: 12, color: C.text, whiteSpace: 'nowrap', textAlign: 'right' }}>{`฿${fmtMoney(m.amount)}`}</td>
-                    <td style={{ ...TD, padding: '8px 10px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                      <span style={{ background: ss.bg, color: ss.color, padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <Card style={{ padding: '12px 14px', marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.text, marginBottom: 10 }}>🏁 Milestones</div>
+          {phaseOrder.map(phase => (
+            <div key={phase} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>{phase}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                {milestonesByPhase[phase].sort((a, b) => a.name.localeCompare(b.name)).map(m => {
+                  const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
+                  return (
+                    <div key={m.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
+                        <span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: C.text2, marginBottom: 6, whiteSpace: 'nowrap' }}>฿{fmtMoney(m.amount)}</div>
+                      {m.dueDate && <div style={{ fontSize: 11, color: C.text2 }}>{fmtDate(m.dueDate)}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </Card>
       )}
     </div>
