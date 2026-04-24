@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Project, ProjectEnvironment } from '../../types';
 import { useStore } from '../../store';
@@ -27,6 +27,11 @@ export default function ProjectEnvironmentTab({ project }: Props) {
   const [modal, setModal] = useState<Partial<ProjectEnvironment> | null>(null);
   const [deleting, setDeleting] = useState<ProjectEnvironment | null>(null);
   const [version, setVersion] = useState<Project['softwareVersion']>(project.softwareVersion || '');
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
+  const [passwordModal, setPasswordModal] = useState<ProjectEnvironment | null>(null);
+  const [passwordPrompt, setPasswordPrompt] = useState('');
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchProjectEnvironments(project.id);
@@ -35,6 +40,12 @@ export default function ProjectEnvironmentTab({ project }: Props) {
   useEffect(() => {
     setVersion(project.softwareVersion || '');
   }, [project.softwareVersion, project.id]);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const rows = useMemo(
     () => projectEnvironments
@@ -51,6 +62,30 @@ export default function ProjectEnvironmentTab({ project }: Props) {
       return;
     }
     window.open(next, '_blank', 'noopener,noreferrer');
+  };
+
+  const todayKey = () => {
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(d.getFullYear());
+    return `${dd}${mm}${yyyy}`;
+  };
+
+  const requestPasswordReveal = (row: ProjectEnvironment) => {
+    setPasswordPrompt('');
+    setPasswordModal(row);
+  };
+
+  const confirmPasswordReveal = () => {
+    if (!passwordModal) return;
+    if (passwordPrompt === todayKey()) {
+      setRevealedPasswords((prev) => ({ ...prev, [passwordModal.id]: true }));
+      setPasswordModal(null);
+      toast.success('Password revealed');
+    } else {
+      toast.error('Incorrect identify password');
+    }
   };
 
   const saveVersion = async () => {
@@ -127,37 +162,89 @@ export default function ProjectEnvironmentTab({ project }: Props) {
       </div>
 
       <Card>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: C.bg }}>
-              {['Env', 'URL', 'User', 'Password', 'Open', ''].map((h) => (
-                <th key={h} style={TH}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={row.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
-                <td style={{ ...TD, fontWeight: 700 }}>{row.environment}</td>
-                <td style={{ ...TD, color: C.text2, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.url || '—'}</td>
-                <td style={TD}>{row.username || '—'}</td>
-                <td style={TD}>{row.password || '—'}</td>
-                <td style={TD}>
-                  <Btn variant="outline" small onClick={() => openUrl(row.url)} disabled={!row.url?.trim()}>
-                    <ExternalLink size={12} /> Open URL
-                  </Btn>
-                </td>
-                <td style={TD}>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => setModal(row)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', color: C.primary, cursor: 'pointer' }}><Pencil size={11} /></button>
-                    <button onClick={() => setDeleting(row)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '4px 10px', color: C.red, cursor: 'pointer' }}><Trash2 size={11} /></button>
+        {isMobile ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {rows.length > 0 ? rows.map((row) => {
+              const revealed = Boolean(revealedPasswords[row.id]);
+              return (
+                <Card key={row.id} style={{ padding: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>{row.environment}</div>
+                      <div style={{ fontSize: 12, color: C.text2, marginBottom: 4 }}>{row.url || '—'}</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, color: C.text2 }}>
+                        <div><strong>User</strong><br />{row.username || '—'}</div>
+                        <div><strong>Password</strong><br />{row.password ? (revealed ? row.password : '••••••••') : '—'}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+                      <button
+                        onClick={() => revealed ? setRevealedPasswords((prev) => ({ ...prev, [row.id]: false })) : requestPasswordReveal(row)}
+                        style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: '1px solid '+C.border, background: C.white, cursor: 'pointer', color: C.text2 }}>
+                        {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                      <button
+                        onClick={() => openUrl(row.url)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.primaryBg, color: C.primary, cursor: row.url?.trim() ? 'pointer' : 'not-allowed', opacity: row.url?.trim() ? 1 : 0.6 }}
+                        disabled={!row.url?.trim()}>
+                        <ExternalLink size={14} /> Open
+                      </button>
+                    </div>
                   </div>
-                </td>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button onClick={() => setModal(row)} style={{ flex: 1, minWidth: 0, borderRadius: 8, border: '1px solid '+C.primary, background: C.primaryBg, color: C.primary, padding: '8px 12px', fontWeight: 600, cursor: 'pointer' }}><Pencil size={14} /> Edit</button>
+                    <button onClick={() => setDeleting(row)} style={{ flex: 1, minWidth: 0, borderRadius: 8, border: '1px solid '+C.red, background: C.redBg, color: C.red, padding: '8px 12px', fontWeight: 600, cursor: 'pointer' }}><Trash2 size={14} /> Delete</button>
+                  </div>
+                </Card>
+              );
+            }) : (
+              <div style={{ padding: 28, textAlign: 'center', color: C.text3 }}>No environment URLs yet.</div>
+            )}
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                {['Env', 'URL', 'User', 'Password', 'Open', ''].map((h) => (
+                  <th key={h} style={TH}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: C.text3 }}>No environment URLs yet.</div>}
+            </thead>
+            <tbody>
+              {rows.map((row, i) => {
+                const revealed = Boolean(revealedPasswords[row.id]);
+                return (
+                  <tr key={row.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
+                    <td style={{ ...TD, fontWeight: 700 }}>{row.environment}</td>
+                    <td style={{ ...TD, color: C.text2, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.url || '—'}</td>
+                    <td style={TD}>{row.username || '—'}</td>
+                    <td style={{ ...TD, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{row.password ? (revealed ? row.password : '••••••••') : '—'}</span>
+                      {row.password ? (
+                        <button
+                          onClick={() => revealed ? setRevealedPasswords((prev) => ({ ...prev, [row.id]: false })) : requestPasswordReveal(row)}
+                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, border: '1px solid '+C.border, background: C.white, color: C.text2, cursor: 'pointer' }}>
+                          {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      ) : null}
+                    </td>
+                    <td style={TD}>
+                      <Btn variant="outline" small onClick={() => openUrl(row.url)} disabled={!row.url?.trim()}>
+                        <ExternalLink size={12} /> Open URL
+                      </Btn>
+                    </td>
+                    <td style={TD}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => setModal(row)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', color: C.primary, cursor: 'pointer' }}><Pencil size={11} /></button>
+                        <button onClick={() => setDeleting(row)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '4px 10px', color: C.red, cursor: 'pointer' }}><Trash2 size={11} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </Card>
 
       {modal !== null && (
@@ -169,6 +256,28 @@ export default function ProjectEnvironmentTab({ project }: Props) {
           onConfirm={handleDelete}
           onCancel={() => setDeleting(null)}
         />
+      )}
+      {passwordModal && (
+        <Modal title="Reveal Environment Password" onClose={() => setPasswordModal(null)} width={520}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={{ color: C.text2, lineHeight: 1.5 }}>
+              Enter today's identify password to reveal the stored environment password.
+              <br />Use the current date in <strong>ddmmyyyy</strong> format.
+            </div>
+            <FormRow label="Identify Password" required>
+              <Input
+                type="password"
+                value={passwordPrompt}
+                onChange={(v) => setPasswordPrompt(v)}
+                placeholder="e.g. 24042026"
+              />
+            </FormRow>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <Btn variant="ghost" onClick={() => setPasswordModal(null)}>Cancel</Btn>
+              <Btn onClick={confirmPasswordReveal}>Reveal Password</Btn>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
