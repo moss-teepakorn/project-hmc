@@ -430,7 +430,7 @@ export default function ProjectSummaryTab({ project }: Props) {
           </div>
         </div>
         <div style={{ overflowX: isMobile ? 'hidden' : 'auto' }}>
-          <svg ref={svgRef} width={chartWidth} height={chartHeight} style={{ display: 'block', fontFamily: 'Poppins, sans-serif', width: '100%', maxWidth: chartWidth }}>
+          <svg ref={svgRef} width={chartWidth} height={chartHeight} style={{ display: 'block', fontFamily: 'Poppins, sans-serif', width: '100%', maxWidth: '100%' }}>
             {[0, 25, 50, 75, 100].map((value) => {
               const y = chartMargin.top + innerHeight * (1 - value / 100);
               return (
