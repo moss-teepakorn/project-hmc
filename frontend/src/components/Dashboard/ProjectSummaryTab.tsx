@@ -509,35 +509,57 @@ export default function ProjectSummaryTab({ project }: Props) {
                     value={row.actualInput}
                     onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
                     placeholder="0-100"
-                    style={{ width: '100%', height: 28, padding: '4px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: 'Poppins, sans-serif' }}
+                    style={{ width: '100%', height: 32, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: 'Poppins, sans-serif' }}
                   />
                   <textarea
                     rows={1}
                     value={row.note}
                     onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
-                    style={{ width: '100%', minWidth: 0, height: 28, padding: '4px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: 'Poppins, sans-serif', resize: 'none', lineHeight: 1.2, overflow: 'hidden' }}
+                    style={{ width: '100%', minWidth: 0, height: 32, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: 'Poppins, sans-serif', resize: 'none', lineHeight: 1.3, overflow: 'hidden' }}
                   />
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
-                  <Btn
-                    variant={row.dirty ? 'primary' : 'outline'}
-                    small
+                  <button
+                    type="button"
                     onClick={() => handleSave(row.snapshotDate)}
                     disabled={!row.dirty || savingSnapshot === row.snapshotDate}
-                    style={{ width: 32, height: 32, padding: 0 }}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 10,
+                      border: `1px solid ${row.dirty ? C.primary : C.border}`,
+                      background: row.dirty ? C.primary : C.white,
+                      color: row.dirty ? '#fff' : C.text,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
                   >
                     {savingSnapshot === row.snapshotDate ? <span style={{ fontSize: 12 }}>…</span> : <Check size={16} />}
-                  </Btn>
+                  </button>
                   {row.id && (
-                    <Btn
-                      variant="danger"
-                      small
+                    <button
+                      type="button"
                       onClick={() => handleDelete(row.id, row.snapshotDate)}
                       disabled={savingSnapshot === row.snapshotDate}
-                      style={{ width: 32, height: 32, padding: 0 }}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 10,
+                        border: `1px solid ${C.red}`,
+                        background: C.redBg,
+                        color: C.red,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
                     >
                       <Trash2 size={16} />
-                    </Btn>
+                    </button>
                   )}
                 </div>
               </Card>
@@ -568,7 +590,7 @@ export default function ProjectSummaryTab({ project }: Props) {
                         value={row.actualInput}
                         onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
                         placeholder=""
-                        style={{ width: 72, height: 24, padding: '4px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}
+                        style={{ width: 72, height: 30, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}
                       />
                     </td>
                     <td style={{ ...TD, height: ROW_H, verticalAlign: 'middle' }}>
@@ -576,31 +598,53 @@ export default function ProjectSummaryTab({ project }: Props) {
                         rows={1}
                         value={row.note}
                         onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
-                        style={{ width: '100%', minWidth: 220, height: 24, padding: '4px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif', resize: 'none', lineHeight: 1.2, overflow: 'hidden' }}
+                        style={{ width: '100%', minWidth: 220, height: 30, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif', resize: 'none', lineHeight: 1.3, overflow: 'hidden' }}
                       />
                     </td>
                     <td style={{ ...TD, height: ROW_H, verticalAlign: 'middle' }}>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <Btn
-                      variant={row.dirty ? 'primary' : 'outline'}
-                      small
-                      onClick={() => handleSave(row.snapshotDate)}
-                      disabled={!row.dirty || savingSnapshot === row.snapshotDate}
-                      style={{ width: 32, height: 32, padding: 0 }}
-                    >
-                      {savingSnapshot === row.snapshotDate ? <span style={{ fontSize: 12 }}>…</span> : <Check size={16} />}
-                    </Btn>
-                    {row.id && (
-                      <Btn
-                        variant="danger"
-                        small
-                        onClick={() => handleDelete(row.id, row.snapshotDate)}
-                        disabled={savingSnapshot === row.snapshotDate}
-                        style={{ width: 32, height: 32, padding: 0 }}
-                      >
-                        <Trash2 size={16} />
-                      </Btn>
-                    )}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleSave(row.snapshotDate)}
+                          disabled={!row.dirty || savingSnapshot === row.snapshotDate}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 10,
+                            border: `1px solid ${row.dirty ? C.primary : C.border}`,
+                            background: row.dirty ? C.primary : C.white,
+                            color: row.dirty ? '#fff' : C.text,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {savingSnapshot === row.snapshotDate ? <span style={{ fontSize: 12 }}>…</span> : <Check size={16} />}
+                        </button>
+                        {row.id && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(row.id, row.snapshotDate)}
+                            disabled={savingSnapshot === row.snapshotDate}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 10,
+                              border: `1px solid ${C.red}`,
+                              background: C.redBg,
+                              color: C.red,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
