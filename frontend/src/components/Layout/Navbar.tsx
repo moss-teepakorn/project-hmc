@@ -53,9 +53,6 @@ export default function Navbar() {
           <span style={{ fontSize: 16, fontWeight: 800, color: textColor, fontFamily: F, letterSpacing: '-0.3px' }}>
             Project Tracking System
           </span>
-          <span style={{ fontSize: 10, color: textMuted, fontFamily: F, fontWeight: 500, marginLeft: 6 }}>
-            Enterprise
-          </span>
         </div>
       </div>
 
