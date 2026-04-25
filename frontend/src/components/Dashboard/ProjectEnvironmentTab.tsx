@@ -280,15 +280,14 @@ export default function ProjectEnvironmentTab({ project }: Props) {
         <Modal title="Reveal Environment Password" onClose={() => setPasswordModal(null)} width={520}>
           <div style={{ display: 'grid', gap: 12 }}>
             <div style={{ color: C.text2, lineHeight: 1.5 }}>
-              Enter today's identify password to reveal the stored environment password.
-              <br />Use the current date in <strong>ddmmyyyy</strong> format.
+              Enter the verification code to reveal the stored environment password.
             </div>
-            <FormRow label="Identify Password" required>
+            <FormRow label="Verification Code" required>
               <Input
                 type="password"
                 value={passwordPrompt}
                 onChange={(v) => setPasswordPrompt(v)}
-                placeholder="e.g. 24042026"
+                placeholder="Verification code"
               />
             </FormRow>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>

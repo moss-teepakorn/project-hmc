@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -28,6 +28,14 @@ const OPEN_ISSUE_STATUSES = ['Open', 'In Progress'] as const;
 
 export default function PortfolioReportSummary() {
   const { projects, milestones, efforts, issues, changeRequests, fetchMilestones, fetchEfforts, fetchIssues, fetchCRs } = useStore();
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 768;
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchMilestones('');
@@ -197,37 +205,61 @@ export default function PortfolioReportSummary() {
         ].map((group) => (
           <div key={group.title}>
             <div style={{ marginBottom: 10, fontSize: 12, fontWeight: 700, color: C.text }}>{group.title} ({group.rows.length})</div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: C.bg }}>
-                    {['Project ID', 'Project Name', 'Client', 'Start Date', 'End Date', 'Status', 'Payments', 'Effort', 'Open Issues', 'Closed CRs'].map((label) => (
-                      <th key={label} style={{ ...TH, padding: '10px 12px', fontSize: 11, textAlign: 'left' }}>{label}</th>
+            {group.rows.length === 0 ? (
+              <Card style={{ padding: 16, textAlign: 'center', color: C.text3 }}>No projects</Card>
+            ) : isMobile ? (
+              <div style={{ display: 'grid', gap: 12 }}>
+                {group.rows.map((row) => (
+                  <Card key={row.projectId} style={{ padding: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>{row.projectName}</div>
+                        <div style={{ fontSize: 11, color: C.text2, marginBottom: 4 }}>{row.client}</div>
+                        <div style={{ fontSize: 11, color: C.text2 }}>{row.projectId}</div>
+                      </div>
+                      <div style={{ display: 'grid', gap: 4, minWidth: 120, textAlign: 'right' }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.primary }}>{row.status}</div>
+                        <div style={{ fontSize: 10, color: C.text2 }}>{row.startDate} - {row.endDate}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
+                      <div style={{ fontSize: 11, color: C.text2 }}><strong style={{ color: C.text }}>Payments</strong><br />{row.paymentCollected}</div>
+                      <div style={{ fontSize: 11, color: C.text2 }}><strong style={{ color: C.text }}>Effort</strong><br />{row.effortUsed}</div>
+                      <div style={{ fontSize: 11, color: C.text2 }}><strong style={{ color: C.text }}>Open Issues</strong><br />{row.openIssues}</div>
+                      <div style={{ fontSize: 11, color: C.text2 }}><strong style={{ color: C.text }}>Closed CRs</strong><br />{row.closedCRs}/{row.totalCRs}</div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: C.bg }}>
+                      {['Project ID', 'Project Name', 'Client', 'Start Date', 'End Date', 'Status', 'Payments', 'Effort', 'Open Issues', 'Closed CRs'].map((label) => (
+                        <th key={label} style={{ ...TH, padding: '10px 12px', fontSize: 11, textAlign: 'left' }}>{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.rows.map((row, index) => (
+                      <tr key={row.projectId} style={{ background: index % 2 === 0 ? C.white : C.bg }}>
+                        <td style={{ ...TD, padding: '10px 12px', fontWeight: 700 }}>{row.projectId}</td>
+                        <td style={{ ...TD, padding: '10px 12px' }}>{row.projectName}</td>
+                        <td style={{ ...TD, padding: '10px 12px' }}>{row.client}</td>
+                        <td style={{ ...TD, padding: '10px 12px' }}>{row.startDate}</td>
+                        <td style={{ ...TD, padding: '10px 12px' }}>{row.endDate}</td>
+                        <td style={{ ...TD, padding: '10px 12px' }}>{row.status}</td>
+                        <td style={{ ...TD, padding: '10px 12px' }}>{row.paymentCollected}</td>
+                        <td style={{ ...TD, padding: '10px 12px' }}>{row.effortUsed}</td>
+                        <td style={{ ...TD, padding: '10px 12px' }}>{row.openIssues}</td>
+                        <td style={{ ...TD, padding: '10px 12px' }}>{row.closedCRs}/{row.totalCRs}</td>
+                      </tr>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} style={{ ...TD, padding: 16, textAlign: 'center', color: C.text3 }}>No projects</td>
-                    </tr>
-                  ) : group.rows.map((row, index) => (
-                    <tr key={row.projectId} style={{ background: index % 2 === 0 ? C.white : C.bg }}>
-                      <td style={{ ...TD, padding: '10px 12px', fontWeight: 700 }}>{row.projectId}</td>
-                      <td style={{ ...TD, padding: '10px 12px' }}>{row.projectName}</td>
-                      <td style={{ ...TD, padding: '10px 12px' }}>{row.client}</td>
-                      <td style={{ ...TD, padding: '10px 12px' }}>{row.startDate}</td>
-                      <td style={{ ...TD, padding: '10px 12px' }}>{row.endDate}</td>
-                      <td style={{ ...TD, padding: '10px 12px' }}>{row.status}</td>
-                      <td style={{ ...TD, padding: '10px 12px' }}>{row.paymentCollected}</td>
-                      <td style={{ ...TD, padding: '10px 12px' }}>{row.effortUsed}</td>
-                      <td style={{ ...TD, padding: '10px 12px' }}>{row.openIssues}</td>
-                      <td style={{ ...TD, padding: '10px 12px' }}>{row.closedCRs}/{row.totalCRs}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [showAdd,    setShowAdd]    = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showHypercare, setShowHypercare] = useState(false);
+  const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>('overview');
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
 
@@ -174,7 +175,35 @@ export default function Dashboard() {
       {/* ── Right panel: summary or welcome ─────────────────────────────── */}
       <div style={{ flex: 1, overflow: 'auto', background: C.bg }}>
         {!selected ? (
-          <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} isMobile={isMobile} />
+          <div style={{ width: '100%', minHeight: 0 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '16px 14px 0' : '24px 32px 0' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['overview', 'report'].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setDashboardTab(tab as 'overview' | 'report')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 10,
+                      border: dashboardTab === tab ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
+                      background: dashboardTab === tab ? C.primaryBg : C.white,
+                      color: dashboardTab === tab ? C.primary : C.text,
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontFamily: 'Poppins, sans-serif',
+                    }}
+                  >
+                    {tab === 'overview' ? 'Portfolio Overview' : 'Project Summary Report'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {dashboardTab === 'overview' ? (
+              <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} isMobile={isMobile} />
+            ) : (
+              <PortfolioReportSummary />
+            )}
+          </div>
         ) : (
           <ProjectSummaryPanel
             project={selected}

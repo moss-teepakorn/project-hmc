@@ -93,14 +93,12 @@ export default function ProjectDetail({ project }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px', background: C.primary, borderBottom: `1px solid ${C.border}`, color: '#fff', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={() => setActiveProject(null)}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, border: 'none', background: '#fff', color: C.primary, cursor: 'pointer' }}>
-            <Home size={18} />
-          </button>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Project Details</span>
-        </div>
+        <button
+          onClick={() => setActiveProject(null)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, border: 'none', background: '#fff', color: C.primary, cursor: 'pointer', fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+          <Home size={18} />
+          Workplaze
+        </button>
         {isMobile && <div style={{ width: 34, height: 34 }} />}
       </div>
       <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
