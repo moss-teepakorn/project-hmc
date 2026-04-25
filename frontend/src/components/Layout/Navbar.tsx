@@ -3,7 +3,7 @@ import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { C } from '../Common';
-import { LogOut, Moon, Sun } from 'lucide-react';
+import { Home, LogOut, Moon, Sun } from 'lucide-react';
 
 const F = 'Poppins, sans-serif';
 
@@ -45,11 +45,13 @@ export default function Navbar() {
           width: 32, height: 32, borderRadius: 9,
           background: `linear-gradient(135deg, ${C.primary}, #818CF8)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 14, fontWeight: 800, fontFamily: F,
-        }}>PM</div>
+          color: '#fff', fontSize: 16, fontWeight: 700, fontFamily: F,
+        }}>
+          <Home size={18} />
+        </div>
         <div>
           <span style={{ fontSize: 16, fontWeight: 800, color: textColor, fontFamily: F, letterSpacing: '-0.3px' }}>
-            ProjectMS
+            Project Tracking System
           </span>
           <span style={{ fontSize: 10, color: textMuted, fontFamily: F, fontWeight: 500, marginLeft: 6 }}>
             Enterprise
