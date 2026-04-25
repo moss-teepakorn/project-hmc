@@ -197,20 +197,20 @@ export default function PortfolioReportSummary() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
-        <div style={{ minHeight: 88, padding: 16, borderRadius: 22, background: C.white, boxShadow: C.shadow2, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ height: 88, padding: '12px 14px', borderRadius: 22, background: C.white, boxShadow: C.shadow2, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>On Going Projects</div>
-          <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800, color: C.primary }}>{ongoingRows.length}</div>
-          <div style={{ marginTop: 4, fontSize: 12, color: C.text2 }}>Active projects still in progress</div>
+          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 800, color: C.primary }}>{ongoingRows.length}</div>
+          <div style={{ marginTop: 4, fontSize: 11, color: C.text2 }}>Active projects still in progress</div>
         </div>
-        <div style={{ minHeight: 88, padding: 16, borderRadius: 22, background: C.white, boxShadow: C.shadow2, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ height: 88, padding: '12px 14px', borderRadius: 22, background: C.white, boxShadow: C.shadow2, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Closed Projects</div>
-          <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800, color: C.amber }}>{closeRows.length}</div>
-          <div style={{ marginTop: 4, fontSize: 12, color: C.text2 }}>Projects moved into close / hypercare status</div>
+          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 800, color: C.amber }}>{closeRows.length}</div>
+          <div style={{ marginTop: 4, fontSize: 11, color: C.text2 }}>Projects moved into close / hypercare status</div>
         </div>
-        <div style={{ minHeight: 88, padding: 16, borderRadius: 22, background: C.primary, boxShadow: C.shadow2, color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ height: 88, padding: '12px 14px', borderRadius: 22, background: C.primary, boxShadow: C.shadow2, color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.9 }}>Report Date</div>
-          <div style={{ marginTop: 8, fontSize: 22, fontWeight: 700 }}>{new Date().toLocaleDateString('en-GB')}</div>
-          <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>Generated automatically from project data</div>
+          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 700 }}>{new Date().toLocaleDateString('en-GB')}</div>
+          <div style={{ marginTop: 4, fontSize: 11, opacity: 0.85 }}>Generated automatically from project data</div>
         </div>
       </div>
 
@@ -266,23 +266,23 @@ export default function PortfolioReportSummary() {
                     <thead>
                       <tr style={{ background: C.primary, color: '#fff' }}>
                         {['Project ID', 'Project Name', 'Client', 'Start Date', 'End Date', 'Status', 'Payments', 'Effort', 'Open Issues', 'Closed CRs'].map((label) => (
-                          <th key={label} style={{ textAlign: 'left', padding: '14px 16px', fontSize: 12, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', borderBottom: `1px solid ${C.primary}` }}>{label}</th>
+                          <th key={label} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', borderBottom: `1px solid ${C.primary}` }}>{label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {group.rows.map((row, index) => (
                         <tr key={row.projectId} style={{ background: index % 2 === 0 ? '#fff' : C.bg }}>
-                          <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 700, color: C.text }}>{row.projectId}</td>
-                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text }}>{row.projectName}</td>
-                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.client}</td>
-                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.startDate}</td>
-                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.endDate}</td>
-                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.primary, fontWeight: 700 }}>{row.status}</td>
-                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.paymentCollected}</td>
-                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.effortUsed}</td>
-                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.openIssues}</td>
-                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.closedCRs}/{row.totalCRs}</td>
+                          <td style={{ padding: '7px 14px', fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.4 }}>{row.projectId}</td>
+                          <td style={{ padding: '7px 14px', fontSize: 12, color: C.text, lineHeight: 1.4 }}>{row.projectName}</td>
+                          <td style={{ padding: '7px 14px', fontSize: 12, color: C.text2, lineHeight: 1.4 }}>{row.client}</td>
+                          <td style={{ padding: '7px 14px', fontSize: 12, color: C.text2, lineHeight: 1.4 }}>{row.startDate}</td>
+                          <td style={{ padding: '7px 14px', fontSize: 12, color: C.text2, lineHeight: 1.4 }}>{row.endDate}</td>
+                          <td style={{ padding: '7px 14px', fontSize: 12, color: C.primary, fontWeight: 700, lineHeight: 1.4 }}>{row.status}</td>
+                          <td style={{ padding: '7px 14px', fontSize: 12, color: C.text2, lineHeight: 1.4 }}>{row.paymentCollected}</td>
+                          <td style={{ padding: '7px 14px', fontSize: 12, color: C.text2, lineHeight: 1.4 }}>{row.effortUsed}</td>
+                          <td style={{ padding: '7px 14px', fontSize: 12, color: C.text2, lineHeight: 1.4 }}>{row.openIssues}</td>
+                          <td style={{ padding: '7px 14px', fontSize: 12, color: C.text2, lineHeight: 1.4 }}>{row.closedCRs}/{row.totalCRs}</td>
                         </tr>
                       ))}
                     </tbody>
