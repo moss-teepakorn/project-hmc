@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
+import { Check, Trash2 } from 'lucide-react';
 import { Btn, Card, C, FormRow, TH, TD } from '../Common';
 import { fmtDate, getHalfMonthSnapshotDates, computeBaselineProgress } from '../../utils';
 import type { Project, ProjectProgressSnapshot } from '../../types';
@@ -31,6 +32,7 @@ export default function ProjectSummaryTab({ project }: Props) {
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [chartWidth, setChartWidth] = useState<number>(typeof window !== 'undefined' ? Math.max(window.innerWidth - 56, 760) : 760);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const ROW_H = 36;
   const chartWrapperRef = useRef<HTMLDivElement | null>(null);
   const isMobile = windowWidth < 768;
 
@@ -486,8 +488,8 @@ export default function ProjectSummaryTab({ project }: Props) {
         {isMobile ? (
           <div style={{ display: 'grid', gap: 6 }}>
             {rows.map((row) => (
-              <Card key={row.snapshotDate} style={{ padding: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+              <Card key={row.snapshotDate} style={{ padding: 8, minHeight: ROW_H, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8, minHeight: ROW_H, alignItems: 'center' }}>
                   <div style={{ minWidth: 0, flex: '1 1 120px' }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.text }}>{fmtDate(row.snapshotDate)}</div>
                     <div style={{ marginTop: 4, fontSize: 9, color: C.text2, lineHeight: 1.3, maxWidth: 160, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.note || 'No notes yet'}</div>
@@ -499,7 +501,7 @@ export default function ProjectSummaryTab({ project }: Props) {
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.green }}>{row.actualPercent}%</div>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gap: 8, marginBottom: 8 }}>
+                <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
                   <input
                     type="number"
                     min={0}
@@ -507,22 +509,34 @@ export default function ProjectSummaryTab({ project }: Props) {
                     value={row.actualInput}
                     onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
                     placeholder="0-100"
-                    style={{ width: '100%', padding: '6px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: 'Poppins, sans-serif' }}
+                    style={{ width: '100%', height: 28, padding: '4px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: 'Poppins, sans-serif' }}
                   />
                   <textarea
                     rows={1}
                     value={row.note}
                     onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
-                    style={{ width: '100%', minWidth: 0, padding: '6px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: 'Poppins, sans-serif', resize: 'vertical', lineHeight: 1.3, maxHeight: 48, overflow: 'hidden' }}
+                    style={{ width: '100%', minWidth: 0, height: 28, padding: '4px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: 'Poppins, sans-serif', resize: 'none', lineHeight: 1.2, overflow: 'hidden' }}
                   />
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <Btn variant={row.dirty ? 'primary' : 'outline'} small onClick={() => handleSave(row.snapshotDate)} disabled={!row.dirty || savingSnapshot === row.snapshotDate}>
-                    {savingSnapshot === row.snapshotDate ? 'Saving…' : row.dirty ? 'Save' : 'Saved'}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                  <Btn
+                    variant={row.dirty ? 'primary' : 'outline'}
+                    small
+                    onClick={() => handleSave(row.snapshotDate)}
+                    disabled={!row.dirty || savingSnapshot === row.snapshotDate}
+                    style={{ width: 32, height: 32, padding: 0 }}
+                  >
+                    {savingSnapshot === row.snapshotDate ? <span style={{ fontSize: 12 }}>…</span> : <Check size={16} />}
                   </Btn>
                   {row.id && (
-                    <Btn variant="danger" small onClick={() => handleDelete(row.id, row.snapshotDate)} disabled={savingSnapshot === row.snapshotDate}>
-                      Delete
+                    <Btn
+                      variant="danger"
+                      small
+                      onClick={() => handleDelete(row.id, row.snapshotDate)}
+                      disabled={savingSnapshot === row.snapshotDate}
+                      style={{ width: 32, height: 32, padding: 0 }}
+                    >
+                      <Trash2 size={16} />
                     </Btn>
                   )}
                 </div>
@@ -543,10 +557,10 @@ export default function ProjectSummaryTab({ project }: Props) {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.snapshotDate} style={{ background: row.dirty ? '#FEFBF7' : undefined }}>
-                    <td style={TD}>{fmtDate(row.snapshotDate)}</td>
-                    <td style={TD}>{row.baselinePercent}%</td>
-                    <td style={TD}>
+                  <tr key={row.snapshotDate} style={{ background: row.dirty ? '#FEFBF7' : undefined, height: ROW_H, minHeight: ROW_H }}>
+                    <td style={{ ...TD, height: ROW_H, verticalAlign: 'middle' }}>{fmtDate(row.snapshotDate)}</td>
+                    <td style={{ ...TD, height: ROW_H, verticalAlign: 'middle' }}>{row.baselinePercent}%</td>
+                    <td style={{ ...TD, height: ROW_H, verticalAlign: 'middle' }}>
                       <input
                         type="number"
                         min={0}
@@ -554,27 +568,39 @@ export default function ProjectSummaryTab({ project }: Props) {
                         value={row.actualInput}
                         onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
                         placeholder=""
-                        style={{ width: 72, padding: '6px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}
+                        style={{ width: 72, height: 24, padding: '4px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}
                       />
                     </td>
-                    <td style={TD}>
+                    <td style={{ ...TD, height: ROW_H, verticalAlign: 'middle' }}>
                       <textarea
                         rows={1}
                         value={row.note}
                         onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
-                        style={{ width: '100%', minWidth: 220, padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif', resize: 'vertical' }}
+                        style={{ width: '100%', minWidth: 220, height: 24, padding: '4px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif', resize: 'none', lineHeight: 1.2, overflow: 'hidden' }}
                       />
                     </td>
-                    <td style={TD}>
+                    <td style={{ ...TD, height: ROW_H, verticalAlign: 'middle' }}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <Btn variant={row.dirty ? 'primary' : 'outline'} small onClick={() => handleSave(row.snapshotDate)} disabled={!row.dirty || savingSnapshot === row.snapshotDate}>
-                          {savingSnapshot === row.snapshotDate ? 'Saving…' : row.dirty ? 'Save' : 'Saved'}
-                        </Btn>
-                        {row.id && (
-                          <Btn variant="danger" small onClick={() => handleDelete(row.id, row.snapshotDate)} disabled={savingSnapshot === row.snapshotDate}>
-                            Delete
-                          </Btn>
-                        )}
+                        <Btn
+                      variant={row.dirty ? 'primary' : 'outline'}
+                      small
+                      onClick={() => handleSave(row.snapshotDate)}
+                      disabled={!row.dirty || savingSnapshot === row.snapshotDate}
+                      style={{ width: 32, height: 32, padding: 0 }}
+                    >
+                      {savingSnapshot === row.snapshotDate ? <span style={{ fontSize: 12 }}>…</span> : <Check size={16} />}
+                    </Btn>
+                    {row.id && (
+                      <Btn
+                        variant="danger"
+                        small
+                        onClick={() => handleDelete(row.id, row.snapshotDate)}
+                        disabled={savingSnapshot === row.snapshotDate}
+                        style={{ width: 32, height: 32, padding: 0 }}
+                      >
+                        <Trash2 size={16} />
+                      </Btn>
+                    )}
                       </div>
                     </td>
                   </tr>
