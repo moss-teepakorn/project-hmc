@@ -62,7 +62,7 @@ export default function Navbar() {
     })
     .map((t) => ({
       id: t.id,
-      title: `งานใกล้ครบ ${t.taskName}`,
+      title: `Task : ${t.taskName}`,
       subtitle: `Due ${t.endDate}`,
       type: 'task',
     }));
@@ -75,7 +75,7 @@ export default function Navbar() {
     })
     .map((t) => ({
       id: t.id,
-      title: `งานเลยกำหนด ${t.taskName}`,
+      title: `Task : ${t.taskName}`,
       subtitle: `Due ${t.endDate}`,
       type: 'task',
     }));
@@ -88,7 +88,7 @@ export default function Navbar() {
     })
     .map((m) => ({
       id: m.id,
-      title: `Milestone ยังไม่ billing: ${m.name}`,
+      title: `Milestone : ${m.name}`,
       subtitle: `Billing ${m.billingDate}`,
       type: 'milestone',
     }));
