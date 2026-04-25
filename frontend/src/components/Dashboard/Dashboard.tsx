@@ -6,6 +6,7 @@ import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, PROJECT_STATUS, MILESTO
 import { fmtDate, fmtMoney, compareWbs } from '../../utils';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
+import PortfolioReportSummary from './PortfolioReportSummary';
 
 const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care'];
 
@@ -276,6 +277,8 @@ function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Proje
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px,1fr))', gap: 14 }}>
         {normalProjects.map(p => renderOverviewProjectCard(p, C.primary))}
       </div>
+
+      <PortfolioReportSummary />
 
       {/* Hypercare section — collapsible, hidden by default */}
       {hypercareProjects.length > 0 && (
