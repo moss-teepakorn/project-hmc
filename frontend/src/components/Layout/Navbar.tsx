@@ -107,7 +107,10 @@ export default function Navbar() {
     }}>
       {/* Brand */}
       <div
-        onClick={() => setActiveProject(null)}
+        onClick={() => {
+          setActiveProject(null);
+          window.dispatchEvent(new CustomEvent('app-home'));
+        }}
         title="Go home"
         style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
         <div style={{

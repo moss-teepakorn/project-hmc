@@ -30,6 +30,15 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  React.useEffect(() => {
+    const onHome = () => {
+      setSelected(null);
+      setDashboardTab('overview');
+    };
+    window.addEventListener('app-home', onHome);
+    return () => window.removeEventListener('app-home', onHome);
+  }, []);
+
   // Note: fetchProjects is called from App.tsx, not needed here
 
   React.useEffect(() => {
