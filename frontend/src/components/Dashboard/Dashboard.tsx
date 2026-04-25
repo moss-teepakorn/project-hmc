@@ -183,13 +183,14 @@ export default function Dashboard() {
                     key={tab}
                     onClick={() => setDashboardTab(tab as 'overview' | 'report')}
                     style={{
-                      padding: '8px 16px',
+                      padding: '6px 12px',
                       borderRadius: 10,
                       border: dashboardTab === tab ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
                       background: dashboardTab === tab ? C.primaryBg : C.white,
                       color: dashboardTab === tab ? C.primary : C.text,
                       cursor: 'pointer',
                       fontWeight: 600,
+                      fontSize: 12,
                       fontFamily: 'Poppins, sans-serif',
                     }}
                   >
@@ -306,8 +307,6 @@ function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Proje
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px,1fr))', gap: 14 }}>
         {normalProjects.map(p => renderOverviewProjectCard(p, C.primary))}
       </div>
-
-      <PortfolioReportSummary />
 
       {/* Hypercare section — collapsible, hidden by default */}
       {hypercareProjects.length > 0 && (

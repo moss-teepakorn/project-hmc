@@ -184,8 +184,8 @@ export default function PortfolioReportSummary() {
     <div style={{ width: '100%', minHeight: '100%', padding: isMobile ? '18px 16px 24px' : '24px 28px 32px', background: C.bg2, fontFamily: 'Poppins, sans-serif' }}>
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 18, marginBottom: 24 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800, color: C.text, lineHeight: 1.05 }}>Portfolio Project Summary</div>
-          <div style={{ marginTop: 10, fontSize: 14, color: C.text2, maxWidth: 680, lineHeight: 1.7 }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: C.text, lineHeight: 1.05 }}>Portfolio Project Summary</div>
+          <div style={{ marginTop: 10, fontSize: 12, color: C.text2, maxWidth: 680, lineHeight: 1.7 }}>
             A polished overview of active and closed projects with payments, effort, issues, and change request status.
           </div>
         </div>
@@ -197,20 +197,20 @@ export default function PortfolioReportSummary() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
-        <div style={{ padding: 20, borderRadius: 22, background: C.white, boxShadow: C.shadow2, border: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.text2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>On Going Projects</div>
-          <div style={{ marginTop: 10, fontSize: 32, fontWeight: 800, color: C.primary }}>{ongoingRows.length}</div>
-          <div style={{ marginTop: 6, fontSize: 13, color: C.text2 }}>Active projects still in progress</div>
+        <div style={{ minHeight: 88, padding: 16, borderRadius: 22, background: C.white, boxShadow: C.shadow2, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>On Going Projects</div>
+          <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800, color: C.primary }}>{ongoingRows.length}</div>
+          <div style={{ marginTop: 4, fontSize: 12, color: C.text2 }}>Active projects still in progress</div>
         </div>
-        <div style={{ padding: 20, borderRadius: 22, background: C.white, boxShadow: C.shadow2, border: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.text2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Closed Projects</div>
-          <div style={{ marginTop: 10, fontSize: 32, fontWeight: 800, color: C.amber }}>{closeRows.length}</div>
-          <div style={{ marginTop: 6, fontSize: 13, color: C.text2 }}>Projects moved into close / hypercare status</div>
+        <div style={{ minHeight: 88, padding: 16, borderRadius: 22, background: C.white, boxShadow: C.shadow2, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Closed Projects</div>
+          <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800, color: C.amber }}>{closeRows.length}</div>
+          <div style={{ marginTop: 4, fontSize: 12, color: C.text2 }}>Projects moved into close / hypercare status</div>
         </div>
-        <div style={{ padding: 20, borderRadius: 22, background: C.primary, boxShadow: C.shadow2, color: '#fff' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.9 }}>Report Date</div>
-          <div style={{ marginTop: 10, fontSize: 24, fontWeight: 700 }}>{new Date().toLocaleDateString('en-GB')}</div>
-          <div style={{ marginTop: 6, fontSize: 13, opacity: 0.85 }}>Generated automatically from project data</div>
+        <div style={{ minHeight: 88, padding: 16, borderRadius: 22, background: C.primary, boxShadow: C.shadow2, color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.9 }}>Report Date</div>
+          <div style={{ marginTop: 8, fontSize: 22, fontWeight: 700 }}>{new Date().toLocaleDateString('en-GB')}</div>
+          <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>Generated automatically from project data</div>
         </div>
       </div>
 
