@@ -82,14 +82,16 @@ export default function Navbar() {
 
   const milestoneNotifications = milestones
     .filter((m) => String(m.status).toLowerCase() === 'pending')
+    .filter((m) => {
+      const due = parseDate(m.dueDate);
+      return due && due <= dueIn10;
+    })
     .map((m) => ({
       id: m.id,
       title: `Milestone : ${m.name}`,
       subtitle: m.billingDate
         ? `Billing ${m.billingDate}`
-        : m.dueDate
-          ? `Due ${m.dueDate}`
-          : 'Status pending',
+        : `Due ${m.dueDate}`,
       type: 'milestone',
     }));
 
