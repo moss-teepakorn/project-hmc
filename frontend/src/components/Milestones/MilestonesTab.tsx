@@ -247,6 +247,10 @@ function MilestoneModal({ data, phaseBudgetByPhase, isMobile, onClose, onSave }:
           }}
           options={PHASES.map(p => ({ value: p, label: p }))} />
       </FormRow>
+      <FormRow label="Status">
+        <Select value={form.status ?? 'pending'} onChange={v => up('status', v)}
+          options={[{ value: 'pending', label: 'Pending' }, { value: 'billed', label: 'Billed' }, { value: 'paid', label: 'Paid' }]} />
+      </FormRow>
       <FormRow label="Milestone Name" required>
         <Input autoFocus value={form.name ?? ''} onChange={v => up('name', v)} placeholder="e.g. Project Kickoff" />
       </FormRow>

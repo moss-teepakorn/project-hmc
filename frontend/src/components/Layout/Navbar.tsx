@@ -80,20 +80,20 @@ export default function Navbar() {
       type: 'task',
     }));
 
-  const billingNotifications = milestones
-    .filter((m) => m.status !== 'billed' && m.status !== 'paid')
-    .filter((m) => {
-      const bill = parseDate(m.billingDate);
-      return bill && bill <= dueIn10 && bill >= now;
-    })
+  const milestoneNotifications = milestones
+    .filter((m) => String(m.status).toLowerCase() === 'pending')
     .map((m) => ({
       id: m.id,
       title: `Milestone : ${m.name}`,
-      subtitle: `Billing ${m.billingDate}`,
+      subtitle: m.billingDate
+        ? `Billing ${m.billingDate}`
+        : m.dueDate
+          ? `Due ${m.dueDate}`
+          : 'Status pending',
       type: 'milestone',
     }));
 
-  const notifications = [...overdueTasks, ...upcomingTasks, ...billingNotifications];
+  const notifications = [...overdueTasks, ...upcomingTasks, ...milestoneNotifications];
 
   return (
     <nav style={{
