@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseISO, isValid } from 'date-fns';
 import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -42,8 +43,9 @@ export default function Navbar() {
   const commitId = String(commitIdRaw).slice(0, 8);
 
   const parseDate = (value: string) => {
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
+    if (!value) return null;
+    const d = parseISO(value);
+    return isValid(d) ? d : null;
   };
 
   const now = new Date();

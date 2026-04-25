@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { parseISO, isValid } from 'date-fns';
 import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Menu, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
@@ -48,8 +49,9 @@ export default function Dashboard() {
     dueIn10.setDate(dueIn10.getDate() + 10);
 
     const parseDate = (value: string) => {
-      const date = new Date(value);
-      return isNaN(date.getTime()) ? null : date;
+      if (!value) return null;
+      const date = parseISO(value);
+      return isValid(date) ? date : null;
     };
 
     const overdueTasks = tasks.filter((t) => {
