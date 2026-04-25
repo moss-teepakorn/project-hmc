@@ -112,12 +112,20 @@ export default function PortfolioReportSummary() {
 
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    doc.setFontSize(14);
-    doc.text('Portfolio Project Summary', 14, 14);
-    doc.setFontSize(9);
-    doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, 14, 20);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Portfolio Project Summary', 14, 16);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, 14, 22);
+    doc.setDrawColor(79, 70, 229);
+    doc.setLineWidth(0.8);
+    doc.line(14, 24, 286, 24);
 
     const renderGroup = (title: string, rows: SummaryRow[], yStart: number) => {
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.setTextColor(23, 34, 63);
       doc.text(`${title} (${rows.length})`, 14, yStart);
@@ -173,96 +181,118 @@ export default function PortfolioReportSummary() {
   };
 
   return (
-    <Card style={{ padding: 18, marginTop: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Project Summary Report</div>
-          <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Summary of all projects grouped by On Going and Close.</div>
+    <div style={{ width: '100%', minHeight: '100%', padding: isMobile ? '18px 16px 24px' : '24px 28px 32px', background: C.bg2, fontFamily: 'Poppins, sans-serif' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 18, marginBottom: 24 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800, color: C.text, lineHeight: 1.05 }}>Portfolio Project Summary</div>
+          <div style={{ marginTop: 10, fontSize: 14, color: C.text2, maxWidth: 680, lineHeight: 1.7 }}>
+            A polished overview of active and closed projects with payments, effort, issues, and change request status.
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Btn variant="ghost" small onClick={exportExcel}>Export Excel</Btn>
-          <Btn variant="ghost" small onClick={exportPDF}>Export PDF</Btn>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
+          <Btn variant="ghost" small onClick={exportExcel} style={{ minWidth: 112 }}>Export Excel</Btn>
+          <Btn variant="primary" small onClick={exportPDF} style={{ minWidth: 112 }}>Export PDF</Btn>
         </div>
       </div>
 
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-          <div style={{ padding: 12, background: C.bg, borderRadius: 12 }}>
-            <div style={{ fontSize: 11, color: C.text2 }}>On Going Projects</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: C.primary }}>{ongoingRows.length}</div>
-          </div>
-          <div style={{ padding: 12, background: C.bg, borderRadius: 12 }}>
-            <div style={{ fontSize: 11, color: C.text2 }}>Close Projects</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: C.amber }}>{closeRows.length}</div>
-          </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
+        <div style={{ padding: 20, borderRadius: 22, background: C.white, boxShadow: C.shadow2, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.text2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>On Going Projects</div>
+          <div style={{ marginTop: 10, fontSize: 32, fontWeight: 800, color: C.primary }}>{ongoingRows.length}</div>
+          <div style={{ marginTop: 6, fontSize: 13, color: C.text2 }}>Active projects still in progress</div>
+        </div>
+        <div style={{ padding: 20, borderRadius: 22, background: C.white, boxShadow: C.shadow2, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.text2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Closed Projects</div>
+          <div style={{ marginTop: 10, fontSize: 32, fontWeight: 800, color: C.amber }}>{closeRows.length}</div>
+          <div style={{ marginTop: 6, fontSize: 13, color: C.text2 }}>Projects moved into close / hypercare status</div>
+        </div>
+        <div style={{ padding: 20, borderRadius: 22, background: C.primary, boxShadow: C.shadow2, color: '#fff' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.9 }}>Report Date</div>
+          <div style={{ marginTop: 10, fontSize: 24, fontWeight: 700 }}>{new Date().toLocaleDateString('en-GB')}</div>
+          <div style={{ marginTop: 6, fontSize: 13, opacity: 0.85 }}>Generated automatically from project data</div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gap: 18 }}>
+      <div style={{ display: 'grid', gap: 24 }}>
         {[
           { title: 'On Going Projects', rows: ongoingRows },
           { title: 'Close Projects', rows: closeRows },
         ].map((group) => (
-          <div key={group.title}>
-            <div style={{ marginBottom: 10, fontSize: 12, fontWeight: 700, color: C.text }}>{group.title} ({group.rows.length})</div>
+          <div key={group.title} style={{ width: '100%' }}>
+            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{group.title}</div>
+                <div style={{ marginTop: 4, fontSize: 13, color: C.text2 }}>{group.rows.length} project{group.rows.length !== 1 ? 's' : ''} in this section.</div>
+              </div>
+            </div>
+
             {group.rows.length === 0 ? (
-              <Card style={{ padding: 16, textAlign: 'center', color: C.text3 }}>No projects</Card>
+              <Card style={{ padding: 24, textAlign: 'center', color: C.text3, background: C.white, borderRadius: 20, boxShadow: C.shadow2, border: `1px solid ${C.border}` }}>No projects in this group.</Card>
             ) : isMobile ? (
-              <div style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'grid', gap: 16 }}>
                 {group.rows.map((row) => (
-                  <Card key={row.projectId} style={{ padding: 14 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>{row.projectName}</div>
-                        <div style={{ fontSize: 11, color: C.text2, marginBottom: 4 }}>{row.client}</div>
-                        <div style={{ fontSize: 11, color: C.text2 }}>{row.projectId}</div>
+                  <div key={row.projectId} style={{ padding: 20, borderRadius: 20, background: C.white, border: `1px solid ${C.border}`, boxShadow: C.shadow2, minWidth: 0 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{row.projectName}</div>
+                        <div style={{ marginTop: 6, fontSize: 12, color: C.text2 }}>{row.projectId} • {row.client}</div>
                       </div>
-                      <div style={{ display: 'grid', gap: 4, minWidth: 120, textAlign: 'right' }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: C.primary }}>{row.status}</div>
-                        <div style={{ fontSize: 10, color: C.text2 }}>{row.startDate} - {row.endDate}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                        <div style={{ padding: '6px 10px', borderRadius: 999, background: C.primaryBg, color: C.primary, fontSize: 11, fontWeight: 700 }}>{row.status}</div>
+                        <div style={{ color: C.text2, fontSize: 12 }}>{row.startDate} — {row.endDate}</div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        {[
+                          { label: 'Payments', value: row.paymentCollected },
+                          { label: 'Effort', value: row.effortUsed },
+                          { label: 'Open Issues', value: String(row.openIssues) },
+                          { label: 'Closed CRs', value: `${row.closedCRs}/${row.totalCRs}` },
+                        ].map((item) => (
+                          <div key={item.label} style={{ padding: 14, borderRadius: 16, background: C.bg, minHeight: 72 }}>
+                            <div style={{ fontSize: 11, color: C.text2, fontWeight: 700, marginBottom: 4 }}>{item.label}</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{item.value}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
-                      <div style={{ fontSize: 11, color: C.text2 }}><strong style={{ color: C.text }}>Payments</strong><br />{row.paymentCollected}</div>
-                      <div style={{ fontSize: 11, color: C.text2 }}><strong style={{ color: C.text }}>Effort</strong><br />{row.effortUsed}</div>
-                      <div style={{ fontSize: 11, color: C.text2 }}><strong style={{ color: C.text }}>Open Issues</strong><br />{row.openIssues}</div>
-                      <div style={{ fontSize: 11, color: C.text2 }}><strong style={{ color: C.text }}>Closed CRs</strong><br />{row.closedCRs}/{row.totalCRs}</div>
-                    </div>
-                  </Card>
+                  </div>
                 ))}
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: C.bg }}>
-                      {['Project ID', 'Project Name', 'Client', 'Start Date', 'End Date', 'Status', 'Payments', 'Effort', 'Open Issues', 'Closed CRs'].map((label) => (
-                        <th key={label} style={{ ...TH, padding: '10px 12px', fontSize: 11, textAlign: 'left' }}>{label}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.rows.map((row, index) => (
-                      <tr key={row.projectId} style={{ background: index % 2 === 0 ? C.white : C.bg }}>
-                        <td style={{ ...TD, padding: '10px 12px', fontWeight: 700 }}>{row.projectId}</td>
-                        <td style={{ ...TD, padding: '10px 12px' }}>{row.projectName}</td>
-                        <td style={{ ...TD, padding: '10px 12px' }}>{row.client}</td>
-                        <td style={{ ...TD, padding: '10px 12px' }}>{row.startDate}</td>
-                        <td style={{ ...TD, padding: '10px 12px' }}>{row.endDate}</td>
-                        <td style={{ ...TD, padding: '10px 12px' }}>{row.status}</td>
-                        <td style={{ ...TD, padding: '10px 12px' }}>{row.paymentCollected}</td>
-                        <td style={{ ...TD, padding: '10px 12px' }}>{row.effortUsed}</td>
-                        <td style={{ ...TD, padding: '10px 12px' }}>{row.openIssues}</td>
-                        <td style={{ ...TD, padding: '10px 12px' }}>{row.closedCRs}/{row.totalCRs}</td>
+                <div style={{ minWidth: 1080, borderRadius: 20, overflow: 'hidden', border: `1px solid ${C.border}`, boxShadow: C.shadow2, background: C.white }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: C.primary, color: '#fff' }}>
+                        {['Project ID', 'Project Name', 'Client', 'Start Date', 'End Date', 'Status', 'Payments', 'Effort', 'Open Issues', 'Closed CRs'].map((label) => (
+                          <th key={label} style={{ textAlign: 'left', padding: '14px 16px', fontSize: 12, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', borderBottom: `1px solid ${C.primary}` }}>{label}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {group.rows.map((row, index) => (
+                        <tr key={row.projectId} style={{ background: index % 2 === 0 ? '#fff' : C.bg }}>
+                          <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 700, color: C.text }}>{row.projectId}</td>
+                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text }}>{row.projectName}</td>
+                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.client}</td>
+                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.startDate}</td>
+                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.endDate}</td>
+                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.primary, fontWeight: 700 }}>{row.status}</td>
+                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.paymentCollected}</td>
+                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.effortUsed}</td>
+                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.openIssues}</td>
+                          <td style={{ padding: '14px 16px', fontSize: 13, color: C.text2 }}>{row.closedCRs}/{row.totalCRs}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }
