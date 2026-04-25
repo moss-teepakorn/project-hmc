@@ -35,7 +35,7 @@ interface Store {
   updateMember:    (id: string, m: Partial<Member>) => Promise<void>;
   deleteMember:    (id: string) => Promise<void>;
 
-  fetchMilestones: (pid: string) => Promise<void>;
+  fetchMilestones: (pid?: string) => Promise<void>;
   createMilestone: (m: Partial<Milestone>) => Promise<void>;
   updateMilestone: (id: string, m: Partial<Milestone>) => Promise<void>;
   deleteMilestone: (id: string) => Promise<void>;

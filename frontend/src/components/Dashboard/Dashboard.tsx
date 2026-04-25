@@ -11,7 +11,7 @@ import PortfolioReportSummary from './PortfolioReportSummary';
 const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care'];
 
 export default function Dashboard() {
-  const { projects, tasks, issues, risks, changeRequests, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts } = useStore();
+  const { projects, tasks, milestones, issues, risks, changeRequests, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts } = useStore();
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [selected,   setSelected]   = useState<Project | null>(null);
@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [showHypercare, setShowHypercare] = useState(false);
   const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>('overview');
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [notificationsShown, setNotificationsShown] = useState(false);
   const isMobile = windowWidth < 768;
 
   React.useEffect(() => {
@@ -33,8 +34,67 @@ export default function Dashboard() {
   React.useEffect(() => {
     // Load all tasks once so progress % can show for all project cards in portfolio overview.
     fetchTasks();
-  }, [fetchTasks]);
+    fetchMilestones();
+  }, [fetchTasks, fetchMilestones]);
   
+  React.useEffect(() => {
+    if (notificationsShown) return;
+    if (!tasks.length && !milestones.length) return;
+
+    const now = new Date();
+    const endIn7 = new Date(now);
+    endIn7.setDate(endIn7.getDate() + 7);
+    const dueIn10 = new Date(now);
+    dueIn10.setDate(dueIn10.getDate() + 10);
+
+    const parseDate = (value: string) => {
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? null : date;
+    };
+
+    const overdueTasks = tasks.filter((t) => {
+      const due = parseDate(t.endDate);
+      return due && t.percentComplete < 100 && due < now;
+    });
+    const upcomingTasks = tasks.filter((t) => {
+      const due = parseDate(t.endDate);
+      return due && t.percentComplete < 100 && due >= now && due <= endIn7;
+    });
+    const billingWarnings = milestones.filter((m) => {
+      const bill = parseDate(m.billingDate);
+      return bill && m.status !== 'billed' && m.status !== 'paid' && bill <= dueIn10;
+    });
+
+    const messages: string[] = [];
+    if (overdueTasks.length) messages.push(`มี ${overdueTasks.length} แผนงานเกินกำหนดที่ยังไม่เสร็จ`);
+    if (upcomingTasks.length) messages.push(`มี ${upcomingTasks.length} แผนงานที่ใกล้ครบใน 7 วัน`);
+    if (billingWarnings.length) messages.push(`มี ${billingWarnings.length} milestone ที่ยังไม่ billing ในอีก 10 วัน`);
+
+    if (messages.length > 0) {
+      toast.custom((t) => (
+        <div style={{
+          padding: 14,
+          background: C.white,
+          border: `1px solid ${C.border}`,
+          borderRadius: 14,
+          boxShadow: C.shadow,
+          fontFamily: 'Poppins, sans-serif',
+          color: C.text,
+          maxWidth: 360,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>แจ้งเตือนโปรเจกต์</div>
+          {messages.map((msg) => (
+            <div key={msg} style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 4 }}>
+              {msg}
+            </div>
+          ))}
+          <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>ตรวจสอบได้ในหน้า Portfolio Overview หรือ Milestones</div>
+        </div>
+      ));
+    }
+    setNotificationsShown(true);
+  }, [tasks, milestones, notificationsShown]);
+
   // Fetch data when project selected
   React.useEffect(() => {
     if (selected?.id) {
