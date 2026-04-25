@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -14,6 +14,7 @@ interface SummaryRow {
   client: string;
   startDate: string;
   endDate: string;
+  startIso: string;
   status: string;
   paymentCollected: string;
   effortUsed: string;
@@ -26,7 +27,14 @@ const CLOSED_STATUSES = ['Close'] as const;
 const OPEN_ISSUE_STATUSES = ['Open', 'In Progress'] as const;
 
 export default function PortfolioReportSummary() {
-  const { projects, milestones, efforts, issues, changeRequests } = useStore();
+  const { projects, milestones, efforts, issues, changeRequests, fetchMilestones, fetchEfforts, fetchIssues, fetchCRs } = useStore();
+
+  useEffect(() => {
+    fetchMilestones('');
+    fetchEfforts('');
+    fetchIssues('');
+    fetchCRs('');
+  }, [fetchMilestones, fetchEfforts, fetchIssues, fetchCRs]);
 
   const reportRows = useMemo(() => {
     return projects.map((project) => {
@@ -50,6 +58,7 @@ export default function PortfolioReportSummary() {
         client: project.client || '-',
         startDate: fmtDate(project.startDate),
         endDate: fmtDate(project.endDate),
+        startIso: project.startDate,
         status: project.status || 'Unknown',
         paymentCollected: `${collectedCount}/${totalMilestones}`,
         effortUsed: `${effortUsed}/${effortBudget}`,
@@ -57,7 +66,7 @@ export default function PortfolioReportSummary() {
         closedCRs: closedCRCount,
         totalCRs: projectCRs.length,
       };
-    }).sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    }).sort((a, b) => new Date(a.startIso).getTime() - new Date(b.startIso).getTime());
   }, [projects, milestones, efforts, issues, changeRequests]);
 
   const ongoingRows = reportRows.filter((row) => row.status !== 'Hyper Care');

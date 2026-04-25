@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Home } from 'lucide-react';
 import { Badge, Tabs, C, PROJECT_STATUS } from '../Common';
 import { fmtDate } from '../../utils';
 import type { Project } from '../../types';
@@ -92,16 +92,17 @@ export default function ProjectDetail({ project }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {isMobile && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.primary, borderBottom: `1px solid ${C.border}`, color: '#fff', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px', background: C.primary, borderBottom: `1px solid ${C.border}`, color: '#fff', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             onClick={() => setActiveProject(null)}
             style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, border: 'none', background: '#fff', color: C.primary, cursor: 'pointer' }}>
-            <ChevronLeft size={18} />
+            <Home size={18} />
           </button>
           <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Project Details</span>
         </div>
-      )}
+        {isMobile && <div style={{ width: 34, height: 34 }} />}
+      </div>
       <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
         <div style={{ padding: isMobile ? '12px 16px 0' : '14px 24px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
