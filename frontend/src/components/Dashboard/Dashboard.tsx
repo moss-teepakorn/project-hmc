@@ -62,15 +62,15 @@ export default function Dashboard() {
       const due = parseDate(t.endDate);
       return due && t.percentComplete < 100 && due >= now && due <= endIn7;
     });
-    const billingWarnings = milestones.filter((m) => {
-      const bill = parseDate(m.billingDate);
-      return bill && m.status !== 'billed' && m.status !== 'paid' && bill <= dueIn10;
+    const dueMilestones = milestones.filter((m) => {
+      const due = parseDate(m.dueDate);
+      return String(m.status).toLowerCase() === 'pending' && due && due <= dueIn10;
     });
 
     const messages: string[] = [];
     if (overdueTasks.length) messages.push(`มี ${overdueTasks.length} แผนงานเกินกำหนดที่ยังไม่เสร็จ`);
     if (upcomingTasks.length) messages.push(`มี ${upcomingTasks.length} แผนงานที่ใกล้ครบใน 7 วัน`);
-    if (billingWarnings.length) messages.push(`มี ${billingWarnings.length} milestone ที่ยังไม่ billing ในอีก 10 วัน`);
+    if (dueMilestones.length) messages.push(`มี ${dueMilestones.length} milestone ที่กำลังจะครบหรือเลย Due Date ภายใน 10 วัน`);
 
     if (messages.length > 0) {
       toast.custom((t) => (
