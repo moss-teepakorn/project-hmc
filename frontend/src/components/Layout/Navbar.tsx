@@ -3,15 +3,17 @@ import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { C } from '../Common';
-import { Home, LogOut, Moon, Sun } from 'lucide-react';
+import { Bell, Home, LogOut, Moon, Sun } from 'lucide-react';
 
 const F = 'Poppins, sans-serif';
 
 export default function Navbar() {
-  const { activeProject, setActiveProject, projects } = useStore();
+  const { activeProject, setActiveProject, projects, tasks, milestones } = useStore();
   const { user, profile, signOut, configured } = useAuth();
   const { theme, toggle } = useTheme();
   const [isMobile, setIsMobile] = React.useState(false);
+  const [notifyOpen, setNotifyOpen] = React.useState(false);
+  const bellRef = React.useRef<HTMLDivElement | null>(null);
   const isDark = theme === 'dark';
 
   React.useEffect(() => {
@@ -21,12 +23,75 @@ export default function Navbar() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  React.useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (!notifyOpen) return;
+      if (bellRef.current && !bellRef.current.contains(event.target as Node)) {
+        setNotifyOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [notifyOpen]);
+
   const navBg = isDark ? '#1E293B' : C.white;
   const navBorder = isDark ? '#334155' : C.border;
   const textColor = isDark ? '#F1F5F9' : C.text;
   const textMuted = isDark ? '#94A3B8' : C.text3;
   const commitIdRaw = (import.meta as any).env?.VITE_COMMIT_ID || 'local';
   const commitId = String(commitIdRaw).slice(0, 8);
+
+  const parseDate = (value: string) => {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const now = new Date();
+  const endIn7 = new Date(now);
+  endIn7.setDate(endIn7.getDate() + 7);
+  const dueIn10 = new Date(now);
+  dueIn10.setDate(dueIn10.getDate() + 10);
+
+  const upcomingTasks = tasks
+    .filter((t) => t.percentComplete < 100)
+    .filter((t) => {
+      const due = parseDate(t.endDate);
+      return due && due >= now && due <= endIn7;
+    })
+    .map((t) => ({
+      id: t.id,
+      title: `งานใกล้ครบ ${t.taskName}`,
+      subtitle: `Due ${t.endDate}`,
+      type: 'task',
+    }));
+
+  const overdueTasks = tasks
+    .filter((t) => t.percentComplete < 100)
+    .filter((t) => {
+      const due = parseDate(t.endDate);
+      return due && due < now;
+    })
+    .map((t) => ({
+      id: t.id,
+      title: `งานเลยกำหนด ${t.taskName}`,
+      subtitle: `Due ${t.endDate}`,
+      type: 'task',
+    }));
+
+  const billingNotifications = milestones
+    .filter((m) => m.status !== 'billed' && m.status !== 'paid')
+    .filter((m) => {
+      const bill = parseDate(m.billingDate);
+      return bill && bill <= dueIn10 && bill >= now;
+    })
+    .map((m) => ({
+      id: m.id,
+      title: `Milestone ยังไม่ billing: ${m.name}`,
+      subtitle: `Billing ${m.billingDate}`,
+      type: 'milestone',
+    }));
+
+  const notifications = [...overdueTasks, ...upcomingTasks, ...billingNotifications];
 
   return (
     <nav style={{
@@ -73,8 +138,8 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* Right: theme toggle + auth */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, fontFamily: F }}>
+      {/* Right: notifications, theme toggle + auth */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, fontFamily: F, position: 'relative' }}>
         {!isMobile && (
           <>
             <span style={{ color: textMuted }}>
@@ -85,6 +150,54 @@ export default function Navbar() {
             </span>
           </>
         )}
+
+        <div ref={bellRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setNotifyOpen((open) => !open)}
+            title="Notifications"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 34, height: 34, borderRadius: 10,
+              background: isDark ? '#334155' : '#F8FAFC',
+              border: `1px solid ${isDark ? '#475569' : '#E2E8F0'}`,
+              cursor: 'pointer', color: isDark ? '#F8FAFC' : '#475569',
+              position: 'relative',
+            }}
+          >
+            <Bell size={18} />
+            {notifications.length > 0 && (
+              <span style={{
+                position: 'absolute', top: 4, right: 4,
+                minWidth: 16, height: 16, borderRadius: 999,
+                background: C.red, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 700, padding: '0 4px'
+              }}>
+                {notifications.length}
+              </span>
+            )}
+          </button>
+          {notifyOpen && (
+            <div style={{
+              position: 'absolute', right: 0, top: 42, width: isMobile ? 'calc(100vw - 32px)' : 320,
+              background: C.white, border: `1px solid ${C.border}`, borderRadius: 18,
+              boxShadow: C.shadow2, zIndex: 300, padding: 12,
+              maxHeight: 360, overflowY: 'auto'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Notifications</div>
+                <span style={{ fontSize: 11, color: C.text3 }}>{notifications.length} รายการ</span>
+              </div>
+              {notifications.length === 0 ? (
+                <div style={{ color: C.text2, fontSize: 12 }}>ไม่มีการแจ้งเตือนใหม่</div>
+              ) : notifications.map((item) => (
+                <div key={item.id} style={{ padding: '10px 10px 8px', borderBottom: `1px solid ${C.bg}`, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{item.title}</div>
+                  <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{item.subtitle}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Dark/Light mode toggle */}
         <button
