@@ -92,15 +92,6 @@ export default function ProjectDetail({ project }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px', background: C.primary, borderBottom: `1px solid ${C.border}`, color: '#fff', flexShrink: 0 }}>
-        <button
-          onClick={() => setActiveProject(null)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, border: 'none', background: '#fff', color: C.primary, cursor: 'pointer', fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
-          <Home size={18} />
-          Workplaze
-        </button>
-        {isMobile && <div style={{ width: 34, height: 34 }} />}
-      </div>
       <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
         <div style={{ padding: isMobile ? '12px 16px 0' : '14px 24px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>

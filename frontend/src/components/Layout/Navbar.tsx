@@ -37,7 +37,10 @@ export default function Navbar() {
       position: 'sticky', top: 0, zIndex: 100,
     }}>
       {/* Brand */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div
+        onClick={() => setActiveProject(null)}
+        title="Go home"
+        style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
         <div style={{
           width: 32, height: 32, borderRadius: 9,
           background: `linear-gradient(135deg, ${C.primary}, #818CF8)`,
