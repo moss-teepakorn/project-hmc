@@ -92,18 +92,52 @@ export const getHalfMonthSnapshotDates = (startDateStr: string, endDateStr: stri
   return dates.filter((value, index, self) => self.indexOf(value) === index);
 };
 
-export const computeBaselineProgress = (tasks: Task[], snapshotDates: string[]) => {
-  const validTasks = tasks.filter((task) => task.startDate && task.endDate && task.duration > 0);
-  const totalWeight = validTasks.reduce((sum, task) => sum + task.duration, 0) || validTasks.length;
+export interface BaselineProgressRow {
+  baselineDate: string;
+  plannedWorkingDaysInPeriod: number;
+  accumulatedPlannedWorkingDays: number;
+  totalPlannedWorkingDays: number;
+  baselinePercent: number;
+}
+
+const isChildWbsTask = (task: Task) => String(task.wbs || '').trim().includes('.');
+
+export const computeBaselineProgress = (tasks: Task[], snapshotDates: string[]): BaselineProgressRow[] => {
+  const childTasks = tasks.filter((task) => task.startDate && task.endDate && isChildWbsTask(task));
+  const taskPlans = childTasks.map((task) => {
+    const planned = calcDuration(task.startDate, task.endDate);
+    return { task, planned };
+  }).filter((item) => item.planned > 0);
+
+  const totalPlannedWorkingDays = taskPlans.reduce((sum, item) => sum + item.planned, 0);
+  let previousAccumulated = 0;
+
   return snapshotDates.map((snapshot) => {
     const snapshotDate = parseISO(snapshot);
-    const completedWeight = validTasks
-      .filter((task) => {
-        const taskEnd = parseISO(task.endDate);
-        return isValid(taskEnd) && taskEnd <= snapshotDate;
-      })
-      .reduce((sum, task) => sum + task.duration, 0);
-    return totalWeight > 0 ? Math.min(100, Math.round((completedWeight / totalWeight) * 100)) : 0;
+    const accumulatedPlannedWorkingDays = taskPlans.reduce((sum, item) => {
+      const start = parseISO(item.task.startDate);
+      const end = parseISO(item.task.endDate);
+      if (!isValid(start) || !isValid(end) || end < start || !isValid(snapshotDate)) return sum;
+      if (snapshotDate < start) return sum;
+      const cutoff = snapshotDate <= end ? snapshotDate : end;
+      const countedDays = calcDuration(format(start, 'yyyy-MM-dd'), format(cutoff, 'yyyy-MM-dd'));
+      return sum + countedDays;
+    }, 0);
+
+    const baselinePercent = totalPlannedWorkingDays > 0
+      ? Math.min(100, Math.round((accumulatedPlannedWorkingDays / totalPlannedWorkingDays) * 100))
+      : 0;
+
+    const plannedWorkingDaysInPeriod = Math.max(0, accumulatedPlannedWorkingDays - previousAccumulated);
+    previousAccumulated = accumulatedPlannedWorkingDays;
+
+    return {
+      baselineDate: snapshot,
+      plannedWorkingDaysInPeriod,
+      accumulatedPlannedWorkingDays,
+      totalPlannedWorkingDays,
+      baselinePercent,
+    };
   });
 };
 

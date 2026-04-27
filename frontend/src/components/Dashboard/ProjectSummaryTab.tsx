@@ -70,13 +70,7 @@ export default function ProjectSummaryTab({ project }: Props) {
     [project.startDate, project.endDate],
   );
 
-  const baselineProgress = useMemo(() => {
-    const computed = computeBaselineProgress(projectTasks, snapshotDates);
-    if (snapshotDates.length > 0 && snapshotDates[snapshotDates.length - 1] === project.endDate) {
-      computed[snapshotDates.length - 1] = 100;
-    }
-    return computed;
-  }, [projectTasks, snapshotDates, project.endDate]);
+  const baselineProgress = useMemo(() => computeBaselineProgress(projectTasks, snapshotDates), [projectTasks, snapshotDates]);
 
   const savedByDate = useMemo(() => {
     const map = new Map<string, ProjectProgressSnapshot>();
@@ -89,7 +83,7 @@ export default function ProjectSummaryTab({ project }: Props) {
   const rows = useMemo(() => snapshotDates.map((date, index) => {
     const saved = savedByDate.get(date);
     const draft = drafts[date];
-    const baselinePercent = baselineProgress[index] ?? 0;
+    const baselinePercent = baselineProgress[index]?.baselinePercent ?? 0;
     const originalActualInput = saved ? String(saved.actualPercent ?? 0) : '';
     const actualInput = draft?.actualPercent ?? originalActualInput;
     const actualPercent = actualInput.trim() === '' ? 0 : Number(actualInput);
@@ -137,7 +131,7 @@ export default function ProjectSummaryTab({ project }: Props) {
         id: saved?.id,
         projectId: project.id,
         snapshotDate: date,
-        baselinePercent: baselineProgress[snapshotDates.indexOf(date)] ?? 0,
+        baselinePercent: baselineProgress[snapshotDates.indexOf(date)]?.baselinePercent ?? 0,
         actualPercent: draft?.actualPercent?.trim() === ''
           ? 0
           : Number(draft?.actualPercent ?? saved?.actualPercent ?? 0),
@@ -194,7 +188,7 @@ export default function ProjectSummaryTab({ project }: Props) {
           id: saved?.id,
           projectId: project.id,
           snapshotDate,
-          baselinePercent: baselineProgress[index] ?? 0,
+          baselinePercent: baselineProgress[index]?.baselinePercent ?? 0,
           actualPercent: draft?.actualPercent?.trim() === ''
             ? 0
             : Number(draft?.actualPercent ?? saved?.actualPercent ?? 0),
