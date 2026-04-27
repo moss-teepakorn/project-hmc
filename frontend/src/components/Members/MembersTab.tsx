@@ -98,13 +98,42 @@ export default function MembersTab({ projectId }: Props) {
     }
   };
 
+  const formatPhoneNumber = (value?: string) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const hasPlus = raw.startsWith('+');
+    const digits = raw.replace(/[^0-9]/g, '');
+    if (!digits) return '';
+
+    const formatGroups = (nums: string) => {
+      if (nums.length <= 4) return nums;
+      if (nums.length <= 7) return `${nums.slice(0, nums.length - 4)}-${nums.slice(-4)}`;
+      const last4 = nums.slice(-4);
+      const middle = nums.slice(-7, -4);
+      const prefix = nums.slice(0, nums.length - 7);
+      return `${prefix}-${middle}-${last4}`;
+    };
+
+    if (hasPlus) {
+      return `+${formatGroups(digits)}`;
+    }
+
+    if (digits.length === 10) {
+      return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+
+    return formatGroups(digits);
+  };
+
   const handleSave = async (form: Partial<Member>) => {
     try {
+      const normalizedTel = formatPhoneNumber(form.tel);
+      const payload = { ...form, tel: normalizedTel, projectId };
       if (form.id) {
-        await updateMember(form.id, { ...form, projectId });
+        await updateMember(form.id, payload);
         toast.success('Member updated');
       } else {
-        await createMember({ ...form, projectId });
+        await createMember(payload);
         toast.success('Member added');
         if (form.email) await syncMemberEmail(form.email);
       }
