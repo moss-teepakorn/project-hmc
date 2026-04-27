@@ -16,6 +16,33 @@ export const ROLES = [
 
 interface Props { projectId: string; }
 
+const formatPhoneNumber = (value?: string) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const hasPlus = raw.startsWith('+');
+  const digits = raw.replace(/[^0-9]/g, '');
+  if (!digits) return '';
+
+  const formatGroups = (nums: string) => {
+    if (nums.length <= 4) return nums;
+    if (nums.length <= 7) return `${nums.slice(0, nums.length - 4)}-${nums.slice(-4)}`;
+    const last4 = nums.slice(-4);
+    const middle = nums.slice(-7, -4);
+    const prefix = nums.slice(0, nums.length - 7);
+    return `${prefix}-${middle}-${last4}`;
+  };
+
+  if (hasPlus) {
+    return `+${formatGroups(digits)}`;
+  }
+
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  return formatGroups(digits);
+};
+
 export default function MembersTab({ projectId }: Props) {
   const { members, fetchMembers, createMember, updateMember, deleteMember } = useStore();
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -355,7 +382,7 @@ function MemberModal({ data, currentUserRole, onClose, onSave }: { data: Partial
         <FormRow label="Position"><Input value={form.position ?? ''} onChange={v => up('position', v)} placeholder="e.g. Senior Developer" /></FormRow>
       </div>
       <FormRow label="Email"><Input type="email" value={form.email ?? ''} onChange={v => up('email', v)} placeholder="email@example.com" /></FormRow>
-      <FormRow label="Tel"><Input value={form.tel ?? ''} onChange={v => up('tel', v)} placeholder="+66-81-234-5678" /></FormRow>
+      <FormRow label="Tel"><Input type="tel" value={form.tel ?? ''} onChange={v => up('tel', formatPhoneNumber(v))} placeholder="+66-81-234-5678" /></FormRow>
       <FormRow label="Notes"><Textarea value={form.notes ?? ''} onChange={v => up('notes', v)} rows={2} placeholder="Additional remarks…" /></FormRow>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
