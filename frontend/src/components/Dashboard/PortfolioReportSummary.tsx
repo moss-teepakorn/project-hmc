@@ -12,6 +12,7 @@ interface SummaryRow {
   projectId: string;
   projectName: string;
   client: string;
+  overall: number;
   startDate: string;
   endDate: string;
   startIso: string;
@@ -27,7 +28,7 @@ const CLOSED_STATUSES = ['Close'] as const;
 const OPEN_ISSUE_STATUSES = ['Open', 'In Progress'] as const;
 
 export default function PortfolioReportSummary() {
-  const { projects, milestones, efforts, issues, changeRequests, fetchMilestones, fetchEfforts, fetchIssues, fetchCRs } = useStore();
+  const { projects, tasks, milestones, efforts, issues, changeRequests, fetchTasks, fetchMilestones, fetchEfforts, fetchIssues, fetchCRs } = useStore();
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
 
@@ -38,11 +39,12 @@ export default function PortfolioReportSummary() {
   }, []);
 
   useEffect(() => {
+    fetchTasks('');
     fetchMilestones('');
     fetchEfforts('');
     fetchIssues('');
     fetchCRs('');
-  }, [fetchMilestones, fetchEfforts, fetchIssues, fetchCRs]);
+  }, [fetchTasks, fetchMilestones, fetchEfforts, fetchIssues, fetchCRs]);
 
   const reportRows = useMemo(() => {
     return projects.map((project) => {
@@ -60,10 +62,16 @@ export default function PortfolioReportSummary() {
       const projectCRs = changeRequests.filter((c) => c.projectId === project.id);
       const closedCRCount = projectCRs.filter((c) => CLOSED_STATUSES.includes(c.status as any)).length;
 
+      const projectTasks = tasks.filter((t) => t.projectId === project.id && !t.parentId);
+      const overall = projectTasks.length
+        ? Math.round(projectTasks.reduce((sum, t) => sum + t.percentComplete, 0) / projectTasks.length)
+        : 0;
+
       return {
         projectId: String(project.code || project.id || '-'),
         projectName: project.name || '-',
         client: project.client || '-',
+        overall,
         startDate: fmtDate(project.startDate),
         endDate: fmtDate(project.endDate),
         startIso: project.startDate,
@@ -75,7 +83,7 @@ export default function PortfolioReportSummary() {
         totalCRs: projectCRs.length,
       };
     }).sort((a, b) => new Date(a.startIso).getTime() - new Date(b.startIso).getTime());
-  }, [projects, milestones, efforts, issues, changeRequests]);
+  }, [projects, milestones, efforts, issues, changeRequests, tasks]);
 
   const ongoingRows = reportRows.filter((row) => row.status !== 'Hyper Care');
   const closeRows = reportRows.filter((row) => row.status === 'Hyper Care');
@@ -83,11 +91,12 @@ export default function PortfolioReportSummary() {
   const exportExcel = () => {
     const buildSheet = (rows: SummaryRow[]) => {
       const data = [
-        ['Project ID', 'Project Name', 'Client', 'Start Date', 'End Date', 'Status', 'Payments Collected / Total', 'Effort Used / Total', 'Open Issues', 'Closed CRs / Total CRs'],
+        ['Project ID', 'Project Name', 'Client', 'Overall %', 'Start Date', 'End Date', 'Status', 'Payments Collected / Total', 'Effort Used / Total', 'Open Issues', 'Closed CRs / Total CRs'],
         ...rows.map((row) => [
           row.projectId,
           row.projectName,
           row.client,
+          `${row.overall}%`,
           row.startDate,
           row.endDate,
           row.status,
@@ -138,6 +147,7 @@ export default function PortfolioReportSummary() {
         row.projectId,
         row.projectName,
         row.client,
+        `${row.overall}%`,
         row.startDate,
         row.endDate,
         row.status,
@@ -149,7 +159,7 @@ export default function PortfolioReportSummary() {
       autoTable(doc, {
         startY: yStart + 4,
         head: [[
-          'Project ID', 'Project Name', 'Client', 'Start Date', 'End Date', 'Status', 'Payments', 'Effort', 'Open Issues', 'Closed CRs',
+          'Project ID', 'Project Name', 'Client', 'Overall %', 'Start Date', 'End Date', 'Status', 'Payments', 'Effort', 'Open Issues', 'Closed CRs',
         ]],
         body,
         theme: 'grid',
@@ -157,16 +167,17 @@ export default function PortfolioReportSummary() {
         headStyles: { fillColor: [238, 241, 246], textColor: 36, fontSize: 8 },
         styles: { fontSize: 8, cellPadding: 3 },
         columnStyles: {
-          0: { cellWidth: 28 },
-          1: { cellWidth: 55 },
-          2: { cellWidth: 45 },
+          0: { cellWidth: 24 },
+          1: { cellWidth: 50 },
+          2: { cellWidth: 40 },
           3: { cellWidth: 18 },
           4: { cellWidth: 18 },
           5: { cellWidth: 18 },
-          6: { cellWidth: 22 },
-          7: { cellWidth: 24 },
-          8: { cellWidth: 18 },
-          9: { cellWidth: 32 },
+          6: { cellWidth: 18 },
+          7: { cellWidth: 22 },
+          8: { cellWidth: 24 },
+          9: { cellWidth: 18 },
+          10: { cellWidth: 28 },
         },
         margin: { left: 10, right: 10 },
       });
@@ -240,6 +251,7 @@ export default function PortfolioReportSummary() {
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         {[
+                          { label: 'Overall', value: `${row.overall}%` },
                           { label: 'Payments', value: row.paymentCollected },
                           { label: 'Effort', value: row.effortUsed },
                           { label: 'Open Issues', value: String(row.openIssues) },
@@ -261,7 +273,7 @@ export default function PortfolioReportSummary() {
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: C.bg2, color: C.text2 }}>
-                        {['Project ID', 'Project Name', 'Client', 'Start Date', 'End Date', 'Status', 'Payments', 'Effort', 'Open Issues', 'Closed CRs'].map((label) => (
+                        {['Project ID', 'Project Name', 'Client', 'Overall %', 'Start Date', 'End Date', 'Status', 'Payments', 'Effort', 'Open Issues', 'Closed CRs'].map((label) => (
                           <th key={label} style={{ textAlign: 'left', padding: '12px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', borderBottom: `1px solid ${C.border}` }}>{label}</th>
                         ))}
                       </tr>
@@ -272,6 +284,7 @@ export default function PortfolioReportSummary() {
                           <td style={{ padding: '12px 14px', fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.6 }}>{row.projectId}</td>
                           <td style={{ padding: '12px 14px', fontSize: 12, color: C.text, lineHeight: 1.6 }}>{row.projectName}</td>
                           <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2, lineHeight: 1.6 }}>{row.client}</td>
+                          <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2, lineHeight: 1.6 }}>{row.overall}%</td>
                           <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2, lineHeight: 1.6 }}>{row.startDate}</td>
                           <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2, lineHeight: 1.6 }}>{row.endDate}</td>
                           <td style={{ padding: '12px 14px', fontSize: 12, color: C.primary, fontWeight: 700, lineHeight: 1.6 }}>{row.status}</td>
