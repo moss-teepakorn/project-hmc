@@ -57,6 +57,7 @@ export interface Member {
   position: string;      // ← new
   email: string;
   tel: string;
+  ext: string;
   type: 'internal' | 'client';
   notes: string;         // ← new
 }

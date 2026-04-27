@@ -36,6 +36,14 @@ const formatPhoneNumber = (value?: string) => {
     return `+${formatGroups(digits)}`;
   }
 
+  if (digits.startsWith('0') && digits.length === 9) {
+    return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
+  }
+
+  if (digits.startsWith('0') && digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
   if (digits.length === 10) {
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
   }
@@ -125,42 +133,20 @@ export default function MembersTab({ projectId }: Props) {
     }
   };
 
-  const formatPhoneNumber = (value?: string) => {
-    const raw = String(value || '').trim();
-    if (!raw) return '';
-    const hasPlus = raw.startsWith('+');
-    const digits = raw.replace(/[^0-9]/g, '');
-    if (!digits) return '';
-
-    const formatGroups = (nums: string) => {
-      if (nums.length <= 4) return nums;
-      if (nums.length <= 7) return `${nums.slice(0, nums.length - 4)}-${nums.slice(-4)}`;
-      const last4 = nums.slice(-4);
-      const middle = nums.slice(-7, -4);
-      const prefix = nums.slice(0, nums.length - 7);
-      return `${prefix}-${middle}-${last4}`;
-    };
-
-    if (hasPlus) {
-      return `+${formatGroups(digits)}`;
-    }
-
-    if (digits.length === 10) {
-      return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-    }
-
-    return formatGroups(digits);
-  };
-
   const handleSave = async (form: Partial<Member>) => {
     try {
       const normalizedTel = formatPhoneNumber(form.tel);
-      const payload = { ...form, tel: normalizedTel, projectId };
+      const normalizedForm: Partial<Member> = {
+        ...form,
+        tel: normalizedTel,
+        ext: form.ext?.trim() || '',
+        projectId,
+      };
       if (form.id) {
-        await updateMember(form.id, payload);
+        await updateMember(form.id, normalizedForm);
         toast.success('Member updated');
       } else {
-        await createMember(payload);
+        await createMember(normalizedForm);
         toast.success('Member added');
         if (form.email) await syncMemberEmail(form.email);
       }
@@ -270,6 +256,7 @@ export default function MembersTab({ projectId }: Props) {
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Role:</strong> <span style={{ color: roleColor(role) }}>{role}</span></div>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Position:</strong> {mb.position || '—'}</div>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Tel:</strong> {mb.tel || '—'}</div>
+                    <div><strong style={{ color: C.text, fontWeight: 600 }}>Ext:</strong> {mb.ext || '—'}</div>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Notes:</strong> {mb.notes || '—'}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
@@ -284,7 +271,7 @@ export default function MembersTab({ projectId }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: C.bg }}>
-                {['Member', 'Nickname', 'Role', 'Position', 'Email', 'Tel', 'Type', 'Notes', ''].map(h => (
+                {['Member', 'Nickname', 'Role', 'Position', 'Email', 'Tel', 'Ext', 'Type', 'Notes', ''].map(h => (
                   <th key={h} style={TH}>{h}</th>
                 ))}
               </tr>
@@ -330,6 +317,7 @@ export default function MembersTab({ projectId }: Props) {
                   <td style={{ ...TD, color: C.text2, fontSize: 11 }}>{mb.position || '—'}</td>
                   <td style={{ ...TD, color: C.blue }}>{mb.email}</td>
                   <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontSize: 12 }}>{mb.tel}</td>
+                  <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontSize: 12 }}>{mb.ext || '—'}</td>
                   <td style={TD}>
                     <Badge bg={mb.type === 'internal' ? C.primaryBg : C.amberBg} color={mb.type === 'internal' ? C.primary : C.amber}>
                       {mb.type === 'internal' ? 'Internal' : 'Client'}
@@ -357,7 +345,7 @@ export default function MembersTab({ projectId }: Props) {
 }
 
 function MemberModal({ data, currentUserRole, onClose, onSave }: { data: Partial<Member>; currentUserRole: UserRole; onClose: () => void; onSave: (f: Partial<Member>) => void }) {
-  const [form, setForm] = useState<Partial<Member>>({ name: '', nickname: '', role: '', position: '', email: '', tel: '', type: 'internal', notes: '', ...data });
+  const [form, setForm] = useState<Partial<Member>>({ name: '', nickname: '', role: '', position: '', email: '', tel: '', ext: '', type: 'internal', notes: '', ...data });
   const up = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
   return (
     <Modal title={form.id ? 'Edit Member' : 'Add Member'} onClose={onClose} width={520}>
@@ -383,6 +371,7 @@ function MemberModal({ data, currentUserRole, onClose, onSave }: { data: Partial
       </div>
       <FormRow label="Email"><Input type="email" value={form.email ?? ''} onChange={v => up('email', v)} placeholder="email@example.com" /></FormRow>
       <FormRow label="Tel"><Input type="tel" value={form.tel ?? ''} onChange={v => up('tel', formatPhoneNumber(v))} placeholder="+66-81-234-5678" /></FormRow>
+      <FormRow label="Ext"><Input value={form.ext ?? ''} onChange={v => up('ext', v.replace(/[^0-9]/g, '').slice(0, 6))} placeholder="e.g. 123" /></FormRow>
       <FormRow label="Notes"><Textarea value={form.notes ?? ''} onChange={v => up('notes', v)} rows={2} placeholder="Additional remarks…" /></FormRow>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>

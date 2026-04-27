@@ -91,6 +91,7 @@ create table if not exists public.members (
   position    text not null default '',
   email       text not null default '',
   tel         text not null default '',
+  ext         text not null default '',
   type        text not null default 'internal' check (type in ('internal','client')),
   notes       text not null default '',
   user_id     uuid references public.profiles(id),
