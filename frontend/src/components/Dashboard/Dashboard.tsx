@@ -597,7 +597,7 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Progress by Phase</div>
               <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Map main task to stage and show completion percent</div>
             </div>
-            <button style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Task Detail</button>
+            <button type="button" onClick={onOpen} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Task Detail</button>
           </div>
           <div style={{ display: 'grid', gap: 12 }}>
             {stageTasks.map((stage) => (
