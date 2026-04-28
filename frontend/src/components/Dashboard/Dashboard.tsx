@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { parseISO, isValid } from 'date-fns';
+import { parseISO, isValid, addDays } from 'date-fns';
 import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Menu, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
@@ -404,227 +404,295 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
   const { tasks, milestones, members, efforts, changeRequests, issues, risks } = useStore();
   const s = PROJECT_STATUS[project.status] ?? PROJECT_STATUS['Planning'];
 
-  const pt = tasks.filter(t => t.projectId === project.id);
-  const ms = milestones.filter(m => m.projectId === project.id);
-  const ef = efforts.filter(e => e.projectId === project.id);
-  const crs = changeRequests.filter(c => c.projectId === project.id);
-  const iss = issues.filter(i => i.projectId === project.id);
-  const rks = risks.filter(r => r.projectId === project.id);
+  const pt = tasks.filter((t) => t.projectId === project.id);
+  const ms = milestones.filter((m) => m.projectId === project.id);
+  const ef = efforts.filter((e) => e.projectId === project.id);
+  const crs = changeRequests.filter((c) => c.projectId === project.id);
+  const iss = issues.filter((i) => i.projectId === project.id);
+  const rks = risks.filter((r) => r.projectId === project.id);
 
-  const roots = pt.filter(t => !t.parentId);
+  const roots = pt.filter((t) => !t.parentId);
   const rootTasksSorted = [...roots].sort((a, b) => compareWbs(a.wbs, b.wbs));
   const prog = roots.length ? Math.round(roots.reduce((sum, t) => sum + t.percentComplete, 0) / roots.length) : 0;
-  const doneTasks = pt.filter(t => t.percentComplete === 100).length;
+  const doneTasks = pt.filter((t) => t.percentComplete === 100).length;
   const totalTasks = pt.length;
 
   const totalContract = ms.reduce((sum, m) => sum + (m.amount || 0), 0);
-  const paidAmt = ms.filter(m => String(m.status).toLowerCase() === 'paid').reduce((sum, m) => sum + (m.amount || 0), 0);
+  const billedAmt = ms.filter((m) => String(m.status).toLowerCase() === 'billed').reduce((sum, m) => sum + (m.amount || 0), 0);
+  const paidAmt = ms.filter((m) => String(m.status).toLowerCase() === 'paid').reduce((sum, m) => sum + (m.amount || 0), 0);
+  const outstandingAmt = Math.max(totalContract - paidAmt, 0);
   const payPct = totalContract > 0 ? Math.round((paidAmt / totalContract) * 100) : 0;
 
   const tBudMD = ef.reduce((sum, e) => sum + (e.budgetManday || 0), 0);
   const tUsedMD = ef.reduce((sum, e) => sum + Object.values(e.monthly || {}).reduce((acc, v) => acc + Number(v || 0), 0), 0);
 
-  const openIssues = iss.filter(i => i.status === 'Open' || i.status === 'In Progress').length;
-  const openRisks = rks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length;
-  const pendingCRs = crs.filter(c => c.status === 'Submitted' || c.status === 'Under Review');
+  const openIssues = iss.filter((i) => i.status === 'Open' || i.status === 'In Progress').length;
+  const openRisks = rks.filter((r) => r.status === 'Monitoring' || r.status === 'Mitigating').length;
+  const pendingCRs = crs.filter((c) => c.status === 'Submitted' || c.status === 'Under Review');
   const openCRs = pendingCRs.length;
+
+  const currentDate = new Date();
+  const upcomingMilestones = ms
+    .filter((m) => {
+      const due = parseISO(m.dueDate || '');
+      if (!isValid(due)) return false;
+      const inWindow = due <= addDays(currentDate, 30);
+      const isDelayed = due < currentDate && String(m.status).toLowerCase() !== 'paid';
+      return inWindow || isDelayed;
+    })
+    .sort((a, b) => Number(parseISO(a.dueDate || '')) - Number(parseISO(b.dueDate || '')))
+    .slice(0, 4);
 
   const snapshotDates = getHalfMonthSnapshotDates(project.startDate, project.endDate);
   const baselineRows = computeBaselineProgress(pt, snapshotDates);
-  const lastBaseline = baselineRows.filter((row) => parseISO(row.baselineDate) <= new Date()).pop() ?? baselineRows[baselineRows.length - 1];
+  const lastBaseline = baselineRows.filter((row) => parseISO(row.baselineDate) <= currentDate).pop() ?? baselineRows[baselineRows.length - 1];
   const plannedPercent = lastBaseline?.baselinePercent ?? 0;
   const scheduleDiff = prog - plannedPercent;
   const scheduleStatus = baselineRows.length ? (scheduleDiff >= 0 ? 'On Track' : 'Delayed') : 'Plan N/A';
   const scheduleColor = scheduleStatus === 'Delayed' ? C.red : scheduleStatus === 'On Track' ? C.green : C.text;
   const scheduleDetail = baselineRows.length ? `Actual ${prog}% vs Planned ${plannedPercent}%` : 'No baseline available';
 
-  const nextMilestones = ms.filter(m => !['paid'].includes(String(m.status).toLowerCase()))
-    .sort((a, b) => {
-      const aDate = parseISO(a.dueDate || '');
-      const bDate = parseISO(b.dueDate || '');
-      return Number(aDate) - Number(bDate);
-    });
-  const upcomingMilestones = nextMilestones.slice(0, 4);
+  const getStageLabel = (name: string) => {
+    const lower = String(name || '').toLowerCase();
+    const mapping = [
+      { label: 'Project Initiation', keywords: ['initiation', 'kick-off', 'kick off', 'project prep'] },
+      { label: 'Requirement & Gap Analysis', keywords: ['requirement', 'gap', 'analysis', 'gathering'] },
+      { label: 'Business Blueprint', keywords: ['blueprint', 'business blueprint'] },
+      { label: 'System Configuration', keywords: ['configuration', 'system config', 'environment', 'setup'] },
+      { label: 'UAT & Parallel Run', keywords: ['uat', 'parallel', 'parallel run', 'testing', 'defects'] },
+      { label: 'Go-live & Hypercare', keywords: ['go-live', 'go live', 'hypercare', 'production', 'support'] },
+    ];
+    const found = mapping.find((item) => item.keywords.some((k) => lower.includes(k)));
+    return found ? found.label : name || 'Main Task';
+  };
 
-  const actionItems = [
-    ...(upcomingMilestones[0]
-      ? [{
-        title: `Prepare milestone: ${upcomingMilestones[0].name}`,
-        subtitle: `Due ${upcomingMilestones[0].dueDate ? fmtDate(upcomingMilestones[0].dueDate) : 'TBD'} · ฿${fmtMoney(upcomingMilestones[0].amount)}`,
-      }]
-      : []),
-    ...iss.filter(i => i.status === 'Open' || i.status === 'In Progress').slice(0, 2).map(i => ({
+  const stageTasks = rootTasksSorted.slice(0, 6).map((t) => ({
+    id: t.id,
+    name: getStageLabel(t.taskName),
+    progress: t.percentComplete,
+  }));
+
+  const nextActions = [
+    ...upcomingMilestones.map((m) => ({
+      title: `Confirm milestone: ${m.name}`,
+      subtitle: `Due ${m.dueDate ? fmtDate(m.dueDate) : 'TBD'}`,
+      date: m.dueDate,
+    })),
+    ...iss.filter((i) => i.status === 'Open' || i.status === 'In Progress').slice(0, 2).map((i) => ({
       title: `Resolve issue: ${i.title}`,
-      subtitle: `Status: ${i.status}`,
+      subtitle: `Assigned to ${i.assignedTo || 'team'}`,
+      date: i.issueDate,
     })),
-    ...rks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').slice(0, 1).map(r => ({
-      title: `Mitigate risk: ${r.title || 'Review risk'}`,
-      subtitle: `Status: ${r.status}`,
-    })),
-    ...pendingCRs.slice(0, 1).map(c => ({
+    ...pendingCRs.slice(0, 1).map((c) => ({
       title: `Review CR: ${c.crId || ''} ${c.title}`.trim(),
       subtitle: `Status: ${c.status}`,
+      date: c.requestDate,
     })),
   ].slice(0, 4);
 
-  const memberCount = members.filter(m => m.projectId === project.id).length;
+  const actionItems = nextActions.length
+    ? nextActions
+    : [{ title: 'No active action items', subtitle: 'No action items at this time', date: '' }];
+
+  const milestoneStatusCards = upcomingMilestones.map((m) => {
+    const due = parseISO(m.dueDate || '');
+    const isDelayed = isValid(due) && due < currentDate && String(m.status).toLowerCase() !== 'paid';
+    return {
+      ...m,
+      isDelayed,
+    };
+  });
 
   const overviewText = baselineRows.length
-    ? `โครงการอยู่ในสถานะ ${s.label} โดยมีความคืบหน้า ${prog}% จาก ${totalTasks} งาน (${doneTasks} งานเสร็จแล้ว) และอยู่ในระดับ ${scheduleStatus.toLowerCase()} ของแผนงาน. มี ${openIssues} issue, ${openRisks} risk และ ${openCRs} CR ที่ต้องติดตาม.`
-    : `โครงการอยู่ในสถานะ ${s.label} โดยความคืบหน้าปัจจุบัน ${prog}% จาก ${totalTasks} งาน. มี ${openIssues} issue, ${openRisks} risk และ ${openCRs} CR ที่ต้องติดตาม.`;
-
-  const milestonesByPhase = ms.reduce((acc, m) => {
-    const phase = m.phase || 'Unspecified';
-    if (!acc[phase]) acc[phase] = [];
-    acc[phase].push(m);
-    return acc;
-  }, {} as Record<string, typeof ms>);
-  const phaseOrder = Object.keys(milestonesByPhase).sort((a, b) => a.localeCompare(b));
-
-  const KPI = ({ label, value, sub, color, bg, icon }: any) => (
-    <div style={{ background: bg, borderRadius: 12, padding: '16px 18px' }}>
-      <div style={{ fontSize: 18, marginBottom: 6 }}>{icon}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color }}>{value}</div>
-      <div style={{ fontSize: 11, color: C.text, fontWeight: 600, marginTop: 4 }}>{label}</div>
-      <div style={{ fontSize: 10, color: C.text2, marginTop: 2 }}>{sub}</div>
-    </div>
-  );
+    ? `โครงการอยู่ในสถานะ ${s.label} มีความคืบหน้า ${prog}% และอยู่ในระดับ ${scheduleStatus.toLowerCase()} เมื่อเทียบกับแผนงาน. มี ${openIssues} issue, ${openRisks} risk และ ${openCRs} CR ที่ต้องติดตาม.`
+    : `โครงการอยู่ในสถานะ ${s.label} มีความคืบหน้าปัจจุบัน ${prog}% และมี ${openIssues} issue, ${openRisks} risk, ${openCRs} CR ที่ต้องติดตาม.`;
 
   const statusCard = ({ title, value, subtitle, color, bg }: any) => (
-    <Card style={{ padding: '16px 18px', minHeight: 110, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+    <Card style={{ padding: '14px 16px', minHeight: 110, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
       <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>{title}</div>
+        <div style={{ fontSize: 11, color: C.text2, marginBottom: 8 }}>{title}</div>
         <div style={{ fontSize: 18, fontWeight: 800, color }}>{value}</div>
       </div>
-      <div style={{ fontSize: 11, color: C.text2, marginTop: 8 }}>{subtitle}</div>
+      <div style={{ fontSize: 10, color: C.text2, marginTop: 8 }}>{subtitle}</div>
     </Card>
   );
 
   return (
-    <div style={{ padding: isMobile ? '18px 14px' : '24px 28px', width: '100%' }}>
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: isMobile ? 16 : 0, marginBottom: 20 }}>
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 14, alignItems: 'flex-start' }}>
-          <div style={{ width: 10, height: 48, borderRadius: 5, background: project.color || C.primary, flexShrink: 0 }} />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, margin: 0 }}>{project.name}</h2>
-              <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
-            </div>
-            {!isMobile && (
-              <div style={{ fontSize: 12, color: C.text3, marginTop: 3 }}>{project.code} · {project.client}</div>
-            )}
-            <div style={{ fontSize: 11, color: C.text2, marginTop: isMobile ? 8 : 2 }}>{fmtDate(project.startDate)} – {fmtDate(project.endDate)}</div>
-          </div>
+    <div style={{ padding: isMobile ? '16px 14px' : '24px 28px', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 18 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>Executive Project Dashboard Summary</div>
+          <div style={{ fontSize: 12, color: C.text2 }}>HR Solution Implementation · Steering Committee View</div>
         </div>
-        <Btn onClick={onOpen} style={{ flexShrink: 0, marginTop: isMobile ? 10 : 0 }}>Open Project →</Btn>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          <Badge bg={scheduleStatus === 'Delayed' ? C.redBg : C.greenBg} color={scheduleColor}>{scheduleStatus === 'Delayed' ? 'Attention Required' : 'Project Health: On Track'}</Badge>
+          {openIssues + openRisks > 0 && <Badge bg={C.amberBg} color={C.amber}>Attention Required</Badge>}
+          <span style={{ fontSize: 11, color: C.text2, padding: '8px 12px', borderRadius: 999, background: C.bg }}>Last Updated: {fmtDate(currentDate.toISOString().slice(0, 10))}</span>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: 16, marginBottom: 20 }}>
-        <Card style={{ padding: '22px 24px', background: C.white }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.15fr 0.85fr', gap: 16, marginBottom: 18 }}>
+        <Card style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Executive Summary</div>
-              <div style={{ fontSize: 15, color: C.text3, marginTop: 6, lineHeight: 1.6 }}>{overviewText}</div>
+              <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.7, marginTop: 10 }}>{overviewText}</div>
             </div>
-            <span style={{ whiteSpace: 'nowrap', padding: '8px 12px', borderRadius: 999, background: scheduleStatus === 'Delayed' ? C.redBg : scheduleStatus === 'On Track' ? C.greenBg : C.border, color: scheduleColor, fontSize: 11, fontWeight: 700 }}>{scheduleStatus}</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
-            <KPI label="Overall Progress" value={`${prog}%`} sub={`${doneTasks}/${totalTasks} completed`} color={C.primary} bg={C.primaryBg} icon="📋" />
-            <KPI label="Schedule Status" value={`${scheduleStatus}`} sub={scheduleDetail} color={scheduleColor} bg={scheduleStatus === 'Delayed' ? C.redBg : C.greenBg} icon="⏱️" />
-            <KPI label="Payment Collected" value={`${payPct}%`} sub={`฿${fmtMoney(paidAmt)} / ฿${fmtMoney(totalContract)}`} color={C.green} bg={C.greenBg} icon="💰" />
-            <KPI label="Resource Usage" value={`${tUsedMD}/${tBudMD}`} sub="Mandays used / budget" color={C.amber} bg={C.amberBg} icon="⚡" />
-            <KPI label="Open Issues" value={`${openIssues}`} sub={`${openRisks} open risks`} color={openIssues > 0 ? C.red : C.green} bg={openIssues > 0 ? C.redBg : C.greenBg} icon="⚠️" />
-            <KPI label="Change Requests" value={`${openCRs}`} sub="Pending review" color={openCRs > 0 ? C.blue : C.green} bg={openCRs > 0 ? C.blueBg : C.greenBg} icon="📝" />
+            <Badge bg={C.primaryBg} color={C.primary}>Decision Needed: Confirm Phase 1 Timeline</Badge>
           </div>
         </Card>
 
         <div style={{ display: 'grid', gap: 12 }}>
-          {statusCard({ title: 'Next Milestone', value: upcomingMilestones.length ? upcomingMilestones[0].name : 'No upcoming milestone', subtitle: upcomingMilestones.length ? `Due ${upcomingMilestones[0].dueDate ? fmtDate(upcomingMilestones[0].dueDate) : 'TBD'}` : 'All milestones are paid or completed', color: C.text, bg: C.white })}
-          {statusCard({ title: 'Team Members', value: `${memberCount}`, subtitle: `Assigned members`, color: C.text, bg: C.white })}
-          {statusCard({ title: 'Workload Alert', value: `${openIssues + openRisks}`, subtitle: `${openIssues} issues, ${openRisks} risks`, color: openIssues + openRisks > 0 ? C.red : C.green, bg: openIssues + openRisks > 0 ? C.redBg : C.greenBg })}
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr', gap: 16, marginBottom: 20 }}>
-        <Card style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 700, color: C.text }}>📋 Main Tasks ({rootTasksSorted.length})</div>
-          <div>
-            {rootTasksSorted.map((t) => (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderBottom: `1px solid ${C.border}`, gap: 12 }}>
-                <div style={{ minWidth: 90, fontSize: 11, fontWeight: 700, color: C.text2 }}>{t.wbs}</div>
-                <div style={{ flex: 1, fontSize: 12, color: C.text }}>{t.taskName}</div>
-                <div style={{ width: 80, flexShrink: 0 }}><ProgressBar value={t.percentComplete} height={6} /></div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: t.percentComplete >= 100 ? C.green : C.primary, minWidth: 36, textAlign: 'right' }}>{t.percentComplete}%</div>
-              </div>
-            ))}
-            {rootTasksSorted.length === 0 && <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: C.text3 }}>No tasks yet</div>}
-          </div>
-        </Card>
-
-        <div style={{ display: 'grid', gap: 12 }}>
-          <Card style={{ padding: '16px 18px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>🏁 Upcoming Milestones</div>
-              <div style={{ fontSize: 11, color: C.text2 }}>{upcomingMilestones.length} items</div>
-            </div>
-            {upcomingMilestones.length === 0 && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming milestones</div>}
-            {upcomingMilestones.map((m) => {
-              const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
-              return (
-                <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: '12px 0', borderBottom: `1px solid ${C.border}` }}>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{m.name}</div>
-                    <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{m.dueDate ? fmtDate(m.dueDate) : 'TBD'}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', minWidth: 84 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{m.amount ? `฿${fmtMoney(m.amount)}` : '-'}</div>
-                    <div style={{ marginTop: 4 }}><span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span></div>
-                  </div>
-                </div>
-              );
-            })}
+          <Card style={{ padding: '14px 16px', display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 11, color: C.text2 }}>Overall Progress</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>{prog}%</div>
+            <div style={{ fontSize: 11, color: C.text2 }}>{doneTasks}/{totalTasks} tasks completed</div>
           </Card>
-
-          <Card style={{ padding: '16px 18px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 12 }}>🛠️ Top Action Items</div>
-            {actionItems.length === 0 && <div style={{ fontSize: 11, color: C.text3 }}>No active actions right now</div>}
-            {actionItems.map((item, index) => (
-              <div key={`${item.title}-${index}`} style={{ marginBottom: index === actionItems.length - 1 ? 0 : 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{item.title}</div>
-                <div style={{ fontSize: 11, color: C.text2, marginTop: 3 }}>{item.subtitle}</div>
-              </div>
-            ))}
+          <Card style={{ padding: '14px 16px', display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 11, color: C.text2 }}>Schedule Status</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: scheduleColor }}>{scheduleDiff >= 0 ? `+${scheduleDiff}%` : `${scheduleDiff}%`}</div>
+            <div style={{ fontSize: 11, color: C.text2 }}>{scheduleDetail}</div>
           </Card>
         </div>
       </div>
 
-      {ms.length > 0 && (
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 12, marginBottom: 18 }}>
+        {[
+          { title: 'Progress', value: `${prog}%`, detail: `${doneTasks}/${totalTasks} completed`, color: C.primary, bg: C.primaryBg },
+          { title: 'Payment Collected', value: `฿${fmtMoney(paidAmt)}`, detail: `Outstanding ฿${fmtMoney(outstandingAmt)}`, color: C.green, bg: C.greenBg },
+          { title: 'Resource Usage', value: `${tUsedMD}/${tBudMD}`, detail: 'Mandays used / budget', color: C.amber, bg: C.amberBg },
+          { title: 'Risks / Issues', value: `${openRisks}/${openIssues}`, detail: `${openRisks} open risks`, color: openRisks ? C.red : C.green, bg: openRisks ? C.redBg : C.greenBg },
+          { title: 'Change Requests', value: `${openCRs}`, detail: 'Pending review', color: openCRs ? C.blue : C.green, bg: openCRs ? C.blueBg : C.greenBg },
+          { title: 'Billed', value: `฿${fmtMoney(billedAmt)}`, detail: `${payPct}% collected`, color: C.text, bg: C.bg },
+        ].map((item) => (
+          <Card key={item.title} style={{ padding: '14px 14px', minHeight: 106 }}>
+            <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>{item.title}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: item.color }}>{item.value}</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 8 }}>{item.detail}</div>
+          </Card>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.7fr 0.9fr', gap: 16, marginBottom: 18 }}>
         <Card style={{ padding: '16px 18px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 12 }}>Milestone Details</div>
-          {phaseOrder.map((phase) => (
-            <div key={phase} style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 10 }}>{phase}</div>
-              <div style={{ display: 'grid', gap: 10 }}>
-                {milestonesByPhase[phase].sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
-                  const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
-                  return (
-                    <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{m.name}</div>
-                        <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{m.dueDate ? fmtDate(m.dueDate) : 'No due date'}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>฿{fmtMoney(m.amount)}</div>
-                        <span style={{ display: 'inline-block', marginTop: 6, background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Progress by Phase</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Map main task to stage and show completion percent</div>
             </div>
-          ))}
+            <button style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Task Detail</button>
+          </div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {stageTasks.map((stage) => (
+              <div key={stage.id} style={{ display: 'grid', gap: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.text2 }}>
+                  <span>{stage.name}</span>
+                  <span style={{ fontWeight: 700, color: C.text }}>{stage.progress}%</span>
+                </div>
+                <ProgressBar value={stage.progress} height={8} color={stage.progress >= 100 ? C.green : C.primary} />
+              </div>
+            ))}
+            {!stageTasks.length && <div style={{ fontSize: 12, color: C.text3 }}>No stage-level main tasks found.</div>}
+          </div>
         </Card>
-      )}
+
+        <Card style={{ padding: '16px 18px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Management Attention</div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+              <div style={{ fontSize: 11, color: C.text2 }}>NEXT MILESTONE</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginTop: 6 }}>{upcomingMilestones[0]?.name || 'No milestone due soon'}</div>
+              {upcomingMilestones[0] && <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>{upcomingMilestones[0].dueDate ? fmtDate(upcomingMilestones[0].dueDate) : 'TBD'} · Amount ฿{fmtMoney(upcomingMilestones[0].amount)}</div>}
+            </div>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+              <div style={{ fontSize: 11, color: C.text2 }}>NEXT ACTION</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginTop: 6 }}>{actionItems[0]?.title || 'No immediate action required'}</div>
+              {actionItems[0]?.subtitle && <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>{actionItems[0].subtitle}</div>}
+            </div>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+              <div style={{ fontSize: 11, color: C.text2 }}>TOP RISKS</div>
+              {rks.slice(0, 3).map((risk) => (
+                <div key={risk.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 10 }}>
+                  <span style={{ fontSize: 12, color: C.text }}>{risk.title || 'Risk item'}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.text2 }}>{risk.probability}</span>
+                </div>
+              ))}
+              {!rks.length && <div style={{ fontSize: 11, color: C.text3, marginTop: 10 }}>No active risks</div>}
+            </div>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+              <div style={{ fontSize: 11, color: C.text2 }}>DECISION REQUIRED</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginTop: 6 }}>Approve or confirm revised Phase timeline</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>Required to keep Business Blueprint completion aligned with project plan.</div>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.18fr 0.82fr', gap: 16, marginBottom: 20 }}>
+        <Card style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Upcoming Milestones</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Delayed or due within 30 days</div>
+            </div>
+            <button style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Milestones</button>
+          </div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {milestoneStatusCards.map((m) => (
+              <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{m.name}</div>
+                  <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{m.phase || 'No phase'}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>฿{fmtMoney(m.amount)}</div>
+                  <div style={{ fontSize: 11, color: m.isDelayed ? C.red : C.text2, marginTop: 4 }}>{m.dueDate ? fmtDate(m.dueDate) : 'TBD'}</div>
+                  <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: m.isDelayed ? C.redBg : C.amberBg, color: m.isDelayed ? C.red : C.amber, fontSize: 10, fontWeight: 700 }}>{m.isDelayed ? 'Delayed' : 'Pending'}</div>
+                </div>
+              </div>
+            ))}
+            {!milestoneStatusCards.length && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming milestones within 30 days</div>}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 16 }}>
+            <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: C.text2 }}>CONTRACT</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(totalContract)}</div>
+            </div>
+            <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: C.text2 }}>BILLED</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(billedAmt)}</div>
+            </div>
+            <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: C.text2 }}>COLLECTED</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(paidAmt)}</div>
+            </div>
+            <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: C.text2 }}>NEXT BILLING</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(upcomingMilestones[0]?.amount || 0)}</div>
+            </div>
+          </div>
+        </Card>
+
+        <Card style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Action Items & Recent Updates</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>รายการที่ต้องติดตามล่าสุด</div>
+            </div>
+            <button style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View MOM</button>
+          </div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {actionItems.map((item, index) => (
+              <div key={`${item.title}-${index}`} style={{ display: 'grid', gap: 6, padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{item.title}</div>
+                <div style={{ fontSize: 11, color: C.text2 }}>{item.subtitle}</div>
+                {item.date && <div style={{ fontSize: 10, color: C.text3 }}>{fmtDate(item.date)}</div>}
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
