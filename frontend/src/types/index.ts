@@ -42,7 +42,7 @@ export interface Task {
   phase?: string;
   duration: number;
   percentComplete: number;
-  status: 'Todo' | 'In Progress' | 'Done';
+  status: 'Todo' | 'In Progress' | 'Review' | 'Done';
   resource: string;
   relatedTask: string;
   parentId: string;

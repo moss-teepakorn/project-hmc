@@ -40,6 +40,19 @@ const PHASE_OPTIONS = [
   'Go-live & Hypercare',
 ] as const;
 
+const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Review', 'Done'] as const;
+
+type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
+
+function getTaskStatus(task: Task): TaskStatus {
+  if (task.status && TASK_STATUS_OPTIONS.includes(task.status as TaskStatus)) {
+    return task.status as TaskStatus;
+  }
+  if (task.percentComplete === 0) return 'Todo';
+  if (task.percentComplete === 100) return 'Done';
+  return 'In Progress';
+}
+
 // Inline % editor
 function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean; onSave: (n: number) => void }) {
   const [editing, setEditing] = useState(false);
@@ -142,10 +155,10 @@ export default function TasksTab({ projectId }: Props) {
   const visible      = flattenTree(projectTasks, expanded);
   const isTableView = view === 'table';
   const viewModes: ViewMode[] = isMobile ? ['table'] : ['table', 'split', 'gantt', 'kanban'];
-  const kanbanColumns = PHASE_OPTIONS.map((phase) => ({
-    phase,
+  const kanbanColumns = TASK_STATUS_OPTIONS.map((status) => ({
+    status,
     tasks: projectTasks
-      .filter((t) => (t.phase || PHASE_OPTIONS[0]) === phase)
+      .filter((t) => getTaskStatus(t) === status)
       .sort((a, b) => compareWbs(a.wbs, b.wbs)),
   }));
 
@@ -171,15 +184,15 @@ export default function TasksTab({ projectId }: Props) {
     e.preventDefault();
   }, []);
 
-  const handleColumnDrop = useCallback(async (phase: string, e: React.DragEvent<HTMLDivElement>) => {
+  const handleColumnDrop = useCallback(async (status: TaskStatus, e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData('text/plain');
     if (!taskId) return;
     const task = projectTasks.find((t) => t.id === taskId);
     if (!task) return;
-    const currentPhase = task.phase || PHASE_OPTIONS[0];
-    if (currentPhase === phase) return;
-    await handleUpdate(task.id, { phase });
+    const currentStatus = getTaskStatus(task);
+    if (currentStatus === status) return;
+    await handleUpdate(task.id, { status });
   }, [projectTasks, handleUpdate]);
 
   const handleUpdateDate = useCallback(async (id: string, field: 'startDate' | 'endDate' | 'actualFinish', value: string) => {
@@ -677,11 +690,11 @@ export default function TasksTab({ projectId }: Props) {
 
   const kanbanContent = (
     <div style={{ flex:1, overflow:'hidden', minHeight:0, display:'flex', gap:16, padding:'16px', background:C.bg2 }}>
-      {kanbanColumns.map(({ phase, tasks }) => (
-        <div key={phase} onDragOver={handleColumnDragOver} onDrop={(e) => handleColumnDrop(phase, e)}
+      {kanbanColumns.map(({ status, tasks }) => (
+        <div key={status} onDragOver={handleColumnDragOver} onDrop={(e) => handleColumnDrop(status, e)}
           style={{ flex:1, minWidth:240, display:'flex', flexDirection:'column', gap:10, background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:12 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:6 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:C.text }}>{phase}</div>
+            <div style={{ fontSize:12, fontWeight:700, color:C.text }}>{status}</div>
             <div style={{ fontSize:11, color:C.text3 }}>{tasks.length}</div>
           </div>
           <div style={{ flex:1, minHeight:0, overflowY:'auto', display:'flex', flexDirection:'column', gap:10 }}>
