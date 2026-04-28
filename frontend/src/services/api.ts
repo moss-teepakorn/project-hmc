@@ -400,8 +400,32 @@ export const taskApi = {
       .eq('id', id)
       .select()
       .single();
-    if (error) throw new Error(error.message);
-    const updated = rowToObj<Task>(data);
+    let updatedData = data;
+    if (error) {
+      const message = String(error.message || '').toLowerCase();
+      const hasStatusError = message.includes('column "status"') || message.includes('invalid input value for enum') || message.includes('cannot insert/update') && message.includes('status');
+      if (hasStatusError && row.status !== undefined) {
+        const fallbackRow = { ...row } as Record<string, unknown>;
+        delete fallbackRow.status;
+        if (fallbackRow.percent_complete === undefined && row.status !== undefined) {
+          const status = String(row.status);
+          if (status === 'Todo') fallbackRow.percent_complete = 0;
+          else if (status === 'Done') fallbackRow.percent_complete = 100;
+          else fallbackRow.percent_complete = 1;
+        }
+        const retry = await supabase
+          .from('tasks')
+          .update(fallbackRow)
+          .eq('id', id)
+          .select()
+          .single();
+        if (retry.error) throw new Error(retry.error.message);
+        updatedData = retry.data;
+      } else {
+        throw new Error(error.message);
+      }
+    }
+    const updated = rowToObj<Task>(updatedData);
 
     // If this is a main/root task and its phase was updated, propagate the phase to all descendant subtasks.
     if (row.phase !== undefined && (!updated.parentId || updated.parentId === '')) {
