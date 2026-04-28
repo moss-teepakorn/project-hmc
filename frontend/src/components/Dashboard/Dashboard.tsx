@@ -13,6 +13,7 @@ const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live',
 
 export default function Dashboard() {
   const { projects, tasks, milestones, issues, risks, changeRequests, activeProject, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts } = useStore();
+  const [selected,   setSelected]   = useState<Project | null>(null);
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [showAdd,    setShowAdd]    = useState(false);
@@ -198,7 +199,7 @@ export default function Dashboard() {
       <div style={{ flex: 1, overflow: 'auto', background: C.bg }}>
           <div style={{ width: '100%', minHeight: 0 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '16px 14px 0' : '24px 32px 0' }}>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {['overview', 'report'].map((tab) => (
                   <button
                     key={tab}
@@ -218,13 +219,36 @@ export default function Dashboard() {
                     {tab === 'overview' ? 'Portfolio Overview' : 'Project Summary Report'}
                   </button>
                 ))}
+                {selected && (
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 10,
+                      border: `1px solid ${C.border}`,
+                      background: C.white,
+                      color: C.text,
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: 12,
+                      fontFamily: 'Poppins, sans-serif',
+                    }}
+                  >
+                    Back
+                  </button>
+                )}
               </div>
               <Btn onClick={() => setShowAdd(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }}>
                 <Plus size={12} style={{ marginRight: 6 }} /> Add Project
               </Btn>
             </div>
             {dashboardTab === 'overview' ? (
-              <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} isMobile={isMobile} />
+              selected ? (
+                <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} isMobile={isMobile} />
+              ) : (
+                <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setSelected} isMobile={isMobile} />
+              )
             ) : (
               <PortfolioReportSummary />
             )}
