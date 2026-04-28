@@ -121,6 +121,16 @@ export default function Dashboard() {
     }
   }, [activeProject?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]);
 
+  React.useEffect(() => {
+    if (!selected?.id) return;
+    fetchMembers(selected.id);
+    fetchIssues(selected.id);
+    fetchRisks(selected.id);
+    fetchCRs(selected.id);
+    fetchMilestones(selected.id);
+    fetchEfforts(selected.id);
+  }, [selected?.id, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]);
+
   // Separate normal projects from Hypercare
   const normalProjects = projects.filter(p => p.status !== 'Hyper Care').sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
   const hypercareProjects = projects.filter(p => p.status === 'Hyper Care').sort((a, b) => a.name.localeCompare(b.name));
