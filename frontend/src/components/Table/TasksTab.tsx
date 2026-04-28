@@ -45,9 +45,10 @@ const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Blocked/Delay', 'Done'] as 
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
 
 function getTaskStatus(task: Task): TaskStatus {
-  if (task.status === 'Review') return 'Blocked/Delay';
-  if (task.status && TASK_STATUS_OPTIONS.includes(task.status as TaskStatus)) {
-    return task.status as TaskStatus;
+  const status = String(task.status || '');
+  if (status === 'Review') return 'Blocked/Delay';
+  if (TASK_STATUS_OPTIONS.includes(status as TaskStatus)) {
+    return status as TaskStatus;
   }
   if (task.percentComplete === 0) return 'Todo';
   if (task.percentComplete === 100) return 'Done';
