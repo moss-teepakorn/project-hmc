@@ -122,7 +122,10 @@ export default function Dashboard() {
   }, [activeProject?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]);
 
   React.useEffect(() => {
-    if (!selected?.id) return;
+    if (!selected?.id) {
+      fetchTasks();
+      return;
+    }
     fetchTasks(selected.id);
     fetchMembers(selected.id);
     fetchIssues(selected.id);
