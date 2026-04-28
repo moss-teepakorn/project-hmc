@@ -4,7 +4,7 @@ import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Menu, X }
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, PROJECT_STATUS, MILESTONE_STATUS, TH, TD } from '../Common';
-import { fmtDate, fmtMoney, compareWbs } from '../../utils';
+import { fmtDate, fmtMoney, compareWbs, computeBaselineProgress, getHalfMonthSnapshotDates } from '../../utils';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
 import PortfolioReportSummary from './PortfolioReportSummary';
@@ -404,21 +404,74 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
   const { tasks, milestones, members, efforts, changeRequests, issues, risks } = useStore();
   const s = PROJECT_STATUS[project.status] ?? PROJECT_STATUS['Planning'];
 
-  const pt   = tasks.filter(t => t.projectId === project.id);
-  const ms   = milestones.filter(m => m.projectId === project.id);   // may be empty if not fetched
-  const ef   = efforts.filter(e => e.projectId === project.id);
-  const crs  = changeRequests.filter(c => c.projectId === project.id);
-  const iss  = issues.filter(i => i.projectId === project.id);
-  const rks  = risks.filter(r => r.projectId === project.id);
+  const pt = tasks.filter(t => t.projectId === project.id);
+  const ms = milestones.filter(m => m.projectId === project.id);
+  const ef = efforts.filter(e => e.projectId === project.id);
+  const crs = changeRequests.filter(c => c.projectId === project.id);
+  const iss = issues.filter(i => i.projectId === project.id);
+  const rks = risks.filter(r => r.projectId === project.id);
 
-  const roots   = pt.filter(t => !t.parentId);
+  const roots = pt.filter(t => !t.parentId);
   const rootTasksSorted = [...roots].sort((a, b) => compareWbs(a.wbs, b.wbs));
-  const prog    = roots.length ? Math.round(roots.reduce((s, t) => s + t.percentComplete, 0) / roots.length) : 0;
+  const prog = roots.length ? Math.round(roots.reduce((sum, t) => sum + t.percentComplete, 0) / roots.length) : 0;
   const doneTasks = pt.filter(t => t.percentComplete === 100).length;
+  const totalTasks = pt.length;
 
-  const totalContract = ms.reduce((s, m) => s + m.amount, 0);
-  const paidAmt       = ms.filter(m => m.status === 'paid').reduce((s, m) => s + m.amount, 0);
-  const payPct        = totalContract > 0 ? Math.round((paidAmt / totalContract) * 100) : 0;
+  const totalContract = ms.reduce((sum, m) => sum + (m.amount || 0), 0);
+  const paidAmt = ms.filter(m => String(m.status).toLowerCase() === 'paid').reduce((sum, m) => sum + (m.amount || 0), 0);
+  const payPct = totalContract > 0 ? Math.round((paidAmt / totalContract) * 100) : 0;
+
+  const tBudMD = ef.reduce((sum, e) => sum + (e.budgetManday || 0), 0);
+  const tUsedMD = ef.reduce((sum, e) => sum + Object.values(e.monthly || {}).reduce((acc, v) => acc + Number(v || 0), 0), 0);
+
+  const openIssues = iss.filter(i => i.status === 'Open' || i.status === 'In Progress').length;
+  const openRisks = rks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length;
+  const pendingCRs = crs.filter(c => c.status === 'Submitted' || c.status === 'Under Review');
+  const openCRs = pendingCRs.length;
+
+  const snapshotDates = getHalfMonthSnapshotDates(project.startDate, project.endDate);
+  const baselineRows = computeBaselineProgress(pt, snapshotDates);
+  const lastBaseline = baselineRows.filter((row) => parseISO(row.baselineDate) <= new Date()).pop() ?? baselineRows[baselineRows.length - 1];
+  const plannedPercent = lastBaseline?.baselinePercent ?? 0;
+  const scheduleDiff = prog - plannedPercent;
+  const scheduleStatus = baselineRows.length ? (scheduleDiff >= 0 ? 'On Track' : 'Delayed') : 'Plan N/A';
+  const scheduleColor = scheduleStatus === 'Delayed' ? C.red : scheduleStatus === 'On Track' ? C.green : C.text;
+  const scheduleDetail = baselineRows.length ? `Actual ${prog}% vs Planned ${plannedPercent}%` : 'No baseline available';
+
+  const nextMilestones = ms.filter(m => !['paid'].includes(String(m.status).toLowerCase()))
+    .sort((a, b) => {
+      const aDate = parseISO(a.dueDate || '');
+      const bDate = parseISO(b.dueDate || '');
+      return Number(aDate) - Number(bDate);
+    });
+  const upcomingMilestones = nextMilestones.slice(0, 4);
+
+  const actionItems = [
+    ...(upcomingMilestones[0]
+      ? [{
+        title: `Prepare milestone: ${upcomingMilestones[0].name}`,
+        subtitle: `Due ${upcomingMilestones[0].dueDate ? fmtDate(upcomingMilestones[0].dueDate) : 'TBD'} · ฿${fmtMoney(upcomingMilestones[0].amount)}`,
+      }]
+      : []),
+    ...iss.filter(i => i.status === 'Open' || i.status === 'In Progress').slice(0, 2).map(i => ({
+      title: `Resolve issue: ${i.title}`,
+      subtitle: `Status: ${i.status}`,
+    })),
+    ...rks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').slice(0, 1).map(r => ({
+      title: `Mitigate risk: ${r.title || 'Review risk'}`,
+      subtitle: `Status: ${r.status}`,
+    })),
+    ...pendingCRs.slice(0, 1).map(c => ({
+      title: `Review CR: ${c.crId || ''} ${c.title}`.trim(),
+      subtitle: `Status: ${c.status}`,
+    })),
+  ].slice(0, 4);
+
+  const memberCount = members.filter(m => m.projectId === project.id).length;
+
+  const overviewText = baselineRows.length
+    ? `โครงการอยู่ในสถานะ ${s.label} โดยมีความคืบหน้า ${prog}% จาก ${totalTasks} งาน (${doneTasks} งานเสร็จแล้ว) และอยู่ในระดับ ${scheduleStatus.toLowerCase()} ของแผนงาน. มี ${openIssues} issue, ${openRisks} risk และ ${openCRs} CR ที่ต้องติดตาม.`
+    : `โครงการอยู่ในสถานะ ${s.label} โดยความคืบหน้าปัจจุบัน ${prog}% จาก ${totalTasks} งาน. มี ${openIssues} issue, ${openRisks} risk และ ${openCRs} CR ที่ต้องติดตาม.`;
 
   const milestonesByPhase = ms.reduce((acc, m) => {
     const phase = m.phase || 'Unspecified';
@@ -428,31 +481,33 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
   }, {} as Record<string, typeof ms>);
   const phaseOrder = Object.keys(milestonesByPhase).sort((a, b) => a.localeCompare(b));
 
-  const tBudMD  = ef.reduce((s, e) => s + e.budgetManday, 0);
-  const tUsedMD = ef.reduce((s, e) => s + Object.values(e.monthly || {}).reduce((a, v) => a + v, 0), 0);
-
-  const openIssues = iss.filter(i => i.status === 'Open' || i.status === 'In Progress').length;
-  const openRisks  = rks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length;
-  const openCRs    = crs.filter(c => c.status === 'Submitted' || c.status === 'Under Review').length;
-
   const KPI = ({ label, value, sub, color, bg, icon }: any) => (
-    <div style={{ background: bg, borderRadius: 10, padding: '14px 16px' }}>
-      <div style={{ fontSize: 18, marginBottom: 4 }}>{icon}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, color }}>{value}</div>
-      <div style={{ fontSize: 11, color: C.text, fontWeight: 600, marginTop: 2 }}>{label}</div>
-      <div style={{ fontSize: 10, color: C.text2, marginTop: 1 }}>{sub}</div>
+    <div style={{ background: bg, borderRadius: 12, padding: '16px 18px' }}>
+      <div style={{ fontSize: 18, marginBottom: 6 }}>{icon}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color }}>{value}</div>
+      <div style={{ fontSize: 11, color: C.text, fontWeight: 600, marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 10, color: C.text2, marginTop: 2 }}>{sub}</div>
     </div>
+  );
+
+  const statusCard = ({ title, value, subtitle, color, bg }: any) => (
+    <Card style={{ padding: '16px 18px', minHeight: 110, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>{title}</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color }}>{value}</div>
+      </div>
+      <div style={{ fontSize: 11, color: C.text2, marginTop: 8 }}>{subtitle}</div>
+    </Card>
   );
 
   return (
     <div style={{ padding: isMobile ? '18px 14px' : '24px 28px', width: '100%' }}>
-      {/* Header */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: isMobile ? 16 : 0, marginBottom: 20 }}>
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 14, alignItems: 'flex-start' }}>
           <div style={{ width: 10, height: 48, borderRadius: 5, background: project.color || C.primary, flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: 0 }}>{project.name}</h2>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, margin: 0 }}>{project.name}</h2>
               <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
             </div>
             {!isMobile && (
@@ -464,124 +519,108 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
         <Btn onClick={onOpen} style={{ flexShrink: 0, marginTop: isMobile ? 10 : 0 }}>Open Project →</Btn>
       </div>
 
-      {/* KPI grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-        <KPI label="Progress" value={`${prog}%`} sub={`${doneTasks}/${pt.length} tasks done`} color={C.primary} bg={C.primaryBg} icon="📋" />
-        <KPI label="Payment" value={`${payPct}%`} sub={`฿${fmtMoney(paidAmt)} collected`} color={C.green} bg={C.greenBg} icon="💰" />
-        <KPI label="Manday" value={`${tUsedMD}/${tBudMD}`} sub="MD used vs budget" color={C.amber} bg={C.amberBg} icon="⚡" />
-        <KPI label="Open Issues" value={openIssues + openCRs} sub={`${openRisks} open risks`} color={openIssues + openCRs > 0 ? C.red : C.green} bg={openIssues + openCRs > 0 ? C.redBg : C.greenBg} icon="⚠️" />
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: 16, marginBottom: 20 }}>
+        <Card style={{ padding: '22px 24px', background: C.white }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Executive Summary</div>
+              <div style={{ fontSize: 15, color: C.text3, marginTop: 6, lineHeight: 1.6 }}>{overviewText}</div>
+            </div>
+            <span style={{ whiteSpace: 'nowrap', padding: '8px 12px', borderRadius: 999, background: scheduleStatus === 'Delayed' ? C.redBg : scheduleStatus === 'On Track' ? C.greenBg : C.border, color: scheduleColor, fontSize: 11, fontWeight: 700 }}>{scheduleStatus}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+            <KPI label="Overall Progress" value={`${prog}%`} sub={`${doneTasks}/${totalTasks} completed`} color={C.primary} bg={C.primaryBg} icon="📋" />
+            <KPI label="Schedule Status" value={`${scheduleStatus}`} sub={scheduleDetail} color={scheduleColor} bg={scheduleStatus === 'Delayed' ? C.redBg : C.greenBg} icon="⏱️" />
+            <KPI label="Payment Collected" value={`${payPct}%`} sub={`฿${fmtMoney(paidAmt)} / ฿${fmtMoney(totalContract)}`} color={C.green} bg={C.greenBg} icon="💰" />
+            <KPI label="Resource Usage" value={`${tUsedMD}/${tBudMD}`} sub="Mandays used / budget" color={C.amber} bg={C.amberBg} icon="⚡" />
+            <KPI label="Open Issues" value={`${openIssues}`} sub={`${openRisks} open risks`} color={openIssues > 0 ? C.red : C.green} bg={openIssues > 0 ? C.redBg : C.greenBg} icon="⚠️" />
+            <KPI label="Change Requests" value={`${openCRs}`} sub="Pending review" color={openCRs > 0 ? C.blue : C.green} bg={openCRs > 0 ? C.blueBg : C.greenBg} icon="📝" />
+          </div>
+        </Card>
+
+        <div style={{ display: 'grid', gap: 12 }}>
+          {statusCard({ title: 'Next Milestone', value: upcomingMilestones.length ? upcomingMilestones[0].name : 'No upcoming milestone', subtitle: upcomingMilestones.length ? `Due ${upcomingMilestones[0].dueDate ? fmtDate(upcomingMilestones[0].dueDate) : 'TBD'}` : 'All milestones are paid or completed', color: C.text, bg: C.white })}
+          {statusCard({ title: 'Team Members', value: `${memberCount}`, subtitle: `Assigned members`, color: C.text, bg: C.white })}
+          {statusCard({ title: 'Workload Alert', value: `${openIssues + openRisks}`, subtitle: `${openIssues} issues, ${openRisks} risks`, color: openIssues + openRisks > 0 ? C.red : C.green, bg: openIssues + openRisks > 0 ? C.redBg : C.greenBg })}
+        </div>
       </div>
 
-      {/* Progress bar */}
-      <Card style={{ padding: '14px 18px', marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
-          <span style={{ fontWeight: 600, color: C.text }}>Overall Progress</span>
-          <span style={{ fontWeight: 700, color: prog >= 100 ? C.green : C.primary }}>{prog}%</span>
-        </div>
-        <ProgressBar value={prog} height={10} color={prog >= 100 ? C.green : project.color || C.primary} />
-      </Card>
-
-      {/* Task summary + Recent issues */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        {/* Root tasks */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr', gap: 16, marginBottom: 20 }}>
         <Card style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 700, color: C.text }}>📋 Main Tasks ({rootTasksSorted.length})</div>
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 700, color: C.text }}>📋 Main Tasks ({rootTasksSorted.length})</div>
           <div>
-            {rootTasksSorted.map(t => (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', padding: '7px 14px', borderBottom: `1px solid ${C.border}`, gap: 10 }}>
-                <div style={{ flex: 1, fontSize: 12, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.wbs} {t.taskName}</div>
-                <div style={{ width: 60, flexShrink: 0 }}><ProgressBar value={t.percentComplete} height={4} /></div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: t.percentComplete >= 100 ? C.green : C.primary, minWidth: 32, textAlign: 'right' }}>{t.percentComplete}%</span>
+            {rootTasksSorted.map((t) => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderBottom: `1px solid ${C.border}`, gap: 12 }}>
+                <div style={{ minWidth: 90, fontSize: 11, fontWeight: 700, color: C.text2 }}>{t.wbs}</div>
+                <div style={{ flex: 1, fontSize: 12, color: C.text }}>{t.taskName}</div>
+                <div style={{ width: 80, flexShrink: 0 }}><ProgressBar value={t.percentComplete} height={6} /></div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: t.percentComplete >= 100 ? C.green : C.primary, minWidth: 36, textAlign: 'right' }}>{t.percentComplete}%</div>
               </div>
             ))}
             {rootTasksSorted.length === 0 && <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: C.text3 }}>No tasks yet</div>}
           </div>
         </Card>
 
-        {/* Issues + CRs summary */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Card style={{ padding: '12px 14px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>🔴 Issues ({iss.length})</div>
-            {iss.length === 0 && <div style={{ fontSize: 11, color: C.text3 }}>No issues logged</div>}
-            {iss.slice(0, 3).map(i => (
-              <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                <span style={{ fontSize: 11, color: C.text2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{i.title}</span>
-                <span style={{ fontSize: 10, fontWeight: 600, color: i.status === 'Resolved' ? C.green : i.status === 'Blocked' ? C.red : i.status === 'In Progress' ? C.blue : C.amber, marginLeft: 8, flexShrink: 0 }}>{i.status}</span>
-              </div>
-            ))}
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Card style={{ padding: '16px 18px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>🏁 Upcoming Milestones</div>
+              <div style={{ fontSize: 11, color: C.text2 }}>{upcomingMilestones.length} items</div>
+            </div>
+            {upcomingMilestones.length === 0 && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming milestones</div>}
+            {upcomingMilestones.map((m) => {
+              const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
+              return (
+                <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: '12px 0', borderBottom: `1px solid ${C.border}` }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{m.name}</div>
+                    <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{m.dueDate ? fmtDate(m.dueDate) : 'TBD'}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', minWidth: 84 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{m.amount ? `฿${fmtMoney(m.amount)}` : '-'}</div>
+                    <div style={{ marginTop: 4 }}><span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span></div>
+                  </div>
+                </div>
+              );
+            })}
           </Card>
-          <Card style={{ padding: '12px 14px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>📝 Change Requests ({crs.length})</div>
-            {crs.length === 0 && <div style={{ fontSize: 11, color: C.text3 }}>No CRs logged</div>}
-            {crs.slice(0, 3).map(c => (
-              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                <span style={{ fontSize: 11, color: C.text2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.crId} {c.title}</span>
-                <span style={{ fontSize: 10, fontWeight: 600, color: c.status === 'Implemented' ? C.green : c.status === 'Rejected' ? C.red : c.status === 'Under Review' ? C.blue : C.amber, marginLeft: 8, flexShrink: 0 }}>{c.status}</span>
+
+          <Card style={{ padding: '16px 18px' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 12 }}>🛠️ Top Action Items</div>
+            {actionItems.length === 0 && <div style={{ fontSize: 11, color: C.text3 }}>No active actions right now</div>}
+            {actionItems.map((item, index) => (
+              <div key={`${item.title}-${index}`} style={{ marginBottom: index === actionItems.length - 1 ? 0 : 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{item.title}</div>
+                <div style={{ fontSize: 11, color: C.text2, marginTop: 3 }}>{item.subtitle}</div>
               </div>
             ))}
           </Card>
         </div>
       </div>
 
-      {/* Milestones payment */}
       {ms.length > 0 && (
-        <Card style={{ padding: '12px 14px', marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.text, marginBottom: 10 }}>🏁 Milestones</div>
-          {phaseOrder.map(phase => (
-            <div key={phase} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>{phase}</div>
-              {isMobile ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
-                  {milestonesByPhase[phase].sort((a, b) => a.name.localeCompare(b.name)).map(m => {
-                    const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
-                    return (
-                      <div key={m.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px', minWidth: 0 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
-                          <span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: C.text2, marginBottom: 6, whiteSpace: 'nowrap' }}>฿{fmtMoney(m.amount)}</div>
-                        {m.dueDate && <div style={{ fontSize: 11, color: C.text2 }}>{fmtDate(m.dueDate)}</div>}
+        <Card style={{ padding: '16px 18px' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 12 }}>Milestone Details</div>
+          {phaseOrder.map((phase) => (
+            <div key={phase} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 10 }}>{phase}</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {milestonesByPhase[phase].sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
+                  const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
+                  return (
+                    <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{m.name}</div>
+                        <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{m.dueDate ? fmtDate(m.dueDate) : 'No due date'}</div>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-                    <colgroup>
-                      <col style={{ width: '30%' }} />
-                      <col style={{ width: '20%' }} />
-                      <col style={{ width: '15%' }} />
-                      <col style={{ width: '15%' }} />
-                      <col style={{ width: '20%' }} />
-                    </colgroup>
-                    <thead>
-                      <tr style={{ background: C.bg }}>
-                        {['Milestone', 'Amount', 'Due Date', 'Billing Date', 'Status'].map(h => (
-                          <th key={h} style={TH}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {milestonesByPhase[phase].sort((a, b) => a.name.localeCompare(b.name)).map((m, idx) => {
-                        const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
-                        return (
-                          <tr key={m.id} style={{ background: idx % 2 === 0 ? C.white : C.bg }}>
-                            <td style={TD}>{m.name}</td>
-                            <td style={TD}>฿{fmtMoney(m.amount)}</td>
-                            <td style={TD}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
-                            <td style={TD}>{m.billingDate ? fmtDate(m.billingDate) : '—'}</td>
-                            <td style={TD}>
-                              <span style={{ background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>฿{fmtMoney(m.amount)}</div>
+                        <span style={{ display: 'inline-block', marginTop: 6, background: ss.bg, color: ss.color, padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </Card>
