@@ -222,7 +222,10 @@ export default function Dashboard() {
                 {selected && (
                   <button
                     type="button"
-                    onClick={() => setSelected(null)}
+                    onClick={() => {
+                      setSelected(null);
+                      setDashboardTab('overview');
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
