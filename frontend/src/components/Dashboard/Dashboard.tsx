@@ -304,6 +304,7 @@ export default function Dashboard() {
 // ── Welcome / global summary ──────────────────────────────────────────────────
 function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void; isMobile: boolean }) {
   const [showHC, setShowHC] = useState(false);
+  const [projectView, setProjectView] = useState<'card' | 'table'>('card');
   const normalProjects = projects.filter(p => p.status !== 'Hyper Care');
   const hypercareProjects = projects.filter(p => p.status === 'Hyper Care');
   const planning   = projects.filter(p => p.status === 'Planning');
@@ -361,7 +362,7 @@ function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Proje
       <h2 style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: C.text, marginBottom: 6 }}>Portfolio Overview</h2>
       <p style={{ color: C.text2, fontSize: 13, marginBottom: 24 }}>Select a project on the left to view its executive summary.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 14, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 14, marginBottom: 28 }}>
         {[
           { label: 'Planning',     value: planning.length,          color: C.amber,   bg: C.amberBg,   icon: '📋' },
           { label: 'Req & Design', value: reqDesign.length,         color: C.primary, bg: C.primaryBg, icon: '🚀' },
@@ -378,9 +379,64 @@ function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Proje
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px,1fr))', gap: 14 }}>
-        {normalProjects.map(p => renderOverviewProjectCard(p, C.primary))}
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {(['card', 'table'] as const).map((mode) => (
+            <button key={mode} type="button" onClick={() => setProjectView(mode)}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 999,
+                border: `1px solid ${projectView === mode ? C.primary : C.border}`,
+                background: projectView === mode ? C.primaryBg : C.white,
+                color: projectView === mode ? C.primary : C.text,
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 700,
+              }}>
+              {mode === 'card' ? 'Card' : 'Table'}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: C.text2 }}>{normalProjects.length} projects</div>
       </div>
+
+      {projectView === 'card' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px,1fr))', gap: 14 }}>
+          {normalProjects.map(p => renderOverviewProjectCard(p, C.primary))}
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['Project ID', 'Project Name', 'Customer', 'Start Date', 'End Date', 'Stage', '% Progress'].map((label) => (
+                  <th key={label} style={{ textAlign: 'left', padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 12, color: C.text2 }}>{label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {normalProjects.map((p) => {
+                const roots = tasks.filter((t) => t.projectId === p.id && !t.parentId);
+                const prog = roots.length ? Math.round(roots.reduce((s: number, t: any) => s + t.percentComplete, 0) / roots.length) : 0;
+                const stage = PROJECT_STATUS[p.status]?.label ?? p.status;
+                return (
+                  <tr key={p.id} onClick={() => onOpen(p)} style={{ cursor: 'pointer', background: C.white, transition: 'background 0.15s' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = '#F8FAFF'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'; }}>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.primary, fontWeight: 700 }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{p.name || '-'}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{p.client || '-'}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{fmtDate(p.startDate)}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{fmtDate(p.endDate)}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{stage}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{prog}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Hypercare section — collapsible, hidden by default */}
       {hypercareProjects.length > 0 && (
