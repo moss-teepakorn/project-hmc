@@ -81,7 +81,9 @@ export default function Dashboard() {
     if (upcomingTasks.length) messages.push(`มี ${upcomingTasks.length} แผนงานที่ใกล้ครบใน 7 วัน`);
     if (dueMilestones.length) messages.push(`มี ${dueMilestones.length} milestone ที่กำลังจะครบหรือเลย Due Date ภายใน 10 วัน`);
 
-    if (messages.length > 0) {
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const lastNotified = window.localStorage.getItem('projectNotificationsLastDate');
+    if (messages.length > 0 && lastNotified !== todayKey) {
       toast.custom((t) => (
         <div style={{
           padding: 14,
@@ -102,6 +104,7 @@ export default function Dashboard() {
           <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>ตรวจสอบได้ในหน้า Portfolio Overview หรือ Milestones</div>
         </div>
       ));
+      window.localStorage.setItem('projectNotificationsLastDate', todayKey);
     }
     setNotificationsShown(true);
   }, [tasks, milestones, notificationsShown]);
@@ -432,6 +435,8 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
   const openCRs = pendingCRs.length;
 
   const currentDate = new Date();
+  const todayIso = currentDate.toISOString().slice(0, 10);
+
   const upcomingMilestones = ms
     .filter((m) => {
       const due = parseISO(m.dueDate || '');
@@ -443,14 +448,18 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
     .sort((a, b) => Number(parseISO(a.dueDate || '')) - Number(parseISO(b.dueDate || '')))
     .slice(0, 4);
 
-  const snapshotDates = getHalfMonthSnapshotDates(project.startDate, project.endDate);
-  const baselineRows = computeBaselineProgress(pt, snapshotDates);
-  const lastBaseline = baselineRows.filter((row) => parseISO(row.baselineDate) <= currentDate).pop() ?? baselineRows[baselineRows.length - 1];
-  const plannedPercent = lastBaseline?.baselinePercent ?? 0;
-  const scheduleDiff = prog - plannedPercent;
-  const scheduleStatus = baselineRows.length ? (scheduleDiff >= 0 ? 'On Track' : 'Delayed') : 'Plan N/A';
-  const scheduleColor = scheduleStatus === 'Delayed' ? C.red : scheduleStatus === 'On Track' ? C.green : C.text;
-  const scheduleDetail = baselineRows.length ? `Actual ${prog}% vs Planned ${plannedPercent}%` : 'No baseline available';
+  const todayBaseline = computeBaselineProgress(pt, [todayIso]);
+  const plannedPercent = todayBaseline[0]?.baselinePercent ?? 0;
+  const scheduleGap = plannedPercent - prog;
+  const scheduleStatus = !todayBaseline.length ? 'Plan N/A'
+    : scheduleGap > 20 ? 'Stoper'
+    : scheduleGap > 3 ? 'Delay'
+    : 'On Track';
+  const scheduleColor = scheduleStatus === 'Stoper' ? C.red : scheduleStatus === 'Delay' ? C.amber : C.green;
+  const scheduleDetail = `Plan ${plannedPercent}% · Actual ${prog}%`;
+  const healthLabel = scheduleStatus;
+  const healthValue = `${prog}%`;
+  const healthSubtitle = `Plan ${plannedPercent}% by today`;
 
   const getStageLabel = (name: string) => {
     const lower = String(name || '').toLowerCase();
@@ -525,9 +534,9 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
           <div style={{ fontSize: 12, color: C.text2 }}>HR Solution Implementation · Steering Committee View</div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          <Badge bg={scheduleStatus === 'Delayed' ? C.redBg : C.greenBg} color={scheduleColor}>{scheduleStatus === 'Delayed' ? 'Attention Required' : 'Project Health: On Track'}</Badge>
-          {openIssues + openRisks > 0 && <Badge bg={C.amberBg} color={C.amber}>Attention Required</Badge>}
+          <Badge bg={scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg} color={scheduleColor}>{scheduleStatus}</Badge>
           <span style={{ fontSize: 11, color: C.text2, padding: '8px 12px', borderRadius: 999, background: C.bg }}>Last Updated: {fmtDate(currentDate.toISOString().slice(0, 10))}</span>
+          <Btn small onClick={onOpen} style={{ padding: '8px 10px', minWidth: 0, width: 'auto' }}><Eye size={14} /></Btn>
         </div>
       </div>
 
@@ -536,7 +545,7 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Executive Summary</div>
-              <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.7, marginTop: 10 }}>{overviewText}</div>
+              <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.6, marginTop: 10, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{overviewText}</div>
             </div>
             <Badge bg={C.primaryBg} color={C.primary}>Decision Needed: Confirm Phase 1 Timeline</Badge>
           </div>
@@ -550,7 +559,7 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
           </Card>
           <Card style={{ padding: '14px 16px', display: 'grid', gap: 8 }}>
             <div style={{ fontSize: 11, color: C.text2 }}>Schedule Status</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: scheduleColor }}>{scheduleDiff >= 0 ? `+${scheduleDiff}%` : `${scheduleDiff}%`}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: scheduleColor }}>{plannedPercent}%</div>
             <div style={{ fontSize: 11, color: C.text2 }}>{scheduleDetail}</div>
           </Card>
         </div>
@@ -558,12 +567,12 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 12, marginBottom: 18 }}>
         {[
-          { title: 'Progress', value: `${prog}%`, detail: `${doneTasks}/${totalTasks} completed`, color: C.primary, bg: C.primaryBg },
+          { title: 'Overall Progress', value: `${prog}%`, detail: `${doneTasks}/${totalTasks} completed`, color: C.primary, bg: C.primaryBg },
+          { title: 'Schedule Status', value: `${plannedPercent}%`, detail: scheduleDetail, color: scheduleColor, bg: scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg },
+          { title: 'Project Health', value: healthValue, detail: healthSubtitle, color: scheduleColor, bg: scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg },
           { title: 'Payment Collected', value: `฿${fmtMoney(paidAmt)}`, detail: `Outstanding ฿${fmtMoney(outstandingAmt)}`, color: C.green, bg: C.greenBg },
           { title: 'Resource Usage', value: `${tUsedMD}/${tBudMD}`, detail: 'Mandays used / budget', color: C.amber, bg: C.amberBg },
           { title: 'Risks / Issues', value: `${openRisks}/${openIssues}`, detail: `${openRisks} open risks`, color: openRisks ? C.red : C.green, bg: openRisks ? C.redBg : C.greenBg },
-          { title: 'Change Requests', value: `${openCRs}`, detail: 'Pending review', color: openCRs ? C.blue : C.green, bg: openCRs ? C.blueBg : C.greenBg },
-          { title: 'Billed', value: `฿${fmtMoney(billedAmt)}`, detail: `${payPct}% collected`, color: C.text, bg: C.bg },
         ].map((item) => (
           <Card key={item.title} style={{ padding: '14px 14px', minHeight: 106 }}>
             <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>{item.title}</div>
