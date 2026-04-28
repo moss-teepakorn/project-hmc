@@ -762,6 +762,7 @@ function formatDmyInput(raw: string): string {
 }
 
 function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Task[]; selectedTask: Task | null; preset: { anchorId: string | null; mode: 'main' | 'sub'; position: 'before' | 'after' | 'append' }; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
+  const { members, activeProject } = useStore();
   const todayIso    = new Date().toISOString().split('T')[0];
   const nextWeekIso = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
   const [form, setForm] = useState<Partial<Task>>({
@@ -916,6 +917,7 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
 }
 
 function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertAfter }: { task:Task; tasks:Task[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void; onInsertBefore: () => void; onInsertAfter: () => void }) {
+  const { members, activeProject } = useStore();
   const [form, setForm] = useState<Partial<Task>>({
     ...task,
     startDate: task.startDate ?? '',
