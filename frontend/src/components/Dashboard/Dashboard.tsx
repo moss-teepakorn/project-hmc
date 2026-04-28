@@ -33,10 +33,11 @@ export default function Dashboard() {
     const onHome = () => {
       setSelected(null);
       setDashboardTab('overview');
+      fetchTasks();
     };
     window.addEventListener('app-home', onHome);
     return () => window.removeEventListener('app-home', onHome);
-  }, []);
+  }, [fetchTasks]);
 
   // Note: fetchProjects is called from App.tsx, not needed here
 
