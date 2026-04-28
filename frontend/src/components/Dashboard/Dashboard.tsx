@@ -468,6 +468,7 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
       { label: 'Requirement & Gap Analysis', keywords: ['requirement', 'gap', 'analysis', 'gathering'] },
       { label: 'Business Blueprint', keywords: ['blueprint', 'business blueprint'] },
       { label: 'System Configuration', keywords: ['configuration', 'system config', 'environment', 'setup'] },
+      { label: 'Data Migration', keywords: ['migration', 'data migration', 'data move'] },
       { label: 'UAT & Parallel Run', keywords: ['uat', 'parallel', 'parallel run', 'testing', 'defects'] },
       { label: 'Go-live & Hypercare', keywords: ['go-live', 'go live', 'hypercare', 'production', 'support'] },
     ];
@@ -475,33 +476,53 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
     return found ? found.label : name || 'Main Task';
   };
 
-  const stageTasks = rootTasksSorted.slice(0, 6).map((t) => ({
-    id: t.id,
-    name: getStageLabel(t.taskName),
-    progress: t.percentComplete,
-  }));
+  const phaseLabels = [
+    'Project Initiation',
+    'Requirement & Gap Analysis',
+    'Business Blueprint',
+    'System Configuration',
+    'Data Migration',
+    'UAT & Parallel Run',
+    'Go-live & Hypercare',
+  ];
 
-  const nextActions = [
-    ...upcomingMilestones.map((m) => ({
-      title: `Confirm milestone: ${m.name}`,
-      subtitle: `Due ${m.dueDate ? fmtDate(m.dueDate) : 'TBD'}`,
-      date: m.dueDate,
-    })),
-    ...iss.filter((i) => i.status === 'Open' || i.status === 'In Progress').slice(0, 2).map((i) => ({
-      title: `Resolve issue: ${i.title}`,
-      subtitle: `Assigned to ${i.assignedTo || 'team'}`,
-      date: i.issueDate,
-    })),
-    ...pendingCRs.slice(0, 1).map((c) => ({
-      title: `Review CR: ${c.crId || ''} ${c.title}`.trim(),
-      subtitle: `Status: ${c.status}`,
-      date: c.requestDate,
-    })),
-  ].slice(0, 4);
+  const phaseProgress = rootTasksSorted.reduce<Record<string, { total: number; count: number }>>((acc, t) => {
+    const phaseName = t.phase && String(t.phase).trim() ? String(t.phase).trim() : getStageLabel(t.taskName);
+    const label = phaseLabels.includes(phaseName) ? phaseName : getStageLabel(t.taskName);
+    if (!acc[label]) acc[label] = { total: 0, count: 0 };
+    acc[label].total += t.percentComplete;
+    acc[label].count += 1;
+    return acc;
+  }, {});
 
-  const actionItems = nextActions.length
-    ? nextActions
-    : [{ title: 'No active action items', subtitle: 'No action items at this time', date: '' }];
+  const stageTasks = phaseLabels
+    .filter((label) => phaseProgress[label]?.count)
+    .map((label) => ({
+      id: label,
+      name: label,
+      progress: Math.round(phaseProgress[label].total / phaseProgress[label].count),
+    }));
+
+  const recentFinishedTasks = pt
+    .filter((t) => t.actualFinish)
+    .sort((a, b) => {
+      const da = parseISO(a.actualFinish || '');
+      const db = parseISO(b.actualFinish || '');
+      if (!isValid(db) && !isValid(da)) return 0;
+      if (!isValid(db)) return -1;
+      if (!isValid(da)) return 1;
+      return Number(db) - Number(da);
+    })
+    .slice(0, 3)
+    .map((t) => ({
+      title: t.taskName,
+      subtitle: t.actualFinish ? `Finished ${fmtDate(t.actualFinish)}` : '',
+      date: t.actualFinish,
+    }));
+
+  const actionItems = recentFinishedTasks.length
+    ? recentFinishedTasks
+    : [{ title: 'No recent completed tasks', subtitle: 'No finished tasks found', date: '' }];
 
   const milestoneStatusCards = upcomingMilestones.map((m) => {
     const due = parseISO(m.dueDate || '');
@@ -676,7 +697,6 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Action Items & Recent Updates</div>
               <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>รายการที่ต้องติดตามล่าสุด</div>
             </div>
-            <button style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View MOM</button>
           </div>
           <div style={{ display: 'grid', gap: 12 }}>
             {actionItems.map((item, index) => (

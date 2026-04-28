@@ -39,6 +39,7 @@ export interface Task {
   startDate: string;
   endDate: string;
   actualFinish: string;   // ← new: actual finish date
+  phase?: string;
   duration: number;
   percentComplete: number;
   resource: string;

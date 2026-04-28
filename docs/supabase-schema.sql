@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   
   wbs VARCHAR(100),
   task_name VARCHAR(255) NOT NULL,
+  phase VARCHAR(100),
   description TEXT,
   
   -- Dates

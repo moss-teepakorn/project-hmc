@@ -30,6 +30,16 @@ const COLS = [
 ];
 const TABLE_FIXED_W = 52 + 94 + 94 + 120 + 46 + 120 + 160 + 76;
 
+const PHASE_OPTIONS = [
+  'Project Initiation',
+  'Requirement & Gap Analysis',
+  'Business Blueprint',
+  'System Configuration',
+  'Data Migration',
+  'UAT & Parallel Run',
+  'Go-live & Hypercare',
+] as const;
+
 // Inline % editor
 function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean; onSave: (n: number) => void }) {
   const [editing, setEditing] = useState(false);
@@ -760,7 +770,8 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
     endDate: nextWeekIso,
     resource:'',
     parentId:'',
-    relatedTask:''
+    relatedTask:'',
+    phase: PHASE_OPTIONS[0],
   });
   const [insertType, setInsertType] = useState<'main' | 'sub'>(preset.mode);
   const [insertPosition, setInsertPosition] = useState<'before' | 'after' | 'append'>(preset.position);
@@ -788,6 +799,12 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
             </button>
           </div>
         </FormRow>
+        {insertType === 'main' && (
+          <FormRow label="Phase" required>
+            <Select value={String(form.phase || PHASE_OPTIONS[0])} onChange={v => setForm(f => ({ ...f, phase: v }))}
+              options={PHASE_OPTIONS.map(p => ({ value: p, label: p }))} />
+          </FormRow>
+        )}
 
         <FormRow label="Insert Position">
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -869,7 +886,15 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
             }
           }
 
-          onSave({ ...form, parentId, order, startDate, endDate, duration: dur });
+          onSave({
+            ...form,
+            parentId,
+            order,
+            startDate,
+            endDate,
+            duration: dur,
+            phase: String(form.phase || (selectedTask?.phase ?? PHASE_OPTIONS[0])),
+          });
         }}>Create Task</Btn>
       </div>
     </Modal>
@@ -892,6 +917,10 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
         <input autoFocus value={form.taskName??''} onChange={e=>up('taskName',e.target.value)}
           style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
           onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
+      </FormRow>
+      <FormRow label="Phase">
+        <Select value={String(form.phase || PHASE_OPTIONS[0])} onChange={v => up('phase', v)}
+          options={PHASE_OPTIONS.map(p => ({ value: p, label: p }))} />
       </FormRow>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <FormRow label="Start Date"><Input type="date" value={form.startDate ?? ''} onChange={v => up('startDate', v)} /></FormRow>
