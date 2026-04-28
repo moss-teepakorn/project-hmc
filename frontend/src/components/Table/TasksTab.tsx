@@ -74,7 +74,7 @@ function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean
 }
 
 export default function TasksTab({ projectId }: Props) {
-  const { tasks, fetchTasks, createTask, updateTask, deleteTask } = useStore();
+  const { tasks, members, activeProject, fetchTasks, createTask, updateTask, deleteTask } = useStore();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView]         = useState<ViewMode>(() => typeof window !== 'undefined' && window.innerWidth < 768 ? 'table' : 'split');
@@ -835,9 +835,17 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
       </div>
       {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
       <FormRow label="Resource">
-        <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
-          style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
-          onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
+        <>
+          <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
+            list="task-resource-options"
+            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+            onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
+          <datalist id="task-resource-options">
+            {members.filter(m => m.projectId === activeProject?.id).map((member) => (
+              <option key={member.id} value={member.name || member.nickname || ''} />
+            ))}
+          </datalist>
+        </>
       </FormRow>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <FormRow label="Parent Task">
@@ -943,9 +951,17 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
         </FormRow>
       </div>
       <FormRow label="Resource">
-        <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
-          style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
-          onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
+        <>
+          <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
+            list="task-resource-options"
+            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+            onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
+          <datalist id="task-resource-options">
+            {members.filter(m => m.projectId === activeProject?.id).map((member) => (
+              <option key={member.id} value={member.name || member.nickname || ''} />
+            ))}
+          </datalist>
+        </>
       </FormRow>
       <FormRow label="Parent Task (change to restructure)">
         <Select value={form.parentId??''} onChange={v=>up('parentId',v)}
