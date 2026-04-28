@@ -534,35 +534,22 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
           <div style={{ fontSize: 12, color: C.text2 }}>HR Solution Implementation · Steering Committee View</div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          <Badge bg={scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg} color={scheduleColor}>{scheduleStatus}</Badge>
+          <Badge bg={scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg} color={scheduleColor}>Project Health : {scheduleStatus}</Badge>
           <span style={{ fontSize: 11, color: C.text2, padding: '8px 12px', borderRadius: 999, background: C.bg }}>Last Updated: {fmtDate(currentDate.toISOString().slice(0, 10))}</span>
           <Btn small onClick={onOpen} style={{ padding: '8px 10px', minWidth: 0, width: 'auto' }}><Eye size={14} /></Btn>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.15fr 0.85fr', gap: 16, marginBottom: 18 }}>
-        <Card style={{ padding: '16px 18px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginBottom: 18 }}>
+        <Card style={{ padding: '14px 16px', minHeight: 120 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Executive Summary</div>
-              <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.6, marginTop: 10, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{overviewText}</div>
+              <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.45, marginTop: 10, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{overviewText}</div>
             </div>
             <Badge bg={C.primaryBg} color={C.primary}>Decision Needed: Confirm Phase 1 Timeline</Badge>
           </div>
         </Card>
-
-        <div style={{ display: 'grid', gap: 12 }}>
-          <Card style={{ padding: '14px 16px', display: 'grid', gap: 8 }}>
-            <div style={{ fontSize: 11, color: C.text2 }}>Overall Progress</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>{prog}%</div>
-            <div style={{ fontSize: 11, color: C.text2 }}>{doneTasks}/{totalTasks} tasks completed</div>
-          </Card>
-          <Card style={{ padding: '14px 16px', display: 'grid', gap: 8 }}>
-            <div style={{ fontSize: 11, color: C.text2 }}>Schedule Status</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: scheduleColor }}>{plannedPercent}%</div>
-            <div style={{ fontSize: 11, color: C.text2 }}>{scheduleDetail}</div>
-          </Card>
-        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 12, marginBottom: 18 }}>
