@@ -141,7 +141,13 @@ export default function TasksTab({ projectId }: Props) {
   const projectTasks = tasks.filter(t => t.projectId === projectId);
   const visible      = flattenTree(projectTasks, expanded);
   const isTableView = view === 'table';
-  const viewModes: ViewMode[] = isMobile ? ['table'] : ['table', 'split', 'gantt'];
+  const viewModes: ViewMode[] = isMobile ? ['table'] : ['table', 'split', 'gantt', 'kanban'];
+  const kanbanColumns = PHASE_OPTIONS.map((phase) => ({
+    phase,
+    tasks: projectTasks
+      .filter((t) => (t.phase || PHASE_OPTIONS[0]) === phase)
+      .sort((a, b) => compareWbs(a.wbs, b.wbs)),
+  }));
 
   useEffect(() => {
     if (isMobile && view !== 'table') setView('table');
@@ -155,6 +161,26 @@ export default function TasksTab({ projectId }: Props) {
     try { await updateTask(id, updates); }
     catch { toast.error('Failed to save'); }
   }, [updateTask]);
+
+  const handleCardDragStart = useCallback((task: Task) => (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.setData('text/plain', task.id);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleColumnDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  }, []);
+
+  const handleColumnDrop = useCallback(async (phase: string, e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (!taskId) return;
+    const task = projectTasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const currentPhase = task.phase || PHASE_OPTIONS[0];
+    if (currentPhase === phase) return;
+    await handleUpdate(task.id, { phase });
+  }, [projectTasks, handleUpdate]);
 
   const handleUpdateDate = useCallback(async (id: string, field: 'startDate' | 'endDate' | 'actualFinish', value: string) => {
     const raw = String(value || '').trim();
@@ -649,6 +675,57 @@ export default function TasksTab({ projectId }: Props) {
     </div>
   );
 
+  const kanbanContent = (
+    <div style={{ flex:1, overflow:'hidden', minHeight:0, display:'flex', gap:16, padding:'16px', background:C.bg2 }}>
+      {kanbanColumns.map(({ phase, tasks }) => (
+        <div key={phase} onDragOver={handleColumnDragOver} onDrop={(e) => handleColumnDrop(phase, e)}
+          style={{ flex:1, minWidth:240, display:'flex', flexDirection:'column', gap:10, background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:12 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:6 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.text }}>{phase}</div>
+            <div style={{ fontSize:11, color:C.text3 }}>{tasks.length}</div>
+          </div>
+          <div style={{ flex:1, minHeight:0, overflowY:'auto', display:'flex', flexDirection:'column', gap:10 }}>
+            {tasks.length === 0 ? (
+              <div style={{ color:C.text3, fontSize:12, padding:'16px 8px', border:`1px dashed ${C.border}`, borderRadius:12, textAlign:'center' }}>No tasks</div>
+            ) : tasks.map((task) => {
+              const isSel = selected === task.id;
+              return (
+                <div key={task.id}
+                  draggable
+                  onDragStart={handleCardDragStart(task)}
+                  onClick={() => setSelected(task.id)}
+                  style={{ display:'flex', flexDirection:'column', gap:8, padding:12, borderRadius:14, border:isSel?`1px solid ${C.primary}`:`1px solid ${C.border}`, background:isSel?C.primaryBg:C.white, boxShadow:'0 1px 4px rgba(0,0,0,0.08)', cursor:'pointer' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, flexWrap:'wrap' }}>
+                    <div style={{ minWidth:0, flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{task.taskName || 'Untitled task'}</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:6, fontSize:11, color:C.text3 }}>
+                        <span>{task.wbs || '—'}</span>
+                        <span>{task.duration}d</span>
+                        <span>{task.percentComplete}%</span>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
+                      <button onClick={(e) => { e.stopPropagation(); setEditModal(task); }}
+                        style={{ padding:'6px 10px', borderRadius:8, border:'none', background:C.primaryBg, color:C.primary, fontSize:11, fontWeight:600, cursor:'pointer' }}>
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:11, color:C.text2 }}>
+                    <div><strong style={{ color:C.text, fontWeight:600 }}>Start:</strong> {task.startDate ? isoToDmy(task.startDate) : '—'}</div>
+                    <div><strong style={{ color:C.text, fontWeight:600 }}>Finish:</strong> {task.endDate ? isoToDmy(task.endDate) : '—'}</div>
+                    <div><strong style={{ color:C.text, fontWeight:600 }}>Actual:</strong> {task.actualFinish ? isoToDmy(task.actualFinish) : '—'}</div>
+                    <div><strong style={{ color:C.text, fontWeight:600 }}>Resource:</strong> {task.resource || '—'}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
       {/* Sub-toolbar with zoom controls */}
@@ -658,7 +735,7 @@ export default function TasksTab({ projectId }: Props) {
             {viewModes.map(m => (
               <button key={m} onClick={()=>setView(m)}
                 style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif', background:view===m?C.white:C.bg, color:view===m?C.primary:C.text2, boxShadow:view===m?C.shadow:'none', transition:'all 0.15s' }}>
-                {m==='table'?'☰ Table':m==='split'?'⊟ Split':'▦ Gantt'}
+                {m==='table' ? '☰ Table' : m==='split' ? '⊟ Split' : m==='gantt' ? '▦ Gantt' : '▦ Kanban'}
               </button>
             ))}
           </div>
@@ -710,6 +787,11 @@ export default function TasksTab({ projectId }: Props) {
         {((view==='table') || (!isMobile && view==='split')) && (
           <div style={{ width:view==='split'?splitW:undefined, flex:view==='table'?1:undefined, minWidth:300, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column', flexShrink:0 }}>
             {tableContent}
+          </div>
+        )}
+        {(view === 'kanban') && (
+          <div style={{ flex:1, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+            {kanbanContent}
           </div>
         )}
         {/* Resizable divider */}

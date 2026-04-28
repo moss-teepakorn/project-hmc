@@ -137,7 +137,7 @@ export interface Risk {
   status: 'Monitoring' | 'Mitigating' | 'Closed';
 }
 
-export type ViewMode = 'table' | 'split' | 'gantt';
+export type ViewMode = 'table' | 'split' | 'gantt' | 'kanban';
 export type ProjectStatus = Project['status'];
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
