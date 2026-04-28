@@ -238,8 +238,6 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => {
-                      setSelected(null);
-                      setDashboardTab('overview');
                       setActiveProject(null);
                       window.dispatchEvent(new CustomEvent('app-home'));
                     }}
