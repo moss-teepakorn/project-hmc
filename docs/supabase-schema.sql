@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   
   -- Progress
   percent_complete INTEGER DEFAULT 0 CHECK (percent_complete >= 0 AND percent_complete <= 100),
+  status VARCHAR(50) NOT NULL DEFAULT 'Todo' CHECK (status IN ('Todo', 'In Progress', 'Done')),
   
   -- Dependencies
   related_task UUID REFERENCES tasks(id),

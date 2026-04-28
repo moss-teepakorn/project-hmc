@@ -144,6 +144,7 @@ create table if not exists public.tasks (
   actual_finish    text not null default '',
   duration         integer not null default 0,
   percent_complete integer not null default 0,
+  status           text not null default 'Todo',
   resource         text not null default '',
   related_task     text not null default '',
   parent_id        text not null default '',
