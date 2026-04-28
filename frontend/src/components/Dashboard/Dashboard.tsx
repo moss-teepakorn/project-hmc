@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { parseISO, isValid, addDays } from 'date-fns';
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Menu, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, PROJECT_STATUS, MILESTONE_STATUS, TH, TD } from '../Common';
@@ -15,9 +15,7 @@ export default function Dashboard() {
   const { projects, tasks, milestones, issues, risks, changeRequests, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts } = useStore();
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
-  const [selected,   setSelected]   = useState<Project | null>(null);
   const [showAdd,    setShowAdd]    = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showHypercare, setShowHypercare] = useState(false);
   const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>('overview');
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -32,7 +30,6 @@ export default function Dashboard() {
 
   React.useEffect(() => {
     const onHome = () => {
-      setSelected(null);
       setDashboardTab('overview');
     };
     window.addEventListener('app-home', onHome);
@@ -109,18 +106,18 @@ export default function Dashboard() {
     setNotificationsShown(true);
   }, [tasks, milestones, notificationsShown]);
 
-  // Fetch data when project selected
+  // Fetch remaining data when a project is opened from the overview cards
   React.useEffect(() => {
-    if (selected?.id) {
-      fetchTasks(selected.id);
-      fetchMembers(selected.id);
-      fetchIssues(selected.id);
-      fetchRisks(selected.id);
-      fetchCRs(selected.id);
-      fetchMilestones(selected.id);
-      fetchEfforts(selected.id);
+    if (activeProject?.id) {
+      fetchTasks(activeProject.id);
+      fetchMembers(activeProject.id);
+      fetchIssues(activeProject.id);
+      fetchRisks(activeProject.id);
+      fetchCRs(activeProject.id);
+      fetchMilestones(activeProject.id);
+      fetchEfforts(activeProject.id);
     }
-  }, [selected?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]);
+  }, [activeProject?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]);
 
   // Separate normal projects from Hypercare
   const normalProjects = projects.filter(p => p.status !== 'Hyper Care').sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
@@ -134,7 +131,7 @@ export default function Dashboard() {
 
   const handleDelete = async () => {
     if (!deleting) return;
-    try { await deleteProject(deleting.id); if (selected?.id === deleting.id) setSelected(null); toast.success('Project deleted'); }
+    try { await deleteProject(deleting.id); toast.success('Project deleted'); }
     catch { toast.error('Failed to delete'); }
     setDeleting(null);
   };
@@ -142,13 +139,11 @@ export default function Dashboard() {
   const renderProjectCard = (p: Project, compact = false) => {
     const s    = PROJECT_STATUS[p.status] ?? PROJECT_STATUS['Planning'];
     const prog = getProgress(p.id);
-    const isSel = selected?.id === p.id;
     return (
       <div key={p.id}
-        onClick={() => setSelected(p)}
-        style={{ background: isSel ? C.primaryBg : C.white, borderRadius: 10, border: `1px solid ${isSel ? C.primary : C.border}`, padding: '12px 14px', cursor: 'pointer', transition: 'all 0.15s', marginBottom: 8, borderLeft: `4px solid ${p.color || C.primary}` }}
-        onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = '#F8FAFF'; }}
-        onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = C.white; }}>
+        style={{ background: C.white, borderRadius: 10, border: `1px solid ${C.border}`, padding: '12px 14px', cursor: 'pointer', transition: 'all 0.15s', marginBottom: 8, borderLeft: `4px solid ${p.color || C.primary}` }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFF'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = C.white; }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
           <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.35, whiteSpace: 'normal', wordBreak: 'break-word' }}>
             <span style={{ color: C.text2 }}>Project ID : </span>
@@ -199,56 +194,8 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', flexDirection: isMobile ? 'column' : 'row' }}>
-      {/* Mobile hamburger menu */}
-      {isMobile && (
-        <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', background: C.primary, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-          <button onClick={() => setSidebarOpen(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', padding: 4, display: 'flex', alignItems: 'center' }}>
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginLeft: 8 }}>Projects</span>
-        </div>
-      )}
-
-      {/* ── Left panel: project list ─────────────────────────────────────── */}
-      {sidebarOpen && (
-        <div style={{ width: isMobile ? '100%' : 280, minWidth: isMobile ? 'auto' : 240, maxWidth: isMobile ? '100%' : 320, borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none', display: 'flex', flexDirection: 'column', background: C.bg, overflow: 'hidden', maxHeight: isMobile ? '50vh' : '100%' }}>
-        <div style={{ padding: '14px 14px 10px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>Projects</div>
-            <div style={{ fontSize: 10, color: C.text3, marginTop: 1 }}>{allProjects.length} projects</div>
-          </div>
-          <Btn onClick={() => setShowAdd(true)} small style={{ padding: '5px 10px' }}><Plus size={12} /></Btn>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 0' }}>
-          {normalProjects.length === 0 && hypercareProjects.length === 0 && (
-            <div style={{ padding: '30px 10px', textAlign: 'center', color: C.text3, fontSize: 12 }}>No projects yet</div>
-          )}
-          {normalProjects.map(p => renderProjectCard(p))}
-
-          {/* Hypercare section — collapsible, hidden by default */}
-          {hypercareProjects.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <button
-                onClick={() => setShowHypercare(v => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '8px 10px', background: C.amberBg, border: `1px solid ${C.amber}33`, borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: C.amber, fontFamily: 'Poppins, sans-serif', transition: 'all 0.15s' }}>
-                {showHypercare ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                Hyper Care ({hypercareProjects.length})
-              </button>
-              {showHypercare && (
-                <div style={{ marginTop: 6 }}>
-                  {hypercareProjects.map(p => renderProjectCard(p))}
-                </div>
-              )}
-            </div>
-          )}
-          <div style={{ height: 16 }} />
-        </div>
-      </div>
-      )}
-
-      {/* ── Right panel: summary or welcome ─────────────────────────────── */}
+      {/* ── Main content panel ─────────────────────────────────────────── */}
       <div style={{ flex: 1, overflow: 'auto', background: C.bg }}>
-        {!selected ? (
           <div style={{ width: '100%', minHeight: 0 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '16px 14px 0' : '24px 32px 0' }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -272,6 +219,9 @@ export default function Dashboard() {
                   </button>
                 ))}
               </div>
+              <Btn onClick={() => setShowAdd(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }}>
+                <Plus size={12} style={{ marginRight: 6 }} /> Add Project
+              </Btn>
             </div>
             {dashboardTab === 'overview' ? (
               <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} isMobile={isMobile} />
@@ -279,13 +229,6 @@ export default function Dashboard() {
               <PortfolioReportSummary />
             )}
           </div>
-        ) : (
-          <ProjectSummaryPanel
-            project={selected}
-            onOpen={() => setActiveProject(selected)}
-            isMobile={isMobile}
-          />
-        )}
       </div>
 
       {showAdd  && <ProjectModal onClose={() => setShowAdd(false)} />}
@@ -360,7 +303,7 @@ function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Proje
   return (
     <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', width: '100%' }}>
       <h2 style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: C.text, marginBottom: 6 }}>Portfolio Overview</h2>
-      <p style={{ color: C.text2, fontSize: 13, marginBottom: 24 }}>Select a project on the left to view its executive summary.</p>
+      <p style={{ color: C.text2, fontSize: 13, marginBottom: 24 }}>Select a project from the list below to view its executive summary.</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 14, marginBottom: 28 }}>
         {[
