@@ -512,7 +512,7 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
     };
   });
 
-  const overviewText = baselineRows.length
+  const overviewText = todayBaseline.length
     ? `โครงการอยู่ในสถานะ ${s.label} มีความคืบหน้า ${prog}% และอยู่ในระดับ ${scheduleStatus.toLowerCase()} เมื่อเทียบกับแผนงาน. มี ${openIssues} issue, ${openRisks} risk และ ${openCRs} CR ที่ต้องติดตาม.`
     : `โครงการอยู่ในสถานะ ${s.label} มีความคืบหน้าปัจจุบัน ${prog}% และมี ${openIssues} issue, ${openRisks} risk, ${openCRs} CR ที่ต้องติดตาม.`;
 
