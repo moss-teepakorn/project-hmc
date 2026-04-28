@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { parseISO, isValid, addDays } from 'date-fns';
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Home } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, PROJECT_STATUS, MILESTONE_STATUS, TH, TD } from '../Common';
@@ -224,6 +224,9 @@ export default function Dashboard() {
                     type="button"
                     onClick={() => setSelected(null)}
                     style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
                       padding: '6px 12px',
                       borderRadius: 10,
                       border: `1px solid ${C.border}`,
@@ -234,9 +237,7 @@ export default function Dashboard() {
                       fontSize: 12,
                       fontFamily: 'Poppins, sans-serif',
                     }}
-                  >
-                    Back
-                  </button>
+                  ><Home size={14} /> Home</button>
                 )}
               </div>
               <Btn onClick={() => setShowAdd(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }}>
