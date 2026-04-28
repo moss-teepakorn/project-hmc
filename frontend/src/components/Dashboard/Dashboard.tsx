@@ -240,6 +240,8 @@ export default function Dashboard() {
                     onClick={() => {
                       setSelected(null);
                       setDashboardTab('overview');
+                      setActiveProject(null);
+                      window.dispatchEvent(new CustomEvent('app-home'));
                     }}
                     style={{
                       display: 'flex',
