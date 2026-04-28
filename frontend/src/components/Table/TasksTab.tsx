@@ -771,7 +771,7 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
     resource:'',
     parentId:'',
     relatedTask:'',
-    phase: PHASE_OPTIONS[0],
+    phase: selectedTask?.phase || PHASE_OPTIONS[0],
   });
   const [insertType, setInsertType] = useState<'main' | 'sub'>(preset.mode);
   const [insertPosition, setInsertPosition] = useState<'before' | 'after' | 'append'>(preset.position);
@@ -886,6 +886,7 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
             }
           }
 
+          const selectedParent = tasks.find(t => t.id === (form.parentId as string));
           onSave({
             ...form,
             parentId,
@@ -893,7 +894,12 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
             startDate,
             endDate,
             duration: dur,
-            phase: String(form.phase || (selectedTask?.phase ?? PHASE_OPTIONS[0])),
+            phase: String(
+              form.phase ||
+              selectedParent?.phase ||
+              selectedTask?.phase ||
+              PHASE_OPTIONS[0]
+            ),
           });
         }}>Create Task</Btn>
       </div>
@@ -907,6 +913,7 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
     startDate: task.startDate ?? '',
     endDate: task.endDate ?? '',
     actualFinish: task.actualFinish ?? '',
+    phase: task.phase ?? PHASE_OPTIONS[0],
   });
   const up = (k:string,v:string|number) => setForm(p=>({...p,[k]:v}));
   const dur = calcDuration(String(form.startDate || ''), String(form.endDate || ''));

@@ -402,7 +402,35 @@ export const taskApi = {
       .single();
     if (error) throw new Error(error.message);
     const updated = rowToObj<Task>(data);
-    // Fetch all tasks and recalc full structure + parent dates/percent
+
+    // If this is a main/root task and its phase was updated, propagate the phase to all descendant subtasks.
+    if (row.phase !== undefined && (!updated.parentId || updated.parentId === '')) {
+      const allTasksForProject = await taskApi.getByProject(updated.projectId);
+      const childrenByParent = allTasksForProject.data.reduce<Record<string, Task[]>>((map, task) => {
+        const pid = String(task.parentId || '');
+        map[pid] = map[pid] || [];
+        map[pid].push(task);
+        return map;
+      }, {});
+      const descendantIds: string[] = [];
+      const queue = [updated.id];
+      while (queue.length) {
+        const parentId = queue.shift()!;
+        const children = childrenByParent[parentId] || [];
+        for (const child of children) {
+          descendantIds.push(child.id);
+          queue.push(child.id);
+        }
+      }
+      if (descendantIds.length) {
+        const { error: phaseErr } = await supabase
+          .from('tasks')
+          .update({ phase: updated.phase })
+          .in('id', descendantIds);
+        if (phaseErr) throw new Error(phaseErr.message);
+      }
+    }
+
     const all = await taskApi.getByProject(updated.projectId);
     const structured = recalcStructure(all.data);
     const allTasks = recalcParents(structured);
