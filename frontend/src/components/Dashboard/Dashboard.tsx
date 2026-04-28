@@ -31,6 +31,7 @@ export default function Dashboard() {
 
   React.useEffect(() => {
     const onHome = () => {
+      setSelected(null);
       setDashboardTab('overview');
     };
     window.addEventListener('app-home', onHome);
