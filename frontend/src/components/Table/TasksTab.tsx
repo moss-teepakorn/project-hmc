@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
 import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C } from '../Common';
-import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth, compareWbs, isoToDmy, dmyToIso } from '../../utils';
+import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import type { Task, ViewMode } from '../../types';
 
@@ -842,9 +842,10 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
             style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
             onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
           <datalist id="task-resource-options">
-            {members.filter(m => m.projectId === activeProject?.id).map((member) => (
-              <option key={member.id} value={member.name || member.nickname || ''} />
-            ))}
+            {members.filter(m => m.projectId === activeProject?.id).map((member) => {
+              const displayName = formatNameWithLastInitial(member.name || member.nickname || '');
+              return <option key={member.id} value={displayName} />;
+            })}
           </datalist>
         </>
       </FormRow>
@@ -959,9 +960,10 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
             style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
             onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
           <datalist id="task-resource-options">
-            {members.filter(m => m.projectId === activeProject?.id).map((member) => (
-              <option key={member.id} value={member.name || member.nickname || ''} />
-            ))}
+            {members.filter(m => m.projectId === activeProject?.id).map((member) => {
+              const displayName = formatNameWithLastInitial(member.name || member.nickname || '');
+              return <option key={member.id} value={displayName} />;
+            })}
           </datalist>
         </>
       </FormRow>

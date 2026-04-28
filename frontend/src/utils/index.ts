@@ -236,6 +236,16 @@ export const avatarColor = (name: string): string => {
 export const getInitials = (name: string): string =>
   name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
 
+export const formatNameWithLastInitial = (name: string): string => {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  const normalize = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  const first = normalize(parts[0]);
+  if (parts.length === 1) return first;
+  const lastInitial = parts[parts.length - 1].charAt(0).toUpperCase();
+  return `${first}.${lastInitial}`;
+};
+
 // ── Role colors ───────────────────────────────────────────────────────────────
 const ROLE_COLORS: Record<string, string> = {
   'Project Sponsor': '#8B5CF6', 'Project Advisor': '#6366F1',
