@@ -732,6 +732,20 @@ export default function TasksTab({ projectId }: Props) {
                         <span>{task.duration}d</span>
                         <span>{task.percentComplete}%</span>
                       </div>
+                      <div>
+                        {(() => {
+                          const status = getTaskStatus(task);
+                          const style = PROCESS_STATUS_STYLE[status] || { bg: C.bg2, color: C.text };
+                          return (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999,
+                              fontSize: 11, fontWeight: 700, background: style.bg, color: style.color, marginTop: 4
+                            }}>
+                              {status}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </div>
                     <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
                       <button onClick={(e) => { e.stopPropagation(); setEditModal(task); }}
