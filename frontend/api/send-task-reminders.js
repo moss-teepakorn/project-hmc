@@ -121,17 +121,18 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Missing email or Supabase configuration in environment' });
   }
 
-  const { projectId, test } = req.body || {};
-  const secret = req.headers['x-reminder-secret'] || req.query.secret;
-  const isTestMode = Boolean(test);
-  if (!isTestMode && secret !== REMINDER_API_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  try {
+    const { projectId, test } = req.body || {};
+    const secret = req.headers['x-reminder-secret'] || req.query.secret;
+    const isTestMode = Boolean(test);
+    if (!isTestMode && secret !== REMINDER_API_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
-  const now = new Date();
-  const nowKey = now.toISOString().slice(0, 10);
-  const currentTime = now.toISOString().slice(11, 16);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
+    const now = new Date();
+    const nowKey = now.toISOString().slice(0, 10);
+    const currentTime = now.toISOString().slice(11, 16);
 
   let projectsResp = await supabase
     .from('projects')
@@ -155,16 +156,6 @@ export default async function handler(req, res) {
       return !alreadySentToday && currentTime >= scheduled;
     });
   }
-  if (projectsResp.error) return res.status(500).json({ error: projectsResp.error.message });
-
-  const projects = (projectsResp.data || []).filter((project) => {
-    if (!project.email_notification_time) return false;
-    const scheduled = String(project.email_notification_time).slice(0, 5);
-    const alreadySentToday = project.email_notification_last_sent_at
-      ? String(new Date(project.email_notification_last_sent_at).toISOString().slice(0, 10)) === nowKey
-      : false;
-    return !alreadySentToday && currentTime >= scheduled;
-  });
 
   const results = [];
 
@@ -238,4 +229,8 @@ export default async function handler(req, res) {
   }
 
   return res.status(200).json({ results });
+  } catch (error) {
+    console.error('Reminder handler error', error);
+    return res.status(500).json({ error: String(error) || 'Internal Server Error' });
+  }
 }
