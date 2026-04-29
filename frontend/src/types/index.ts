@@ -9,6 +9,11 @@ export interface Project {
   endDate: string;
   description: string;
   color: string;
+  emailNotificationEnabled: boolean;
+  emailNotificationMode: 'task' | 'custom';
+  emailNotificationRecipients: string;
+  emailNotificationTime: string;
+  emailNotificationLastSentAt?: string;
 }
 
 export interface ProjectEnvironment {

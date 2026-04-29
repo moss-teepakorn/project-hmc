@@ -32,7 +32,12 @@ CREATE TABLE IF NOT EXISTS projects (
   description TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  owner_id UUID
+  owner_id UUID,
+  email_notification_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  email_notification_mode VARCHAR(20) NOT NULL DEFAULT 'task' CHECK (email_notification_mode IN ('task','custom')),
+  email_notification_recipients TEXT NOT NULL DEFAULT '',
+  email_notification_time TIME NOT NULL DEFAULT '08:00',
+  email_notification_last_sent_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_projects_status ON projects(status);

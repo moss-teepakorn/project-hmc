@@ -25,17 +25,21 @@ export default function ProjectModal({ project, onClose }: Props) {
   const [copyFromProjectId, setCopyFromProjectId] = useState('');
   const [copyScope, setCopyScope] = useState<'all' | 'main'>('all');
   const [form, setForm] = useState({
-    name:        project?.name        ?? '',
-    code:        project?.code        ?? '',
-    client:      project?.client      ?? '',
-    status:      project?.status      ?? 'Planning',
-    startDate:   project?.startDate   ?? '',
-    endDate:     project?.endDate     ?? '',
-    description: normalizeDescription(project?.description ?? ''),
-    color:       project?.color       ?? '#4F46E5',
+    name:                        project?.name                        ?? '',
+    code:                        project?.code                        ?? '',
+    client:                      project?.client                      ?? '',
+    status:                      project?.status                      ?? 'Planning',
+    startDate:                   project?.startDate                   ?? '',
+    endDate:                     project?.endDate                     ?? '',
+    description:                 normalizeDescription(project?.description ?? ''),
+    color:                       project?.color                       ?? '#4F46E5',
+    emailNotificationEnabled:    project?.emailNotificationEnabled    ?? false,
+    emailNotificationMode:       project?.emailNotificationMode       ?? 'task',
+    emailNotificationRecipients: project?.emailNotificationRecipients ?? '',
+    emailNotificationTime:       project?.emailNotificationTime       ?? '08:00',
   });
 
-  const up = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+  const up = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Project name is required'); return; }
@@ -125,6 +129,38 @@ export default function ProjectModal({ project, onClose }: Props) {
           ))}
         </div>
       </FormRow>
+      <FormRow label="Enable Email Reminder">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="checkbox"
+            checked={form.emailNotificationEnabled}
+            onChange={(e) => up('emailNotificationEnabled', e.target.checked)}
+          />
+          <span style={{ fontSize: 13, color: '#334155' }}>Send daily reminder emails for this project</span>
+        </div>
+      </FormRow>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <FormRow label="Reminder Mode">
+          <Select value={form.emailNotificationMode} onChange={v => up('emailNotificationMode', v)}
+            options={[
+              { value: 'task', label: 'Use task assignees and fallback recipients' },
+              { value: 'custom', label: 'Send only to custom recipients' },
+            ]} />
+        </FormRow>
+        <FormRow label="Reminder Time">
+          <Input type="time" value={form.emailNotificationTime} onChange={v => up('emailNotificationTime', v)} />
+        </FormRow>
+      </div>
+      <FormRow label="Custom Recipients">
+        <Input
+          value={form.emailNotificationRecipients}
+          onChange={v => up('emailNotificationRecipients', v)}
+          placeholder="somchai@domain.com, apichart@domain.com"
+        />
+      </FormRow>
+      <div style={{ fontSize: 12, color: '#475569', marginBottom: 10 }}>
+        If task assignee email is not available, fallback recipients from Custom Recipients will be used.
+      </div>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : project ? 'Save Changes' : 'Create Project'}</Btn>
