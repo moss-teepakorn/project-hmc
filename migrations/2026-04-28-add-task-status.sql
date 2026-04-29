@@ -11,7 +11,7 @@ BEGIN
       AND constraint_name = 'chk_tasks_status'
   ) THEN
     ALTER TABLE tasks
-      ADD CONSTRAINT chk_tasks_status CHECK (status IN ('Todo', 'In Progress', 'Blocked/Delay', 'Done'));
+      ADD CONSTRAINT chk_tasks_status CHECK (status IN ('Todo', 'In Progress', 'Block/Delay', 'Done'));
   END IF;
 END$$;
 

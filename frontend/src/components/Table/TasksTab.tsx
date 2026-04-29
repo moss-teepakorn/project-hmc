@@ -40,13 +40,13 @@ const PHASE_OPTIONS = [
   'Go-live & Hypercare',
 ] as const;
 
-const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Blocked/Delay', 'Done'] as const;
+const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Block/Delay', 'Done'] as const;
 
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
 
 function getTaskStatus(task: Task): TaskStatus {
   const status = String(task.status || '');
-  if (status === 'Review') return 'Blocked/Delay';
+  if (status === 'Review') return 'Block/Delay';
   if (TASK_STATUS_OPTIONS.includes(status as TaskStatus)) {
     return status as TaskStatus;
   }
