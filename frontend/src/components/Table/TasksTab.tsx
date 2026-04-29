@@ -254,36 +254,6 @@ export default function TasksTab({ projectId }: Props) {
     setContextMenu({ visible: true, x: e.clientX, y: e.clientY, task, taskLevel });
   };
 
-  const getInsertMeta = (anchor: Task, action: InsertAction) => {
-    const sameParentSiblings = projectTasks
-      .filter((t) => t.parentId === (action === 'main-before' || action === 'main-after' ? '' : action === 'child-under' ? anchor.id : anchor.parentId))
-      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
-
-    if (action === 'main-before' || action === 'main-after') {
-      return { parentId: '', order: Number(anchor.order || 0) + (action === 'main-before' ? -0.5 : 0.5), level: 0 };
-    }
-
-    if (action === 'sub-before' || action === 'sub-after') {
-      const parentId = anchor.parentId;
-      const siblingOrders = projectTasks.filter((t) => t.parentId === parentId).map((t) => Number(t.order || 0));
-      const order = Number(anchor.order || 0) + (action === 'sub-before' ? -0.5 : 0.5);
-      return { parentId, order, level: 1 };
-    }
-
-    if (action === 'child-before' || action === 'child-after') {
-      const parentId = anchor.parentId;
-      const order = Number(anchor.order || 0) + (action === 'child-before' ? -0.5 : 0.5);
-      return { parentId, order, level: 2 };
-    }
-
-    // child-under
-    const children = projectTasks
-      .filter((t) => t.parentId === anchor.id)
-      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
-    const nextOrder = children.length ? Number(children[children.length - 1].order || 0) + 1 : 1;
-    return { parentId: anchor.id, order: nextOrder, level: 2 };
-  };
-
   const handleContextMenuSelect = (action: InsertAction) => {
     const anchor = contextMenu.task;
     if (!anchor) return;
