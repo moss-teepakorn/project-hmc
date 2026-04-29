@@ -31,7 +31,19 @@ const formatDate = (value) => {
   return d.toISOString().slice(0, 10);
 };
 
-const buildEmailHtml = (project, rows) => {
+const getGreeting = (recipients, members) => {
+  const emailToMember = new Map(members.map((m) => [String(m.email || '').trim().toLowerCase(), m]));
+  for (const email of recipients) {
+    const member = emailToMember.get(String(email || '').trim().toLowerCase());
+    if (member) {
+      const name = String(member.nickname || member.name || '').trim();
+      if (name) return `Dear ${name},`;
+    }
+  }
+  return 'To whom it may concern,';
+};
+
+const buildEmailHtml = (greeting, project, rows) => {
   const rowsHtml = rows.map((task) => `
       <tr style="border-bottom:1px solid #e5e7eb;">
         <td style="padding:8px 10px;">${project.code || ''}</td>
@@ -44,7 +56,7 @@ const buildEmailHtml = (project, rows) => {
 
   return `
     <div style="font-family: Arial, sans-serif; color: #111827;">
-      <p>Dear Khun,</p>
+      <p>${greeting}</p>
       <p>This is a reminder that the following tasks are due soon or already overdue.</p>
       <table style="border-collapse: collapse; width: 100%; margin-top: 12px;">
         <thead>
@@ -67,9 +79,9 @@ const buildEmailHtml = (project, rows) => {
     </div>`;
 };
 
-const buildEmailText = (rows) => {
+const buildEmailText = (greeting, rows) => {
   const lines = [
-    'Dear Khun,',
+    greeting,
     '',
     'This is a reminder that the following tasks are due soon or already overdue.',
     '',
@@ -91,7 +103,14 @@ const getStatusLabel = (endDateString) => {
   const dueDate = new Date(endDateString);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const inThreeDays = new Date(today);
+  inThreeDays.setDate(inThreeDays.getDate() + 3);
+  const inSevenDays = new Date(today);
+  inSevenDays.setDate(inSevenDays.getDate() + 7);
+
   if (dueDate < today) return 'Overdue';
+  if (dueDate <= inThreeDays) return 'Due in 3 days';
+  if (dueDate <= inSevenDays) return 'Due in 7 days';
   return 'Due Soon';
 };
 
@@ -168,8 +187,9 @@ export default async function handler(req, res) {
   for (const project of projects) {
     const tasksResp = await supabase
       .from('tasks')
-      .select('id,task_name,end_date,percent_complete,resource')
+      .select('id,task_name,end_date,percent_complete,resource,level')
       .eq('project_id', project.id)
+      .gt('level', 0)
       .lt('percent_complete', 100)
       .not('end_date', 'is', null)
       .lte('end_date', new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7).toISOString().slice(0, 10));
@@ -186,7 +206,7 @@ export default async function handler(req, res) {
 
     const memberResp = await supabase
       .from('members')
-      .select('name,email')
+      .select('name,nickname,email')
       .eq('project_id', project.id);
     const members = memberResp.data || [];
     const memberMap = new Map(members.map((m) => [String(m.name).trim().toLowerCase(), String(m.email).trim().toLowerCase()]));
@@ -207,6 +227,8 @@ export default async function handler(req, res) {
       continue;
     }
 
+    const greeting = getGreeting(recipients, members);
+
     const rows = tasks.map((task) => ({
       project_code: project.code || '',
       project_name: project.name || '',
@@ -216,8 +238,8 @@ export default async function handler(req, res) {
       statusLabel: getStatusLabel(task.end_date),
     }));
 
-    const html = buildEmailHtml(project, rows);
-    const text = buildEmailText(rows);
+    const html = buildEmailHtml(greeting, project, rows);
+    const text = buildEmailText(greeting, rows);
     const [to, ...bcc] = recipients;
 
     try {

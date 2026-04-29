@@ -89,7 +89,7 @@ export default function ProjectModal({ project, onClose }: Props) {
   };
 
   return (
-    <Modal title={project ? 'Edit Project' : 'New Project'} onClose={onClose}>
+    <Modal title={project ? 'Edit Project' : 'New Project'} onClose={onClose} width={840}>
       <FormRow label="Project Name" required>
         <Input autoFocus value={form.name} onChange={v => up('name', v)} placeholder="e.g. E-Commerce Platform" />
       </FormRow>

@@ -49,8 +49,10 @@
    - Task
    - Due date
    - % complete
-   - Status (`Overdue` / `Due Soon`)
-5. ส่งอีเมลผ่าน Gmail SMTP
+   - Status (`Overdue` / `Due in 3 days` / `Due in 7 days`)
+   - ส่งเฉพาะงานย่อยที่มี `level > 0` ไม่รวมงานหลัก
+5. ใช้ชื่อเล่น (`nickname`) ของสมาชิกที่ตรงกับ email ผู้รับ หากไม่พบ จะใช้หัวข้อข้อความว่า `To whom it may concern,`
+6. ส่งอีเมลผ่าน Gmail SMTP
 6. อัปเดต `email_notification_last_sent_at` เมื่อส่งสำเร็จ
 
 ## ตัวแปรสภาพแวดล้อม
