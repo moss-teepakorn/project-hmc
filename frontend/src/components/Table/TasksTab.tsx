@@ -198,6 +198,15 @@ export default function TasksTab({ projectId }: Props) {
     }
 
     if (action === 'sub-before' || action === 'sub-after') {
+      if ((anchor.level ?? 0) === 0) {
+        const children = projectTasks
+          .filter((t) => t.parentId === anchor.id)
+          .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+        const order = action === 'sub-before'
+          ? (children.length ? Number(children[0].order || 0) - 0.5 : 1)
+          : (children.length ? Number(children[children.length - 1].order || 0) + 1 : 1);
+        return { parentId: anchor.id, order, level: 1 };
+      }
       const parentId = anchor.parentId;
       return { parentId, order: Number(anchor.order || 0) + (action === 'sub-before' ? -0.5 : 0.5), level: 1 };
     }
@@ -205,6 +214,14 @@ export default function TasksTab({ projectId }: Props) {
     if (action === 'child-before' || action === 'child-after') {
       const parentId = anchor.parentId;
       return { parentId, order: Number(anchor.order || 0) + (action === 'child-before' ? -0.5 : 0.5), level: 2 };
+    }
+
+    if (action === 'child-under') {
+      const children = projectTasks
+        .filter((t) => t.parentId === anchor.id)
+        .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+      const nextOrder = children.length ? Number(children[children.length - 1].order || 0) + 1 : 1;
+      return { parentId: anchor.id, order: nextOrder, level: 2 };
     }
 
     const children = projectTasks
@@ -250,8 +267,12 @@ export default function TasksTab({ projectId }: Props) {
     e.preventDefault();
     e.stopPropagation();
     const taskLevel = task.level ?? 0;
+    const menuWidth = 220;
+    const menuHeight = 180;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12);
     setSelected(task.id);
-    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, task, taskLevel });
+    setContextMenu({ visible: true, x: Math.max(x, 12), y: Math.max(y, 12), task, taskLevel });
   };
 
   const handleContextMenuSelect = (action: InsertAction) => {
@@ -1136,6 +1157,10 @@ export default function TasksTab({ projectId }: Props) {
               <button type="button" onClick={() => handleContextMenuSelect('main-after')}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
                 Add Maintask After
+              </button>
+              <button type="button" onClick={() => handleContextMenuSelect('sub-after')}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Add Subtask After
               </button>
             </>
           ) : contextMenu.taskLevel === 1 ? (
