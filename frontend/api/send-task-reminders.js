@@ -168,7 +168,7 @@ export default async function handler(req, res) {
   for (const project of projects) {
     const tasksResp = await supabase
       .from('tasks')
-      .select('id,task_name,end_date,percent_complete,assigned_to')
+      .select('id,task_name,end_date,percent_complete,resource')
       .eq('project_id', project.id)
       .lt('percent_complete', 100)
       .not('end_date', 'is', null)
@@ -192,7 +192,7 @@ export default async function handler(req, res) {
     const memberMap = new Map(members.map((m) => [String(m.name).trim().toLowerCase(), String(m.email).trim().toLowerCase()]));
 
     const taskBasedRecipients = tasks.map((task) => {
-      const assigned = String(task.assigned_to || '').trim();
+      const assigned = String(task.resource || '').trim();
       if (isValidEmail(assigned)) return assigned.toLowerCase();
       return memberMap.get(assigned.toLowerCase()) || null;
     }).filter(Boolean);
