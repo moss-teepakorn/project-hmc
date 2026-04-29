@@ -89,11 +89,11 @@ export default function ProjectModal({ project, onClose }: Props) {
   };
 
   return (
-    <Modal title={project ? 'Edit Project' : 'New Project'} onClose={onClose} width={840}>
+    <Modal title={project ? 'Edit Project' : 'New Project'} onClose={onClose} width={960}>
       <FormRow label="Project Name" required>
         <Input autoFocus value={form.name} onChange={v => up('name', v)} placeholder="e.g. E-Commerce Platform" />
       </FormRow>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         <FormRow label="Project Code">
           <Input value={form.code} onChange={v => up('code', v)} placeholder="e.g. ECP-2024" />
         </FormRow>
@@ -108,19 +108,27 @@ export default function ProjectModal({ project, onClose }: Props) {
               { value: 'Hyper Care',   label: 'Hyper Care' },
             ]} />
         </FormRow>
+        <FormRow label="Client">
+          <Input value={form.client} onChange={v => up('client', v)} placeholder="Client company name" />
+        </FormRow>
       </div>
-      <FormRow label="Client">
-        <Input value={form.client} onChange={v => up('client', v)} placeholder="Client company name" />
-      </FormRow>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         <FormRow label="Start Date"><Input type="date" value={form.startDate} onChange={v => up('startDate', v)} /></FormRow>
         <FormRow label="End Date"><Input type="date" value={form.endDate} onChange={v => up('endDate', v)} /></FormRow>
+        <FormRow label="Color">
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {COLORS.map(c => (
+              <div key={c} onClick={() => up('color', c)}
+                style={{ width: 26, height: 26, borderRadius: '50%', background: c, cursor: 'pointer', border: form.color === c ? '3px solid #0F172A' : '3px solid transparent', transition: 'all 0.15s' }} />
+            ))}
+          </div>
+        </FormRow>
       </div>
       <FormRow label="Description">
         <Textarea value={form.description} onChange={v => up('description', v)} rows={2} placeholder="Brief project description…" />
       </FormRow>
       {!project && (
-        <>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
           <FormRow label="Copy Tasks From Previous Project">
             <Select
               value={copyFromProjectId}
@@ -132,6 +140,7 @@ export default function ProjectModal({ project, onClose }: Props) {
               ]}
             />
           </FormRow>
+          <div />
           {copyFromProjectId && (
             <FormRow label="Copy Scope">
               <Select
@@ -144,27 +153,19 @@ export default function ProjectModal({ project, onClose }: Props) {
               />
             </FormRow>
           )}
-        </>
+        </div>
       )}
-      <FormRow label="Color">
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {COLORS.map(c => (
-            <div key={c} onClick={() => up('color', c)}
-              style={{ width: 26, height: 26, borderRadius: '50%', background: c, cursor: 'pointer', border: form.color === c ? '3px solid #0F172A' : '3px solid transparent', transition: 'all 0.15s' }} />
-          ))}
-        </div>
-      </FormRow>
-      <FormRow label="Enable Email Reminder">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <input
-            type="checkbox"
-            checked={form.emailNotificationEnabled}
-            onChange={(e) => up('emailNotificationEnabled', e.target.checked)}
-          />
-          <span style={{ fontSize: 13, color: '#334155' }}>Send daily reminder emails for this project</span>
-        </div>
-      </FormRow>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <FormRow label="Enable Email Reminder">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="checkbox"
+              checked={form.emailNotificationEnabled}
+              onChange={(e) => up('emailNotificationEnabled', e.target.checked)}
+            />
+            <span style={{ fontSize: 13, color: '#334155' }}>Send daily reminder emails</span>
+          </div>
+        </FormRow>
         <FormRow label="Reminder Mode">
           <Select value={form.emailNotificationMode} onChange={v => up('emailNotificationMode', v)}
             options={[

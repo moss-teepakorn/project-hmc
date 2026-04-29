@@ -24,6 +24,18 @@ const normalizeNameFromEmail = (email) => {
   return username.replace(/\.|_|-|\d+/g, ' ').trim();
 };
 
+const formatKhunName = (name) => {
+  if (!name) return '';
+  const normalized = String(name).trim();
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    return `${first}.${String(last[0] || '').toUpperCase()}`;
+  }
+  return normalized;
+};
+
 const formatDate = (value) => {
   if (!value) return '';
   const d = new Date(value);
@@ -36,8 +48,10 @@ const getGreeting = (recipients, members) => {
   for (const email of recipients) {
     const member = emailToMember.get(String(email || '').trim().toLowerCase());
     if (member) {
-      const name = String(member.nickname || member.name || '').trim();
-      if (name) return `Dear ${name},`;
+      const fullName = String(member.name || '').trim();
+      const nickname = String(member.nickname || '').trim();
+      const formattedName = fullName ? formatKhunName(fullName) : nickname || '';
+      if (formattedName) return `Dear Khun ${formattedName},`;
     }
   }
   return 'To whom it may concern,';
