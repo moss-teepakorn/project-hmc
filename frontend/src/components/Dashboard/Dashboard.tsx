@@ -267,7 +267,7 @@ export default function Dashboard() {
               selected ? (
                 <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} isMobile={isMobile} />
               ) : (
-                <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setSelected} isMobile={isMobile} />
+                <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setSelected} onEdit={setEditing} onDelete={setDeleting} isMobile={isMobile} />
               )
             ) : (
               <PortfolioReportSummary />
@@ -289,7 +289,7 @@ export default function Dashboard() {
 }
 
 // ── Welcome / global summary ──────────────────────────────────────────────────
-function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void; isMobile: boolean }) {
+function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void; onEdit: (p: Project) => void; onDelete: (p: Project) => void; isMobile: boolean }) {
   const [showHC, setShowHC] = useState(false);
   const [projectView, setProjectView] = useState<'card' | 'table'>('card');
   const normalProjects = projects.filter(p => p.status !== 'Hyper Care');
@@ -317,6 +317,22 @@ function WelcomeSummary({ projects, tasks, onOpen, isMobile }: { projects: Proje
             <span style={{ color: C.primary, fontFamily: 'Poppins, sans-serif' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
           </div>
           <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
+              title="Edit Project"
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.primary; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}>
+              <Pencil size={12} />
+            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(p); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
+              title="Delete Project"
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.red; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}>
+              <Trash2 size={12} />
+            </button>
+          </div>
         </div>
 
         <div style={{ fontSize: 12, color: C.text, lineHeight: 1.35, marginBottom: 4, whiteSpace: 'normal', wordBreak: 'break-word' }}>
