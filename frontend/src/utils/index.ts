@@ -262,8 +262,11 @@ export const roleColor = (role: string): string => ROLE_COLORS[role] || '#94A3B8
 
 // ── Status colors ─────────────────────────────────────────────────────────────
 export const PROCESS_STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  'Open':         { bg: '#FEE2E2', color: '#991B1B' },
+  'Todo':         { bg: '#F3F4F6', color: '#475569' },
   'In Progress':  { bg: '#DBEAFE', color: '#1E40AF' },
+  'Block/Delay':  { bg: '#FEE2E2', color: '#991B1B' },
+  'Done':         { bg: '#D1FAE5', color: '#065F46' },
+  'Open':         { bg: '#FEE2E2', color: '#991B1B' },
   'Resolved':     { bg: '#D1FAE5', color: '#065F46' },
   'Blocked':      { bg: '#FCD34D', color: '#92400E' },
   'Draft':        { bg: '#F3F4F6', color: '#5B6B7A' },

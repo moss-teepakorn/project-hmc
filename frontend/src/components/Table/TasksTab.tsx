@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
 import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C } from '../Common';
-import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial } from '../../utils';
+import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, PROCESS_STATUS_STYLE } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import type { Task, ViewMode } from '../../types';
 
@@ -556,6 +556,20 @@ export default function TasksTab({ projectId }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: C.text, minWidth: 70 }}>{task.wbs || '—'}</span>
                   <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{task.taskName || 'Untitled task'}</span>
+                </div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                  {(() => {
+                    const status = getTaskStatus(task);
+                    const style = PROCESS_STATUS_STYLE[status] || { bg: C.bg2, color: C.text };
+                    return (
+                      <span style={{
+                        padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                        background: style.bg, color: style.color, whiteSpace: 'nowrap'
+                      }}>
+                        {status}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: C.text2 }}>
                   <span>Resource: {task.resource || '—'}</span>
