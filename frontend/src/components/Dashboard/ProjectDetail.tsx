@@ -132,19 +132,13 @@ export default function ProjectDetail({ project }: Props) {
               <div style={{ fontSize: 12, color: C.text3, marginTop: 3 }}>
                 {project.code} · {project.client} · {fmtDate(project.startDate)} – {fmtDate(project.endDate)}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 10 }}>
                 <Badge bg={scheduleBg} color={scheduleColor}>
                   {scheduleLabel}
                 </Badge>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, color: C.text3, width: '100%', maxWidth: 420 }}>
-                  <span>Overall Progress</span>
-                  <span>{overallProgress}%</span>
-                </div>
-                <ProgressBar value={overallProgress} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, color: C.text3, width: '100%', maxWidth: 420 }}>
-                  <span>Target</span>
-                  <span>{plannedPercent}%</span>
-                </div>
+                <span style={{ fontSize: 12, color: C.text3, whiteSpace: 'nowrap' }}>
+                  Overall Progress : {overallProgress}% - Target : {plannedPercent}%
+                </span>
               </div>
             </div>
           </div>
