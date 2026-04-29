@@ -121,8 +121,10 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Missing email or Supabase configuration in environment' });
   }
 
+  const { projectId, test } = req.body || {};
   const secret = req.headers['x-reminder-secret'] || req.query.secret;
-  if (secret !== REMINDER_API_SECRET) {
+  const isTestMode = Boolean(test);
+  if (!isTestMode && secret !== REMINDER_API_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -131,10 +133,28 @@ export default async function handler(req, res) {
   const nowKey = now.toISOString().slice(0, 10);
   const currentTime = now.toISOString().slice(11, 16);
 
-  const projectsResp = await supabase
+  let projectsResp = await supabase
     .from('projects')
-    .select('id,name,code,email_notification_enabled,email_notification_mode,email_notification_recipients,email_notification_time,email_notification_last_sent_at')
-    .eq('email_notification_enabled', true);
+    .select('id,name,code,email_notification_enabled,email_notification_mode,email_notification_recipients,email_notification_time,email_notification_last_sent_at');
+
+  if (projectsResp.error) return res.status(500).json({ error: projectsResp.error.message });
+
+  let projects = projectsResp.data || [];
+  if (projectId) {
+    projects = projects.filter((project) => project.id === projectId);
+  }
+
+  if (!isTestMode) {
+    projects = projects.filter((project) => {
+      if (!project.email_notification_enabled) return false;
+      if (!project.email_notification_time) return false;
+      const scheduled = String(project.email_notification_time).slice(0, 5);
+      const alreadySentToday = project.email_notification_last_sent_at
+        ? String(new Date(project.email_notification_last_sent_at).toISOString().slice(0, 10)) === nowKey
+        : false;
+      return !alreadySentToday && currentTime >= scheduled;
+    });
+  }
   if (projectsResp.error) return res.status(500).json({ error: projectsResp.error.message });
 
   const projects = (projectsResp.data || []).filter((project) => {
@@ -205,11 +225,13 @@ export default async function handler(req, res) {
 
     try {
       await sendMail({ to, bcc, html, text });
-      await supabase
-        .from('projects')
-        .update({ email_notification_last_sent_at: new Date().toISOString() })
-        .eq('id', project.id);
-      results.push({ project: project.id, sentTo: recipients });
+      if (!isTestMode) {
+        await supabase
+          .from('projects')
+          .update({ email_notification_last_sent_at: new Date().toISOString() })
+          .eq('id', project.id);
+      }
+      results.push({ project: project.id, sentTo: recipients, test: isTestMode });
     } catch (error) {
       results.push({ project: project.id, error: String(error) });
     }

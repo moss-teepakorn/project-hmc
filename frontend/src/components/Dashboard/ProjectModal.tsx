@@ -24,6 +24,7 @@ export default function ProjectModal({ project, onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [copyFromProjectId, setCopyFromProjectId] = useState('');
   const [copyScope, setCopyScope] = useState<'all' | 'main'>('all');
+  const [testing, setTesting] = useState(false);
   const [form, setForm] = useState({
     name:                        project?.name                        ?? '',
     code:                        project?.code                        ?? '',
@@ -61,6 +62,30 @@ export default function ProjectModal({ project, onClose }: Props) {
       toast.error(msg || 'Failed to save project');
     }
     setSaving(false);
+  };
+
+  const handleTestSend = async () => {
+    if (!project?.id) return;
+    setTesting(true);
+    try {
+      const res = await fetch('/api/send-task-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: project.id, test: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Test send failed');
+      const result = data?.results?.[0];
+      if (result?.error) {
+        toast.error(`Test send failed: ${result.error}`);
+      } else {
+        toast.success('Test email sent successfully');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Test send failed';
+      toast.error(msg);
+    }
+    setTesting(false);
   };
 
   return (
@@ -161,7 +186,12 @@ export default function ProjectModal({ project, onClose }: Props) {
       <div style={{ fontSize: 12, color: '#475569', marginBottom: 10 }}>
         If task assignee email is not available, fallback recipients from Custom Recipients will be used.
       </div>
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8, flexWrap: 'wrap' }}>
+        {project && (
+          <Btn variant="outline" onClick={handleTestSend} disabled={testing}>
+            {testing ? 'Sending test…' : 'Send Test Email'}
+          </Btn>
+        )}
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : project ? 'Save Changes' : 'Create Project'}</Btn>
       </div>
