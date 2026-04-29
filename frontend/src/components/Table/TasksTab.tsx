@@ -44,6 +44,22 @@ const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Block/Delay', 'Done'] as co
 
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
 
+interface NewTaskInsert {
+  id: string;
+  anchorId: string;
+  parentId: string;
+  mode: 'main' | 'sub';
+  position: 'before' | 'after';
+  order: number;
+  taskName: string;
+  startDate: string;
+  endDate: string;
+  actualFinish: string;
+  resource: string;
+  percentComplete: number;
+  phase: string;
+}
+
 function getTaskStatus(task: Task): TaskStatus {
   const status = String(task.status || '');
   if (status === 'Review') return 'Block/Delay';
@@ -99,6 +115,8 @@ export default function TasksTab({ projectId }: Props) {
   const [showExport, setShowExport] = useState(false);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; isParent: boolean }>({ visible: false, x: 0, y: 0, task: null, isParent: false });
+  const [newTaskInsert, setNewTaskInsert] = useState<NewTaskInsert | null>(null);
   const [splitW, setSplitW]     = useState<number>(() => {
     if (typeof window !== 'undefined') {
       return Math.max(640, Math.round(window.innerWidth * 0.66));
@@ -154,7 +172,53 @@ export default function TasksTab({ projectId }: Props) {
   }, []);
 
   const projectTasks = tasks.filter(t => t.projectId === projectId);
-  const visible      = flattenTree(projectTasks, expanded);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const nextWeekIso = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+
+  const visible = flattenTree(projectTasks, expanded);
+  const getInsertMeta = (anchor: Task, mode: 'main' | 'sub', position: 'before' | 'after') => {
+    if (mode === 'main') {
+      return { parentId: '', order: Number(anchor.order || 0) + (position === 'before' ? -0.5 : 0.5), level: 0 };
+    }
+    const children = projectTasks
+      .filter((t) => t.parentId === anchor.id)
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+    if (!children.length) {
+      return { parentId: anchor.id, order: 1, level: (anchor.level ?? 0) + 1 };
+    }
+    return {
+      parentId: anchor.id,
+      order: Number(children[position === 'before' ? 0 : children.length - 1].order || 0) + (position === 'before' ? -0.5 : 0.5),
+      level: (anchor.level ?? 0) + 1,
+    };
+  };
+
+  const getInsertIndex = (anchor: Task, mode: 'main' | 'sub', position: 'before' | 'after') => {
+    const index = visible.findIndex((t) => t.id === anchor.id);
+    if (index < 0) return visible.length;
+    if (mode === 'main') {
+      return position === 'before' ? index : index + 1;
+    }
+    const anchorLevel = anchor.level ?? 0;
+    if (position === 'before') {
+      return index + 1;
+    }
+    let next = index + 1;
+    while (next < visible.length && (visible[next].level ?? 0) > anchorLevel) {
+      next += 1;
+    }
+    return next;
+  };
+
+  const visibleWithInsert = newTaskInsert ? (() => {
+    const result = [...visible];
+    const anchor = projectTasks.find((t) => t.id === newTaskInsert.anchorId);
+    if (!anchor) return result;
+    const insertIndex = getInsertIndex(anchor, newTaskInsert.mode, newTaskInsert.position);
+    result.splice(insertIndex, 0, newTaskInsert as unknown as Task);
+    return result;
+  })() : visible;
+
   const isTableView = view === 'table';
   const viewModes: ViewMode[] = isMobile ? ['table'] : ['table', 'split', 'gantt', 'kanban'];
   const kanbanColumns = TASK_STATUS_OPTIONS.map((status) => ({
@@ -163,6 +227,74 @@ export default function TasksTab({ projectId }: Props) {
       .filter((t) => getTaskStatus(t) === status)
       .sort((a, b) => compareWbs(a.wbs, b.wbs)),
   }));
+
+  const openTaskContextMenu = (task: Task) => (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const isParent = hasChildren(projectTasks, task.id);
+    setSelected(task.id);
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, task, isParent });
+  };
+
+  const handleContextMenuSelect = (mode: 'main' | 'sub', position: 'before' | 'after') => {
+    const anchor = contextMenu.task;
+    if (!anchor) return;
+    const { parentId, order, level } = getInsertMeta(anchor, mode, position);
+    setNewTaskInsert({
+      id: `new-${Date.now()}`,
+      anchorId: anchor.id,
+      parentId,
+      mode,
+      position,
+      order,
+      taskName: '',
+      startDate: todayIso,
+      endDate: nextWeekIso,
+      actualFinish: '',
+      resource: '',
+      percentComplete: 0,
+      phase: anchor.phase || PHASE_OPTIONS[0],
+      level,
+    });
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+  };
+
+  const cancelNewTask = () => setNewTaskInsert(null);
+
+  const saveNewTask = async () => {
+    if (!newTaskInsert) return;
+    if (!newTaskInsert.taskName.trim()) {
+      toast.error('Task Name is required');
+      return;
+    }
+    try {
+      await createTask({
+        projectId,
+        parentId: newTaskInsert.parentId,
+        order: newTaskInsert.order,
+        taskName: newTaskInsert.taskName,
+        startDate: newTaskInsert.startDate,
+        endDate: newTaskInsert.endDate,
+        actualFinish: newTaskInsert.actualFinish,
+        duration: calcDuration(newTaskInsert.startDate, newTaskInsert.endDate),
+        resource: newTaskInsert.resource,
+        phase: newTaskInsert.phase,
+        percentComplete: newTaskInsert.percentComplete,
+      });
+      toast.success('Task created');
+      setNewTaskInsert(null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to create';
+      toast.error(msg || 'Failed to create');
+    }
+  };
+
+  useEffect(() => {
+    if (!contextMenu.visible) return;
+    const handleClick = () => setContextMenu((prev) => ({ ...prev, visible: false }));
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, [contextMenu.visible]);
 
   useEffect(() => {
     if (isMobile && view !== 'table') setView('table');
@@ -647,56 +779,128 @@ export default function TasksTab({ projectId }: Props) {
             <div ref={tableBodyRef} onScroll={onTableScroll}
               style={{ height:`calc(100% - ${HDR_H}px)`, minHeight:0, overflowY:'scroll', overflowX:'auto', minWidth:'max-content' }}>
               {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
-              {!loading && visible.map((task, i) => {
-                const isPar = hasChildren(projectTasks, task.id);
-                const isExp = expanded.has(task.id);
+              {!loading && visibleWithInsert.map((task, i) => {
+                const isNew = String(task.id).startsWith('new-');
+                const isPar = !isNew && hasChildren(projectTasks, task.id);
+                const isExp = !isNew && expanded.has(task.id);
                 const isSel = selected === task.id;
-                const isChild = !!task.parentId;
+                const level = isNew ? (task as NewTaskInsert).level : task.level ?? 0;
+                const rowTask = task as Task;
+                const newRow = task as NewTaskInsert;
+                const durationDays = isNew ? calcDuration(newRow.startDate, newRow.endDate) : task.duration;
                 return (
-                  <div key={task.id} onClick={() => setSelected(task.id)}
-                    style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isSel ? C.primaryBg : i % 2 === 0 ? C.white : C.bg, borderLeft: isSel ? `3px solid ${C.primary}` : '3px solid transparent', cursor:'pointer', flexShrink:0 }}>
-                    <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{task.wbs}</div>
+                  <div key={task.id}
+                    onClick={() => setSelected(task.id)}
+                    onContextMenu={!isNew ? openTaskContextMenu(rowTask) : undefined}
+                    style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isNew ? C.primaryBg : isSel ? C.primaryBg : i % 2 === 0 ? C.white : C.bg, borderLeft: isSel ? `3px solid ${C.primary}` : '3px solid transparent', cursor:'pointer', flexShrink:0 }}>
+                    <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{isNew ? '—' : rowTask.wbs}</div>
                     <div style={{
                       width: colWidths[1],
                       minWidth: colWidths[1],
-                      padding:`0 4px 0 ${8 + task.level * 20}px`,
+                      padding:`0 4px 0 ${8 + level * 20}px`,
                       display:'flex', alignItems:'center', gap:4, flexShrink:0
                     }}>
-                      {isPar ? (
-                        <button onClick={e => { e.stopPropagation(); toggle(task.id); }}
+                      {!isNew && (isPar ? (
+                        <button onClick={e => { e.stopPropagation(); toggle(rowTask.id); }}
                           style={{ width:18, height:18, background:C.primaryBg, border:`1px solid ${C.primary}33`, borderRadius:4, cursor:'pointer', color:C.primary, padding:0, fontSize:11, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
                           {isExp ? '▾' : '▸'}
                         </button>
                       ) : (
                         <span style={{ width:18, flexShrink:0, display:'inline-flex', justifyContent:'center' }}>
-                          {isChild && <span style={{ color:C.border2, fontSize:10 }}>└</span>}
+                          {!isNew && !!rowTask.parentId && <span style={{ color:C.border2, fontSize:10 }}>└</span>}
                         </span>
-                      )}
-                      {isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
-                      <EditableCell value={task.taskName} onSave={v => handleUpdate(task.id, { taskName: v })} />
+                      ))}
+                      {!isNew && isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
+                      <EditableCell
+                        value={isNew ? newRow.taskName : rowTask.taskName}
+                        onSave={(v) => {
+                          if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, taskName: v } : prev);
+                          else handleUpdate(rowTask.id, { taskName: v });
+                        }}
+                      />
                     </div>
                     <div style={{ width:colWidths[2], minWidth:colWidths[2], padding:'0 6px', flexShrink:0 }}>
-                      <EditableCell type="date" value={isoToDmy(task.startDate)} placeholder="—" onSave={v => handleUpdateDate(task.id, 'startDate', v)} alwaysSave style={{ color:isPar ? C.text3 : C.text }} />
+                      <EditableCell
+                        type="date"
+                        value={isNew ? newRow.startDate : isoToDmy(rowTask.startDate)}
+                        placeholder="—"
+                        onSave={(v) => {
+                          if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, startDate: v } : prev);
+                          else handleUpdateDate(rowTask.id, 'startDate', v);
+                        }}
+                        alwaysSave
+                        style={{ color:isNew ? C.text : isPar ? C.text3 : C.text }}
+                      />
                     </div>
                     <div style={{ width:colWidths[3], minWidth:colWidths[3], padding:'0 6px', flexShrink:0 }}>
-                      <EditableCell type="date" value={isoToDmy(task.endDate)} placeholder="—" onSave={v => handleUpdateDate(task.id, 'endDate', v)} alwaysSave style={{ color:isPar ? C.text3 : C.text }} />
+                      <EditableCell
+                        type="date"
+                        value={isNew ? newRow.endDate : isoToDmy(rowTask.endDate)}
+                        placeholder="—"
+                        onSave={(v) => {
+                          if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, endDate: v } : prev);
+                          else handleUpdateDate(rowTask.id, 'endDate', v);
+                        }}
+                        alwaysSave
+                        style={{ color:isNew ? C.text : isPar ? C.text3 : C.text }}
+                      />
                     </div>
                     <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
-                      <EditableCell type="date" value={task.actualFinish ? isoToDmy(task.actualFinish) : ''} placeholder="—" onSave={v => handleUpdateDate(task.id, 'actualFinish', v)} alwaysSave style={{ color:task.actualFinish ? C.green : C.text3 }} />
+                      <EditableCell
+                        type="date"
+                        value={isNew ? newRow.actualFinish : rowTask.actualFinish ? isoToDmy(rowTask.actualFinish) : ''}
+                        placeholder="—"
+                        onSave={(v) => {
+                          if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, actualFinish: v } : prev);
+                          else handleUpdateDate(rowTask.id, 'actualFinish', v);
+                        }}
+                        alwaysSave
+                        style={{ color:isNew ? C.text3 : rowTask.actualFinish ? C.green : C.text3 }}
+                      />
                     </div>
-                    <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{task.duration}d</div>
+                    <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{durationDays}d</div>
                     <div style={{ width:colWidths[6], minWidth:colWidths[6], padding:'0 6px', flexShrink:0 }}>
-                      <PctCell value={task.percentComplete} isParent={isPar} onSave={n => handlePct(task.id, n)} />
+                      {isNew ? (
+                        <PctCell value={newRow.percentComplete} isParent={false} onSave={(n) => setNewTaskInsert((prev) => prev ? { ...prev, percentComplete: n } : prev)} />
+                      ) : (
+                        <PctCell value={rowTask.percentComplete} isParent={isPar} onSave={(n) => handlePct(rowTask.id, n)} />
+                      )}
                     </div>
                     <div style={{ width:colWidths[7], minWidth:colWidths[7], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
-                      {task.resource && <Avatar name={task.resource} size={20} />}
-                      <EditableCell value={task.resource} onSave={v => handleUpdate(task.id, { resource: v })} placeholder="Assign..." />
+                      {!isNew && rowTask.resource && <Avatar name={rowTask.resource} size={20} />}
+                      <EditableCell
+                        value={isNew ? newRow.resource : rowTask.resource}
+                        onSave={(v) => {
+                          if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, resource: v } : prev);
+                          else handleUpdate(rowTask.id, { resource: v });
+                        }}
+                        placeholder="Assign..."
+                      />
                     </div>
-                    <div style={{ width:colWidths[8], minWidth:colWidths[8], padding:'0 5px', flexShrink:0, display:'flex', gap:4 }}>
-                      <button onClick={e => { e.stopPropagation(); setEditModal(task); }}
-                        style={{ height:22, padding:'0 7px', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary, fontSize:11, fontWeight:600 }}>Edit</button>
-                      <button onClick={e => { e.stopPropagation(); handleDelete(task.id); }}
-                        style={{ width:22, height:22, background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red, fontSize:11 }}>✕</button>
+                    <div style={{ width:colWidths[8], minWidth:colWidths[8], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
+                      {isNew ? (
+                        <>
+                          <button onClick={e => { e.stopPropagation(); saveNewTask(); }}
+                            style={{ height:22, padding:'0 8px', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary, fontSize:11, fontWeight:600 }}>
+                            Save
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); cancelNewTask(); }}
+                            style={{ height:22, padding:'0 8px', background:C.border2, border:'none', borderRadius:5, cursor:'pointer', color:C.text2, fontSize:11 }}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={e => { e.stopPropagation(); setEditModal(rowTask); }}
+                            style={{ height:22, padding:'0 7px', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary, fontSize:11, fontWeight:600 }}>
+                            Edit
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); handleDelete(rowTask.id); }}
+                            style={{ width:22, height:22, background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red, fontSize:11 }}>
+                            ✕
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -886,6 +1090,34 @@ export default function TasksTab({ projectId }: Props) {
           </div>
         )}
       </div>
+
+      {contextMenu.visible && contextMenu.task && (
+        <div style={{ position:'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 999, background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow2, minWidth: 220, overflow: 'hidden' }}>
+          {contextMenu.isParent ? (
+            <>
+              <button type="button" onClick={() => handleContextMenuSelect('sub', 'before')}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Insert subtask before
+              </button>
+              <button type="button" onClick={() => handleContextMenuSelect('sub', 'after')}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Insert subtask after
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => handleContextMenuSelect('main', 'before')}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Insert maintask before
+              </button>
+              <button type="button" onClick={() => handleContextMenuSelect('main', 'after')}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Insert maintask after
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {addModal  && (
         <TaskModal
