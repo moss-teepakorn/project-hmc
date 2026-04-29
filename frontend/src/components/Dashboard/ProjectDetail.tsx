@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, Home } from 'lucide-react';
-import { Badge, Tabs, C, PROJECT_STATUS } from '../Common';
-import { fmtDate } from '../../utils';
+import { Badge, Tabs, C, PROJECT_STATUS, ProgressBar } from '../Common';
+import { fmtDate, computeBaselineProgress } from '../../utils';
 import type { Project } from '../../types';
 import TasksTab          from '../Table/TasksTab';
 import ProjectSummaryTab from './ProjectSummaryTab';
@@ -38,10 +38,37 @@ export default function ProjectDetail({ project }: Props) {
     fetchIssues,
     fetchRisks,
     fetchProjectEnvironments,
-    setActiveProject,
   } = useStore();
 
   const s = PROJECT_STATUS[project.status] ?? PROJECT_STATUS['Planning'];
+  const projectTasks = tasks.filter((t) => t.projectId === project.id);
+  const rootTasks = projectTasks.filter((t) => !t.parentId);
+  const overallProgress = rootTasks.length ? Math.round(rootTasks.reduce((sum, t) => sum + t.percentComplete, 0) / rootTasks.length) : 0;
+
+  const currentDate = new Date();
+  const todayIso = currentDate.toISOString().slice(0, 10);
+  const todayBaseline = computeBaselineProgress(projectTasks, [todayIso]);
+  const plannedPercent = todayBaseline[0]?.baselinePercent ?? 0;
+  const scheduleGap = plannedPercent - overallProgress;
+  const scheduleStatus = !todayBaseline.length ? 'Plan N/A'
+    : scheduleGap > 20 ? 'Stoper'
+    : scheduleGap > 3 ? 'Delay'
+    : 'On Track';
+  const scheduleColor = scheduleStatus === 'Stoper'
+    ? C.red
+    : scheduleStatus === 'Delay'
+      ? C.amber
+      : scheduleStatus === 'Plan N/A'
+        ? C.text3
+        : C.green;
+  const scheduleBg = scheduleStatus === 'Stoper'
+    ? C.redBg
+    : scheduleStatus === 'Delay'
+      ? C.amberBg
+      : scheduleStatus === 'Plan N/A'
+        ? C.bg2
+        : C.greenBg;
+  const scheduleLabel = scheduleStatus === 'Plan N/A' ? 'Plan N/A' : `Project Health : ${scheduleStatus}`;
 
   const TABS = [
     { id: 'tasks',    label: 'Tasks',      icon: '📋', count: tasks.filter(t => t.projectId === project.id).length },
@@ -81,6 +108,7 @@ export default function ProjectDetail({ project }: Props) {
   }, [
     project?.id,
     fetchTasks,
+    fetchProjectProgressSnapshots,
     fetchMembers,
     fetchMilestones,
     fetchEfforts,
@@ -103,6 +131,22 @@ export default function ProjectDetail({ project }: Props) {
               </div>
               <div style={{ fontSize: 12, color: C.text3, marginTop: 3 }}>
                 {project.code} · {project.client} · {fmtDate(project.startDate)} – {fmtDate(project.endDate)}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginTop: 10 }}>
+                <Badge bg={scheduleBg} color={scheduleColor}>
+                  {scheduleLabel}
+                </Badge>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 240, maxWidth: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, color: C.text3 }}>
+                    <span>Overall Progress</span>
+                    <span>{overallProgress}%</span>
+                  </div>
+                  <ProgressBar value={overallProgress} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, color: C.text3 }}>
+                    <span>Target</span>
+                    <span>{plannedPercent}%</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
