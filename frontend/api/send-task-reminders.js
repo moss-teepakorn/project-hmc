@@ -57,11 +57,11 @@ const getGreeting = (recipients, members) => {
   return 'To whom it may concern,';
 };
 
-const buildEmailHtml = (greeting, project, rows) => {
+const buildEmailHtml = (greeting, rows) => {
   const rowsHtml = rows.map((task) => `
       <tr style="border-bottom:1px solid #e5e7eb;">
-        <td style="padding:8px 10px;">${project.code || ''}</td>
-        <td style="padding:8px 10px;">${project.name || ''}</td>
+        <td style="padding:8px 10px;">${task.project_code || ''}</td>
+        <td style="padding:8px 10px;">${task.project_name || ''}</td>
         <td style="padding:8px 10px;">${task.task_name || ''}</td>
         <td style="padding:8px 10px;">${formatDate(task.end_date)}</td>
         <td style="padding:8px 10px; text-align:center;">${task.percent_complete ?? ''}%</td>
@@ -220,6 +220,9 @@ export default async function handler(req, res) {
   }
 
   const results = [];
+  const recipientTasks = new Map();
+  const allMembers = new Map();
+  const projectsToUpdate = new Set();
 
   for (const project of projects) {
     const tasksResp = await supabase
@@ -246,51 +249,77 @@ export default async function handler(req, res) {
       .select('name,nickname,email')
       .eq('project_id', project.id);
     const members = memberResp.data || [];
+    members.forEach((m) => {
+      const email = String(m.email || '').trim().toLowerCase();
+      if (email) allMembers.set(email, m);
+    });
     const memberMap = new Map(members.map((m) => [String(m.name).trim().toLowerCase(), String(m.email).trim().toLowerCase()]));
 
-    const taskBasedRecipients = tasks.map((task) => {
-      const assigned = String(task.resource || '').trim();
-      if (isValidEmail(assigned)) return assigned.toLowerCase();
-      return memberMap.get(assigned.toLowerCase()) || null;
-    }).filter(Boolean);
-
     const customRecipients = normalizeRecipients(project.email_notification_recipients || '');
-    const recipients = project.email_notification_mode === 'custom'
-      ? customRecipients
-      : Array.from(new Set([...(taskBasedRecipients || []), ...(customRecipients || [])]));
+    let anyTaskRecipient = false;
 
-    if (recipients.length === 0) {
+    for (const task of tasks) {
+      const taskRow = {
+        project_code: project.code || '',
+        project_name: project.name || '',
+        task_name: task.task_name || '',
+        end_date: task.end_date,
+        percent_complete: task.percent_complete ?? 0,
+        statusLabel: getStatusLabel(task.end_date),
+      };
+
+      const assigned = String(task.resource || '').trim();
+      const taskBasedEmail = isValidEmail(assigned)
+        ? assigned.toLowerCase()
+        : memberMap.get(assigned.toLowerCase()) || null;
+      const recipients = project.email_notification_mode === 'custom'
+        ? customRecipients
+        : taskBasedEmail
+          ? [taskBasedEmail]
+          : customRecipients;
+
+      if (!recipients.length) continue;
+      anyTaskRecipient = true;
+
+      recipients.forEach((recipient) => {
+        const email = recipient.toLowerCase();
+        const existing = recipientTasks.get(email) || { recipient: email, rows: [], projectIds: new Set() };
+        existing.rows.push(taskRow);
+        existing.projectIds.add(project.id);
+        recipientTasks.set(email, existing);
+      });
+    }
+
+    if (!anyTaskRecipient) {
       results.push({ project: project.id, skipped: 'No email recipients found' });
       continue;
     }
 
-    const greeting = getGreeting(recipients, members);
+    projectsToUpdate.add(project.id);
+  }
 
-    const rows = tasks.map((task) => ({
-      project_code: project.code || '',
-      project_name: project.name || '',
-      task_name: task.task_name || '',
-      end_date: task.end_date,
-      percent_complete: task.percent_complete ?? 0,
-      statusLabel: getStatusLabel(task.end_date),
-    }));
+  if (recipientTasks.size === 0) {
+    return res.status(200).json({ results });
+  }
 
-    const html = buildEmailHtml(greeting, project, rows);
+  for (const { recipient, rows, projectIds } of recipientTasks.values()) {
+    const greeting = getGreeting([recipient], Array.from(allMembers.values()));
+    const html = buildEmailHtml(greeting, rows);
     const text = buildEmailText(greeting, rows);
-    const [to, ...bcc] = recipients;
 
     try {
-      await sendMail({ to, bcc, html, text });
-      if (!isTestMode) {
-        await supabase
-          .from('projects')
-          .update({ email_notification_last_sent_at: new Date().toISOString() })
-          .eq('id', project.id);
-      }
-      results.push({ project: project.id, sentTo: recipients, test: isTestMode });
+      await sendMail({ to: recipient, bcc: [], html, text });
+      results.push({ recipient, sentTasks: rows.length, projects: Array.from(projectIds), test: isTestMode });
     } catch (error) {
-      results.push({ project: project.id, error: String(error) });
+      results.push({ recipient, error: String(error) });
     }
+  }
+
+  if (!isTestMode && projectsToUpdate.size > 0) {
+    await supabase
+      .from('projects')
+      .update({ email_notification_last_sent_at: new Date().toISOString() })
+      .in('id', Array.from(projectsToUpdate));
   }
 
   return res.status(200).json({ results });
