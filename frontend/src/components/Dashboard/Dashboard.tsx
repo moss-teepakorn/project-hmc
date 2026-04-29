@@ -3,6 +3,7 @@ import { parseISO, isValid, addDays } from 'date-fns';
 import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Home } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
+import { supabase } from '../../services/supabase';
 import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, PROJECT_STATUS, MILESTONE_STATUS, TH, TD } from '../Common';
 import { fmtDate, fmtMoney, compareWbs, computeBaselineProgress, getHalfMonthSnapshotDates } from '../../utils';
 import type { Project } from '../../types';
@@ -21,6 +22,7 @@ export default function Dashboard() {
   const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>('overview');
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [notificationsShown, setNotificationsShown] = useState(false);
+  const [sendingAll, setSendingAll] = useState(false);
   const isMobile = windowWidth < 768;
 
   React.useEffect(() => {
@@ -259,9 +261,42 @@ export default function Dashboard() {
                   ><Home size={14} /> Home</button>
                 )}
               </div>
-              <Btn onClick={() => setShowAdd(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }}>
-                <Plus size={12} style={{ marginRight: 6 }} /> Add Project
-              </Btn>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {dashboardTab === 'overview' && (
+                  <Btn variant="outline" onClick={async () => {
+                    setSendingAll(true);
+                    try {
+                      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+                      if (sessionError) throw sessionError;
+                      const accessToken = sessionData?.session?.access_token;
+                      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+                      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+                      const res = await fetch('/api/send-task-reminders', {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({}),
+                      });
+                      const result = await res.json();
+                      if (!res.ok) throw new Error(result?.error || 'Send email failed');
+                      const sentCount = Array.isArray(result.results)
+                        ? result.results.filter((r: any) => r.sentTo?.length).length
+                        : 0;
+                      toast.success(`Sent reminders for ${sentCount} project(s)`);
+                    } catch (error) {
+                      const msg = error instanceof Error ? error.message : 'Failed to send email reminders';
+                      toast.error(msg);
+                    }
+                    setSendingAll(false);
+                  }}
+                  small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }} disabled={sendingAll}>
+                    {sendingAll ? 'Sending…' : 'Send Email'}
+                  </Btn>
+                )}
+                <Btn onClick={() => setShowAdd(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }}>
+                  <Plus size={12} style={{ marginRight: 6 }} /> Add Project
+                </Btn>
+              </div>
             </div>
             {dashboardTab === 'overview' ? (
               selected ? (

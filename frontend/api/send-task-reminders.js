@@ -163,12 +163,35 @@ export default async function handler(req, res) {
   try {
     const { projectId, test } = req.body || {};
     const secret = req.headers['x-reminder-secret'] || req.query.secret;
+    const accessTokenHeader = req.headers.authorization || req.headers.Authorization || '';
+    const accessToken = accessTokenHeader.startsWith('Bearer ') ? accessTokenHeader.slice(7) : accessTokenHeader || null;
     const isTestMode = Boolean(test);
-    if (!isTestMode && secret !== REMINDER_API_SECRET) {
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
+    let isAuthorized = false;
+    if (!isTestMode && secret === REMINDER_API_SECRET) {
+      isAuthorized = true;
+    }
+
+    if (!isTestMode && !isAuthorized && accessToken) {
+      const { data: callerUser, error: callerErr } = await supabase.auth.getUser(accessToken);
+      if (!callerErr && callerUser?.user) {
+        const callerId = callerUser.user.id;
+        const { data: callerProfile, error: profErr } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', callerId)
+          .maybeSingle();
+        if (!profErr && callerProfile?.role === 'admin') {
+          isAuthorized = true;
+        }
+      }
+    }
+
+    if (!isTestMode && !isAuthorized) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
     const now = new Date();
     const nowKey = now.toISOString().slice(0, 10);
     const currentTime = now.toISOString().slice(11, 16);
