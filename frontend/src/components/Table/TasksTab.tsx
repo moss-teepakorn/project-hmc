@@ -43,6 +43,7 @@ const PHASE_OPTIONS = [
 const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Block/Delay', 'Done'] as const;
 
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
+type TaskRow = Task | NewTaskInsert;
 
 interface NewTaskInsert {
   id: string;
@@ -58,6 +59,11 @@ interface NewTaskInsert {
   resource: string;
   percentComplete: number;
   phase: string;
+  level: number;
+}
+
+function isNewTaskInsert(task: TaskRow): task is NewTaskInsert {
+  return String(task.id).startsWith('new-');
 }
 
 function getTaskStatus(task: Task): TaskStatus {
@@ -211,11 +217,11 @@ export default function TasksTab({ projectId }: Props) {
   };
 
   const visibleWithInsert = newTaskInsert ? (() => {
-    const result = [...visible];
+    const result: TaskRow[] = [...visible];
     const anchor = projectTasks.find((t) => t.id === newTaskInsert.anchorId);
     if (!anchor) return result;
     const insertIndex = getInsertIndex(anchor, newTaskInsert.mode, newTaskInsert.position);
-    result.splice(insertIndex, 0, newTaskInsert as unknown as Task);
+    result.splice(insertIndex, 0, newTaskInsert);
     return result;
   })() : visible;
 
@@ -303,6 +309,13 @@ export default function TasksTab({ projectId }: Props) {
   const toggle = (id: string) => setExpanded(p => {
     const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s;
   });
+
+  const expandAll = () => {
+    const parentIds = new Set(projectTasks.filter((t) => hasChildren(projectTasks, t.id)).map((t) => t.id));
+    setExpanded(parentIds);
+  };
+
+  const collapseAll = () => setExpanded(new Set());
 
   const handleUpdate = useCallback(async (id: string, updates: Partial<Task>) => {
     try { await updateTask(id, updates); }
@@ -780,20 +793,20 @@ export default function TasksTab({ projectId }: Props) {
               style={{ height:`calc(100% - ${HDR_H}px)`, minHeight:0, overflowY:'scroll', overflowX:'auto', minWidth:'max-content' }}>
               {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
               {!loading && visibleWithInsert.map((task, i) => {
-                const isNew = String(task.id).startsWith('new-');
+                const isNew = isNewTaskInsert(task);
                 const isPar = !isNew && hasChildren(projectTasks, task.id);
                 const isExp = !isNew && expanded.has(task.id);
                 const isSel = selected === task.id;
-                const level = isNew ? (task as NewTaskInsert).level : task.level ?? 0;
-                const rowTask = task as Task;
-                const newRow = task as NewTaskInsert;
-                const durationDays = isNew ? calcDuration(newRow.startDate, newRow.endDate) : task.duration;
+                const rowTask = !isNew ? task : null;
+                const newRow = isNew ? task : null;
+                const level = isNew ? newRow.level : rowTask?.level ?? 0;
+                const durationDays = isNew ? calcDuration(newRow.startDate, newRow.endDate) : rowTask?.duration ?? 0;
                 return (
                   <div key={task.id}
                     onClick={() => setSelected(task.id)}
-                    onContextMenu={!isNew ? openTaskContextMenu(rowTask) : undefined}
+                    onContextMenu={!isNew ? openTaskContextMenu(rowTask!) : undefined}
                     style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isNew ? C.primaryBg : isSel ? C.primaryBg : i % 2 === 0 ? C.white : C.bg, borderLeft: isSel ? `3px solid ${C.primary}` : '3px solid transparent', cursor:'pointer', flexShrink:0 }}>
-                    <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{isNew ? '—' : rowTask.wbs}</div>
+                    <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{isNew ? '—' : rowTask!.wbs}</div>
                     <div style={{
                       width: colWidths[1],
                       minWidth: colWidths[1],
@@ -801,32 +814,32 @@ export default function TasksTab({ projectId }: Props) {
                       display:'flex', alignItems:'center', gap:4, flexShrink:0
                     }}>
                       {!isNew && (isPar ? (
-                        <button onClick={e => { e.stopPropagation(); toggle(rowTask.id); }}
+                        <button onClick={e => { e.stopPropagation(); toggle(rowTask!.id); }}
                           style={{ width:18, height:18, background:C.primaryBg, border:`1px solid ${C.primary}33`, borderRadius:4, cursor:'pointer', color:C.primary, padding:0, fontSize:11, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
                           {isExp ? '▾' : '▸'}
                         </button>
                       ) : (
                         <span style={{ width:18, flexShrink:0, display:'inline-flex', justifyContent:'center' }}>
-                          {!isNew && !!rowTask.parentId && <span style={{ color:C.border2, fontSize:10 }}>└</span>}
+                          {!isNew && !!rowTask!.parentId && <span style={{ color:C.border2, fontSize:10 }}>└</span>}
                         </span>
                       ))}
                       {!isNew && isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
                       <EditableCell
-                        value={isNew ? newRow.taskName : rowTask.taskName}
+                        value={isNew ? newRow!.taskName : rowTask!.taskName}
                         onSave={(v) => {
                           if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, taskName: v } : prev);
-                          else handleUpdate(rowTask.id, { taskName: v });
+                          else handleUpdate(rowTask!.id, { taskName: v });
                         }}
                       />
                     </div>
                     <div style={{ width:colWidths[2], minWidth:colWidths[2], padding:'0 6px', flexShrink:0 }}>
                       <EditableCell
                         type="date"
-                        value={isNew ? newRow.startDate : isoToDmy(rowTask.startDate)}
+                        value={isNew ? newRow!.startDate : isoToDmy(rowTask!.startDate)}
                         placeholder="—"
                         onSave={(v) => {
                           if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, startDate: v } : prev);
-                          else handleUpdateDate(rowTask.id, 'startDate', v);
+                          else handleUpdateDate(rowTask!.id, 'startDate', v);
                         }}
                         alwaysSave
                         style={{ color:isNew ? C.text : isPar ? C.text3 : C.text }}
@@ -835,11 +848,11 @@ export default function TasksTab({ projectId }: Props) {
                     <div style={{ width:colWidths[3], minWidth:colWidths[3], padding:'0 6px', flexShrink:0 }}>
                       <EditableCell
                         type="date"
-                        value={isNew ? newRow.endDate : isoToDmy(rowTask.endDate)}
+                        value={isNew ? newRow!.endDate : isoToDmy(rowTask!.endDate)}
                         placeholder="—"
                         onSave={(v) => {
                           if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, endDate: v } : prev);
-                          else handleUpdateDate(rowTask.id, 'endDate', v);
+                          else handleUpdateDate(rowTask!.id, 'endDate', v);
                         }}
                         alwaysSave
                         style={{ color:isNew ? C.text : isPar ? C.text3 : C.text }}
@@ -848,31 +861,31 @@ export default function TasksTab({ projectId }: Props) {
                     <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
                       <EditableCell
                         type="date"
-                        value={isNew ? newRow.actualFinish : rowTask.actualFinish ? isoToDmy(rowTask.actualFinish) : ''}
+                        value={isNew ? newRow!.actualFinish : rowTask!.actualFinish ? isoToDmy(rowTask!.actualFinish) : ''}
                         placeholder="—"
                         onSave={(v) => {
                           if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, actualFinish: v } : prev);
-                          else handleUpdateDate(rowTask.id, 'actualFinish', v);
+                          else handleUpdateDate(rowTask!.id, 'actualFinish', v);
                         }}
                         alwaysSave
-                        style={{ color:isNew ? C.text3 : rowTask.actualFinish ? C.green : C.text3 }}
+                        style={{ color:isNew ? C.text3 : rowTask!.actualFinish ? C.green : C.text3 }}
                       />
                     </div>
                     <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{durationDays}d</div>
                     <div style={{ width:colWidths[6], minWidth:colWidths[6], padding:'0 6px', flexShrink:0 }}>
                       {isNew ? (
-                        <PctCell value={newRow.percentComplete} isParent={false} onSave={(n) => setNewTaskInsert((prev) => prev ? { ...prev, percentComplete: n } : prev)} />
+                        <PctCell value={newRow!.percentComplete} isParent={false} onSave={(n) => setNewTaskInsert((prev) => prev ? { ...prev, percentComplete: n } : prev)} />
                       ) : (
                         <PctCell value={rowTask.percentComplete} isParent={isPar} onSave={(n) => handlePct(rowTask.id, n)} />
                       )}
                     </div>
                     <div style={{ width:colWidths[7], minWidth:colWidths[7], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
-                      {!isNew && rowTask.resource && <Avatar name={rowTask.resource} size={20} />}
+                      {!isNew && rowTask!.resource && <Avatar name={rowTask!.resource} size={20} />}
                       <EditableCell
-                        value={isNew ? newRow.resource : rowTask.resource}
+                        value={isNew ? newRow!.resource : rowTask!.resource}
                         onSave={(v) => {
                           if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, resource: v } : prev);
-                          else handleUpdate(rowTask.id, { resource: v });
+                          else handleUpdate(rowTask!.id, { resource: v });
                         }}
                         placeholder="Assign..."
                       />
@@ -891,11 +904,11 @@ export default function TasksTab({ projectId }: Props) {
                         </>
                       ) : (
                         <>
-                          <button onClick={e => { e.stopPropagation(); setEditModal(rowTask); }}
+                          <button onClick={e => { e.stopPropagation(); setEditModal(rowTask!); }}
                             style={{ height:22, padding:'0 7px', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary, fontSize:11, fontWeight:600 }}>
                             Edit
                           </button>
-                          <button onClick={e => { e.stopPropagation(); handleDelete(rowTask.id); }}
+                          <button onClick={e => { e.stopPropagation(); handleDelete(rowTask!.id); }}
                             style={{ width:22, height:22, background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red, fontSize:11 }}>
                             ✕
                           </button>
@@ -1016,6 +1029,16 @@ export default function TasksTab({ projectId }: Props) {
                 {m==='table' ? '☰ Table' : m==='split' ? '⊟ Split' : m==='gantt' ? '▦ Gantt' : '▦ Kanban'}
               </button>
             ))}
+          </div>
+          <div style={{ display:'flex', gap:8, marginLeft:8, alignItems:'center' }}>
+            <button onClick={expandAll}
+              style={{ padding:'5px 10px', borderRadius:6, border:'1px solid transparent', background:C.primaryBg, color:C.primary, cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif' }}>
+              Expand All
+            </button>
+            <button onClick={collapseAll}
+              style={{ padding:'5px 10px', borderRadius:6, border:'1px solid transparent', background:C.bg, color:C.text2, cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif' }}>
+              Collapse All
+            </button>
           </div>
           {/* Zoom controls (visible when Gantt is showing) */}
           {(view==='split'||view==='gantt') && (
