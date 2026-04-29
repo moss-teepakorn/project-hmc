@@ -65,6 +65,7 @@ export default function Navbar() {
       title: `Task : ${t.taskName}`,
       subtitle: `Due ${t.endDate}`,
       type: 'task',
+      status: 'upcoming' as const,
     }));
 
   const overdueTasks = tasks
@@ -78,6 +79,7 @@ export default function Navbar() {
       title: `Task : ${t.taskName}`,
       subtitle: `Due ${t.endDate}`,
       type: 'task',
+      status: 'overdue' as const,
     }));
 
   const milestoneNotifications = milestones
@@ -93,6 +95,7 @@ export default function Navbar() {
         ? `Billing ${m.billingDate}`
         : `Due ${m.dueDate}`,
       type: 'milestone',
+      status: 'upcoming' as const,
     }));
 
   const notifications = [...overdueTasks, ...upcomingTasks, ...milestoneNotifications];
@@ -202,9 +205,18 @@ export default function Navbar() {
               {notifications.length === 0 ? (
                 <div style={{ color: C.text2, fontSize: 12 }}>ไม่มีการแจ้งเตือนใหม่</div>
               ) : notifications.map((item) => (
-                <div key={item.id} style={{ padding: '10px 10px 8px', borderBottom: `1px solid ${C.bg}`, display: 'flex', flexDirection: 'column' }}>
+                <div key={item.id} style={{
+                  padding: '10px 12px',
+                  borderRadius: 14,
+                  border: `1px solid ${item.status === 'overdue' ? C.red : C.green}`,
+                  background: item.status === 'overdue' ? '#FEF2F2' : '#ECFDF5',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  marginBottom: 10,
+                }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{item.title}</div>
-                  <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{item.subtitle}</div>
+                  <div style={{ fontSize: 11, color: C.text2 }}>{item.subtitle}</div>
                 </div>
               ))}
             </div>
