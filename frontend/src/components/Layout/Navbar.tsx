@@ -185,7 +185,12 @@ export default function Navbar() {
           </button>
           {notifyOpen && (
             <div style={{
-              position: 'absolute', right: 0, top: 42, width: isMobile ? 'calc(100vw - 32px)' : 320,
+              position: isMobile ? 'fixed' : 'absolute',
+              top: isMobile ? 52 : 42,
+              right: isMobile ? 12 : 0,
+              left: isMobile ? 12 : 'auto',
+              width: isMobile ? 'auto' : 320,
+              maxWidth: isMobile ? 'calc(100vw - 24px)' : 320,
               background: C.white, border: `1px solid ${C.border}`, borderRadius: 18,
               boxShadow: C.shadow2, zIndex: 300, padding: 12,
               maxHeight: 360, overflowY: 'auto'
