@@ -709,10 +709,18 @@ export default function TasksTab({ projectId }: Props) {
       {kanbanColumns.map(({ status, tasks }) => (
         <div key={status} onDragOver={handleColumnDragOver} onDrop={(e) => handleColumnDrop(status, e)}
           style={{ flex:1, minWidth:240, display:'flex', flexDirection:'column', gap:10, background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:12 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:12, padding:'10px 12px', background:C.bg, border:`1px solid ${C.border}`, borderRadius:14 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:C.text }}>{status}</div>
-            <div style={{ fontSize:12, fontWeight:700, color:C.text3 }}>{tasks.length}</div>
-          </div>
+          {(() => {
+          const headerStyle = PROCESS_STATUS_STYLE[status] || { bg: C.bg, color: C.text };
+          return (
+            <div style={{
+              display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:12,
+              padding:'10px 12px', background: headerStyle.bg, border:`1px solid ${headerStyle.color}33`, borderRadius:14
+            }}>
+              <div style={{ fontSize:13, fontWeight:700, color: headerStyle.color }}>{status}</div>
+              <div style={{ fontSize:12, fontWeight:700, color: headerStyle.color }}>{tasks.length}</div>
+            </div>
+          );
+        })()}
           <div style={{ flex:1, minHeight:0, overflowY:'auto', display:'flex', flexDirection:'column', gap:10 }}>
             {tasks.length === 0 ? (
               <div style={{ color:C.text3, fontSize:12, padding:'16px 8px', border:`1px dashed ${C.border}`, borderRadius:12, textAlign:'center' }}>No tasks</div>
