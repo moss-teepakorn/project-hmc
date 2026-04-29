@@ -402,15 +402,32 @@ export const taskApi = {
       .single();
     let updatedData = data;
     if (error) {
-      const message = String(error.message || '').toLowerCase();
-      const hasStatusError = message.includes('column "status"') || message.includes('invalid input value for enum') || message.includes('cannot insert/update') && message.includes('status');
-      if (hasStatusError && row.status !== undefined) {
+      const statusValue = row.status as string | undefined;
+      if (statusValue !== undefined) {
+        const statusAlternatives: Record<string, string> = {
+          'Block/Delay': 'Blocked/Delay',
+          'Blocked/Delay': 'Block/Delay',
+          'Review': 'Block/Delay',
+        };
+        const altStatus = statusAlternatives[statusValue];
+        if (altStatus) {
+          const retry = await supabase
+            .from('tasks')
+            .update({ ...row, status: altStatus })
+            .eq('id', id)
+            .select()
+            .single();
+          if (!retry.error) {
+            updatedData = retry.data;
+          }
+        }
+      }
+      if (!updatedData) {
         const fallbackRow = { ...row } as Record<string, unknown>;
         delete fallbackRow.status;
-        if (fallbackRow.percent_complete === undefined && row.status !== undefined) {
-          const status = String(row.status);
-          if (status === 'Todo') fallbackRow.percent_complete = 0;
-          else if (status === 'Done') fallbackRow.percent_complete = 100;
+        if (fallbackRow.percent_complete === undefined && statusValue !== undefined) {
+          if (statusValue === 'Todo') fallbackRow.percent_complete = 0;
+          else if (statusValue === 'Done') fallbackRow.percent_complete = 100;
           else fallbackRow.percent_complete = 1;
         }
         const retry = await supabase
@@ -421,8 +438,6 @@ export const taskApi = {
           .single();
         if (retry.error) throw new Error(retry.error.message);
         updatedData = retry.data;
-      } else {
-        throw new Error(error.message);
       }
     }
     const updated = rowToObj<Task>(updatedData);
