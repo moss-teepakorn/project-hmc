@@ -542,6 +542,7 @@ export default function TasksTab({ projectId }: Props) {
       {!loading && visible.map((task, i) => {
         const isPar = hasChildren(projectTasks, task.id);
         const isSel = selected === task.id;
+        const isExpanded = selected === task.id;
         return (
           <Card key={task.id} style={{
             padding: 14,
@@ -571,36 +572,47 @@ export default function TasksTab({ projectId }: Props) {
                     );
                   })()}
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: C.text2 }}>
-                  <span>Resource: {task.resource || '—'}</span>
-                  <span>Level: {task.level ?? 0}</span>
-                </div>
+                {!isExpanded ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: C.text2 }}>
+                    <span>{task.resource || 'No owner'}</span>
+                    <span>{task.startDate ? isoToDmy(task.startDate) : 'TBD'} — {task.endDate ? isoToDmy(task.endDate) : 'TBD'}</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: C.text2 }}>
+                    <span>Resource: {task.resource || '—'}</span>
+                    <span>Level: {task.level ?? 0}</span>
+                  </div>
+                )}
               </div>
               <div style={{ minWidth: 100, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
                 <PctCell value={task.percentComplete} isParent={isPar} onSave={n => handlePct(task.id, n)} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginTop: 12, fontSize: 11, color: C.text2 }}>
-              <div><strong style={{ color: C.text, fontWeight: 600 }}>Start:</strong> {task.startDate ? isoToDmy(task.startDate) : '—'}</div>
-              <div><strong style={{ color: C.text, fontWeight: 600 }}>Finish:</strong> {task.endDate ? isoToDmy(task.endDate) : '—'}</div>
-              <div><strong style={{ color: C.text, fontWeight: 600 }}>Actual:</strong> {task.actualFinish ? isoToDmy(task.actualFinish) : '—'}</div>
-              <div><strong style={{ color: C.text, fontWeight: 600 }}>Days:</strong> {task.duration}d</div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 11, color: C.text2 }}>
-                {isPar ? 'Parent task' : task.parentId ? 'Sub task' : 'Root task'}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={e => { e.stopPropagation(); setEditModal(task); }}
-                  style={{ height: 32, background: C.primaryBg, border: 'none', borderRadius: 8, padding: '0 14px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>
-                  Edit
-                </button>
-                <button onClick={e => { e.stopPropagation(); handleDelete(task.id); }}
-                  style={{ height: 32, background: C.redBg, border: 'none', borderRadius: 8, padding: '0 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}>
-                  Delete
-                </button>
-              </div>
-            </div>
+            {isExpanded ? (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginTop: 12, fontSize: 11, color: C.text2 }}>
+                  <div><strong style={{ color: C.text, fontWeight: 600 }}>Start:</strong> {task.startDate ? isoToDmy(task.startDate) : '—'}</div>
+                  <div><strong style={{ color: C.text, fontWeight: 600 }}>Finish:</strong> {task.endDate ? isoToDmy(task.endDate) : '—'}</div>
+                  <div><strong style={{ color: C.text, fontWeight: 600 }}>Actual:</strong> {task.actualFinish ? isoToDmy(task.actualFinish) : '—'}</div>
+                  <div><strong style={{ color: C.text, fontWeight: 600 }}>Days:</strong> {task.duration}d</div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 11, color: C.text2 }}>
+                    {isPar ? 'Parent task' : task.parentId ? 'Sub task' : 'Root task'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={e => { e.stopPropagation(); setEditModal(task); }}
+                      style={{ height: 32, background: C.primaryBg, border: 'none', borderRadius: 8, padding: '0 14px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>
+                      Edit
+                    </button>
+                    <button onClick={e => { e.stopPropagation(); handleDelete(task.id); }}
+                      style={{ height: 32, background: C.redBg, border: 'none', borderRadius: 8, padding: '0 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
           </Card>
         );
       })}
@@ -726,6 +738,7 @@ export default function TasksTab({ projectId }: Props) {
               <div style={{ color:C.text3, fontSize:12, padding:'16px 8px', border:`1px dashed ${C.border}`, borderRadius:12, textAlign:'center' }}>No tasks</div>
             ) : tasks.map((task) => {
               const isSel = selected === task.id;
+              const isExpanded = selected === task.id;
               return (
                 <div key={task.id}
                   draggable
@@ -735,25 +748,33 @@ export default function TasksTab({ projectId }: Props) {
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, flexWrap:'wrap' }}>
                     <div style={{ minWidth:0, flex:1 }}>
                       <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{task.taskName || 'Untitled task'}</div>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:6, fontSize:11, color:C.text3 }}>
-                        <span>{task.wbs || '—'}</span>
-                        <span>{task.duration}d</span>
-                        <span>{task.percentComplete}%</span>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:8, fontSize:11, color:C.text2 }}>
+                        <span>{task.resource || 'No owner'}</span>
+                        <span>{task.startDate ? isoToDmy(task.startDate) : 'TBD'} — {task.endDate ? isoToDmy(task.endDate) : 'TBD'}</span>
                       </div>
-                      <div>
-                        {(() => {
-                          const status = getTaskStatus(task);
-                          const style = PROCESS_STATUS_STYLE[status] || { bg: C.bg2, color: C.text };
-                          return (
-                            <span style={{
-                              display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999,
-                              fontSize: 11, fontWeight: 700, background: style.bg, color: style.color, marginTop: 4
-                            }}>
-                              {status}
-                            </span>
-                          );
-                        })()}
-                      </div>
+                      {isExpanded && (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:6, fontSize:11, color:C.text3, marginTop:6 }}>
+                          <span>{task.wbs || '—'}</span>
+                          <span>{task.duration}d</span>
+                          <span>{task.percentComplete}%</span>
+                        </div>
+                      )}
+                      {isExpanded && (
+                        <div style={{ marginTop: 6 }}>
+                          {(() => {
+                            const status = getTaskStatus(task);
+                            const style = PROCESS_STATUS_STYLE[status] || { bg: C.bg2, color: C.text };
+                            return (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999,
+                                fontSize: 11, fontWeight: 700, background: style.bg, color: style.color
+                              }}>
+                                {status}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
                       <button onClick={(e) => { e.stopPropagation(); setEditModal(task); }}
@@ -762,12 +783,14 @@ export default function TasksTab({ projectId }: Props) {
                       </button>
                     </div>
                   </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:11, color:C.text2 }}>
-                    <div><strong style={{ color:C.text, fontWeight:600 }}>Start:</strong> {task.startDate ? isoToDmy(task.startDate) : '—'}</div>
-                    <div><strong style={{ color:C.text, fontWeight:600 }}>Finish:</strong> {task.endDate ? isoToDmy(task.endDate) : '—'}</div>
-                    <div><strong style={{ color:C.text, fontWeight:600 }}>Actual:</strong> {task.actualFinish ? isoToDmy(task.actualFinish) : '—'}</div>
-                    <div><strong style={{ color:C.text, fontWeight:600 }}>Resource:</strong> {task.resource || '—'}</div>
-                  </div>
+                  {isExpanded ? (
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:11, color:C.text2 }}>
+                      <div><strong style={{ color:C.text, fontWeight:600 }}>Start:</strong> {task.startDate ? isoToDmy(task.startDate) : '—'}</div>
+                      <div><strong style={{ color:C.text, fontWeight:600 }}>Finish:</strong> {task.endDate ? isoToDmy(task.endDate) : '—'}</div>
+                      <div><strong style={{ color:C.text, fontWeight:600 }}>Actual:</strong> {task.actualFinish ? isoToDmy(task.actualFinish) : '—'}</div>
+                      <div><strong style={{ color:C.text, fontWeight:600 }}>Resource:</strong> {task.resource || '—'}</div>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
