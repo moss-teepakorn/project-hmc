@@ -121,7 +121,8 @@ export default function TasksTab({ projectId }: Props) {
   const [showExport, setShowExport] = useState(false);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
-  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; isParent: boolean }>({ visible: false, x: 0, y: 0, task: null, isParent: false });
+  const [buttonFocus, setButtonFocus] = useState<'expand' | 'collapse' | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; isMainTask: boolean }>({ visible: false, x: 0, y: 0, task: null, isMainTask: false });
   const [newTaskInsert, setNewTaskInsert] = useState<NewTaskInsert | null>(null);
   const [splitW, setSplitW]     = useState<number>(() => {
     if (typeof window !== 'undefined') {
@@ -237,9 +238,9 @@ export default function TasksTab({ projectId }: Props) {
   const openTaskContextMenu = (task: Task) => (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    const isParent = hasChildren(projectTasks, task.id);
+    const isMainTask = !task.parentId;
     setSelected(task.id);
-    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, task, isParent });
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, task, isMainTask });
   };
 
   const handleContextMenuSelect = (mode: 'main' | 'sub', position: 'before' | 'after') => {
@@ -1031,12 +1032,12 @@ export default function TasksTab({ projectId }: Props) {
             ))}
           </div>
           <div style={{ display:'flex', gap:8, marginLeft:8, alignItems:'center' }}>
-            <button onClick={expandAll}
-              style={{ padding:'5px 10px', borderRadius:6, border:'1px solid transparent', background:C.primaryBg, color:C.primary, cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif' }}>
+            <button onClick={expandAll} onFocus={() => setButtonFocus('expand')} onBlur={() => setButtonFocus(null)}
+              style={{ padding:'5px 10px', borderRadius:6, border:'1px solid transparent', background: buttonFocus === 'expand' ? C.primary : C.primaryBg, color: buttonFocus === 'expand' ? C.white : C.primary, cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif', outline:'none' }}>
               Expand All
             </button>
-            <button onClick={collapseAll}
-              style={{ padding:'5px 10px', borderRadius:6, border:'1px solid transparent', background:C.bg, color:C.text2, cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif' }}>
+            <button onClick={collapseAll} onFocus={() => setButtonFocus('collapse')} onBlur={() => setButtonFocus(null)}
+              style={{ padding:'5px 10px', borderRadius:6, border:'1px solid transparent', background: buttonFocus === 'collapse' ? C.text : C.bg, color: buttonFocus === 'collapse' ? C.white : C.text2, cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif', outline:'none' }}>
               Collapse All
             </button>
           </div>
@@ -1116,18 +1117,7 @@ export default function TasksTab({ projectId }: Props) {
 
       {contextMenu.visible && contextMenu.task && (
         <div style={{ position:'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 999, background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow2, minWidth: 220, overflow: 'hidden' }}>
-          {contextMenu.isParent ? (
-            <>
-              <button type="button" onClick={() => handleContextMenuSelect('sub', 'before')}
-                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-                Insert subtask before
-              </button>
-              <button type="button" onClick={() => handleContextMenuSelect('sub', 'after')}
-                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-                Insert subtask after
-              </button>
-            </>
-          ) : (
+          {contextMenu.isMainTask ? (
             <>
               <button type="button" onClick={() => handleContextMenuSelect('main', 'before')}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
@@ -1136,6 +1126,17 @@ export default function TasksTab({ projectId }: Props) {
               <button type="button" onClick={() => handleContextMenuSelect('main', 'after')}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
                 Insert maintask after
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => handleContextMenuSelect('sub', 'before')}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Insert subtask before
+              </button>
+              <button type="button" onClick={() => handleContextMenuSelect('sub', 'after')}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Insert subtask after
               </button>
             </>
           )}
