@@ -88,15 +88,19 @@ export default function Navbar() {
       const due = parseDate(m.dueDate);
       return due && due <= dueIn10;
     })
-    .map((m) => ({
-      id: m.id,
-      title: `Milestone : ${m.name}`,
-      subtitle: m.billingDate
-        ? `Billing ${m.billingDate}`
-        : `Due ${m.dueDate}`,
-      type: 'milestone',
-      status: 'upcoming' as const,
-    }));
+    .map((m) => {
+      const due = parseDate(m.dueDate);
+      const status = due && due < now ? 'overdue' as const : 'upcoming' as const;
+      return {
+        id: m.id,
+        title: `Milestone : ${m.name}`,
+        subtitle: m.billingDate
+          ? `Billing ${m.billingDate}`
+          : `Due ${m.dueDate}`,
+        type: 'milestone',
+        status,
+      };
+    });
 
   const notifications = [...overdueTasks, ...upcomingTasks, ...milestoneNotifications];
 
