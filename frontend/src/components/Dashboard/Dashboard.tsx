@@ -600,7 +600,7 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <Badge bg={scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg} color={scheduleColor}>Project Health : {scheduleStatus}</Badge>
           <span style={{ fontSize: 11, color: C.text2, padding: '8px 12px', borderRadius: 999, background: C.bg }}>Last Updated: {fmtDate(currentDate.toISOString().slice(0, 10))}</span>
-          <Btn small onClick={onOpen} style={{ padding: '8px 10px', minWidth: 0, width: 'auto' }}><Eye size={14} /></Btn>
+          <Btn small onClick={onOpen} style={{ padding: '8px 10px', minWidth: 0, width: 'auto' }}><Eye size={14} />Open Project</Btn>
         </div>
       </div>
 
