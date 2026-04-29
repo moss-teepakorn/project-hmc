@@ -45,12 +45,20 @@ const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Block/Delay', 'Done'] as co
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
 type TaskRow = Task | NewTaskInsert;
 
+type InsertAction =
+  | 'main-before'
+  | 'main-after'
+  | 'sub-before'
+  | 'sub-after'
+  | 'child-under'
+  | 'child-before'
+  | 'child-after';
+
 interface NewTaskInsert {
   id: string;
   anchorId: string;
   parentId: string;
-  mode: 'main' | 'sub';
-  position: 'before' | 'after';
+  action: InsertAction;
   order: number;
   taskName: string;
   startDate: string;
@@ -122,7 +130,7 @@ export default function TasksTab({ projectId }: Props) {
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
   const [buttonFocus, setButtonFocus] = useState<'expand' | 'collapse' | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; isMainTask: boolean }>({ visible: false, x: 0, y: 0, task: null, isMainTask: false });
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; taskLevel: number }>({ visible: false, x: 0, y: 0, task: null, taskLevel: 0 });
   const [newTaskInsert, setNewTaskInsert] = useState<NewTaskInsert | null>(null);
   const [splitW, setSplitW]     = useState<number>(() => {
     if (typeof window !== 'undefined') {
@@ -183,33 +191,36 @@ export default function TasksTab({ projectId }: Props) {
   const nextWeekIso = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
   const visible = flattenTree(projectTasks, expanded);
-  const getInsertMeta = (anchor: Task, mode: 'main' | 'sub', position: 'before' | 'after') => {
-    if (mode === 'main') {
-      return { parentId: '', order: Number(anchor.order || 0) + (position === 'before' ? -0.5 : 0.5), level: 0 };
+
+  const getInsertMeta = (anchor: Task, action: InsertAction) => {
+    if (action === 'main-before' || action === 'main-after') {
+      return { parentId: '', order: Number(anchor.order || 0) + (action === 'main-before' ? -0.5 : 0.5), level: 0 };
     }
+
+    if (action === 'sub-before' || action === 'sub-after') {
+      const parentId = anchor.parentId;
+      return { parentId, order: Number(anchor.order || 0) + (action === 'sub-before' ? -0.5 : 0.5), level: 1 };
+    }
+
+    if (action === 'child-before' || action === 'child-after') {
+      const parentId = anchor.parentId;
+      return { parentId, order: Number(anchor.order || 0) + (action === 'child-before' ? -0.5 : 0.5), level: 2 };
+    }
+
     const children = projectTasks
       .filter((t) => t.parentId === anchor.id)
       .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
-    if (!children.length) {
-      return { parentId: anchor.id, order: 1, level: (anchor.level ?? 0) + 1 };
-    }
-    return {
-      parentId: anchor.id,
-      order: Number(children[position === 'before' ? 0 : children.length - 1].order || 0) + (position === 'before' ? -0.5 : 0.5),
-      level: (anchor.level ?? 0) + 1,
-    };
+    const nextOrder = children.length ? Number(children[children.length - 1].order || 0) + 1 : 1;
+    return { parentId: anchor.id, order: nextOrder, level: 2 };
   };
 
-  const getInsertIndex = (anchor: Task, mode: 'main' | 'sub', position: 'before' | 'after') => {
+  const getInsertIndex = (anchor: Task, action: InsertAction) => {
     const index = visible.findIndex((t) => t.id === anchor.id);
     if (index < 0) return visible.length;
-    if (mode === 'main') {
-      return position === 'before' ? index : index + 1;
+    if (action.endsWith('before')) {
+      return index;
     }
     const anchorLevel = anchor.level ?? 0;
-    if (position === 'before') {
-      return index + 1;
-    }
     let next = index + 1;
     while (next < visible.length && (visible[next].level ?? 0) > anchorLevel) {
       next += 1;
@@ -221,7 +232,7 @@ export default function TasksTab({ projectId }: Props) {
     const result: TaskRow[] = [...visible];
     const anchor = projectTasks.find((t) => t.id === newTaskInsert.anchorId);
     if (!anchor) return result;
-    const insertIndex = getInsertIndex(anchor, newTaskInsert.mode, newTaskInsert.position);
+    const insertIndex = getInsertIndex(anchor, newTaskInsert.action);
     result.splice(insertIndex, 0, newTaskInsert);
     return result;
   })() : visible;
@@ -238,21 +249,50 @@ export default function TasksTab({ projectId }: Props) {
   const openTaskContextMenu = (task: Task) => (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    const isMainTask = !task.parentId;
+    const taskLevel = task.level ?? 0;
     setSelected(task.id);
-    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, task, isMainTask });
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, task, taskLevel });
   };
 
-  const handleContextMenuSelect = (mode: 'main' | 'sub', position: 'before' | 'after') => {
+  const getInsertMeta = (anchor: Task, action: InsertAction) => {
+    const sameParentSiblings = projectTasks
+      .filter((t) => t.parentId === (action === 'main-before' || action === 'main-after' ? '' : action === 'child-under' ? anchor.id : anchor.parentId))
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+
+    if (action === 'main-before' || action === 'main-after') {
+      return { parentId: '', order: Number(anchor.order || 0) + (action === 'main-before' ? -0.5 : 0.5), level: 0 };
+    }
+
+    if (action === 'sub-before' || action === 'sub-after') {
+      const parentId = anchor.parentId;
+      const siblingOrders = projectTasks.filter((t) => t.parentId === parentId).map((t) => Number(t.order || 0));
+      const order = Number(anchor.order || 0) + (action === 'sub-before' ? -0.5 : 0.5);
+      return { parentId, order, level: 1 };
+    }
+
+    if (action === 'child-before' || action === 'child-after') {
+      const parentId = anchor.parentId;
+      const order = Number(anchor.order || 0) + (action === 'child-before' ? -0.5 : 0.5);
+      return { parentId, order, level: 2 };
+    }
+
+    // child-under
+    const children = projectTasks
+      .filter((t) => t.parentId === anchor.id)
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+    const nextOrder = children.length ? Number(children[children.length - 1].order || 0) + 1 : 1;
+    return { parentId: anchor.id, order: nextOrder, level: 2 };
+  };
+
+  const handleContextMenuSelect = (action: InsertAction) => {
     const anchor = contextMenu.task;
     if (!anchor) return;
-    const { parentId, order, level } = getInsertMeta(anchor, mode, position);
+    const { parentId, order, level } = getInsertMeta(anchor, action);
     setNewTaskInsert({
       id: `new-${Date.now()}`,
       anchorId: anchor.id,
       parentId,
-      mode,
-      position,
+      action,
       order,
       taskName: '',
       startDate: todayIso,
@@ -1117,26 +1157,41 @@ export default function TasksTab({ projectId }: Props) {
 
       {contextMenu.visible && contextMenu.task && (
         <div style={{ position:'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 999, background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow2, minWidth: 220, overflow: 'hidden' }}>
-          {contextMenu.isMainTask ? (
+          {contextMenu.taskLevel === 0 ? (
             <>
-              <button type="button" onClick={() => handleContextMenuSelect('main', 'before')}
+              <button type="button" onClick={() => handleContextMenuSelect('main-before')}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-                Insert maintask before
+                Add Maintask Before
               </button>
-              <button type="button" onClick={() => handleContextMenuSelect('main', 'after')}
+              <button type="button" onClick={() => handleContextMenuSelect('main-after')}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-                Insert maintask after
+                Add Maintask After
+              </button>
+            </>
+          ) : contextMenu.taskLevel === 1 ? (
+            <>
+              <button type="button" onClick={() => handleContextMenuSelect('sub-before')}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Add Subtask Before
+              </button>
+              <button type="button" onClick={() => handleContextMenuSelect('sub-after')}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Add Subtask After
+              </button>
+              <button type="button" onClick={() => handleContextMenuSelect('child-under')}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Add Childtask
               </button>
             </>
           ) : (
             <>
-              <button type="button" onClick={() => handleContextMenuSelect('sub', 'before')}
+              <button type="button" onClick={() => handleContextMenuSelect('child-before')}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-                Insert subtask before
+                Add Childtask Before
               </button>
-              <button type="button" onClick={() => handleContextMenuSelect('sub', 'after')}
+              <button type="button" onClick={() => handleContextMenuSelect('child-after')}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-                Insert subtask after
+                Add Childtask After
               </button>
             </>
           )}
