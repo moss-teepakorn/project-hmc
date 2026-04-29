@@ -161,11 +161,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { projectId, test } = req.body || {};
+    const { projectId, test, force } = req.body || {};
     const secret = req.headers['x-reminder-secret'] || req.query.secret;
     const accessTokenHeader = req.headers.authorization || req.headers.Authorization || '';
     const accessToken = accessTokenHeader.startsWith('Bearer ') ? accessTokenHeader.slice(7) : accessTokenHeader || null;
     const isTestMode = Boolean(test);
+    const isForceSend = Boolean(force);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
     let isAuthorized = false;
@@ -212,10 +213,12 @@ export default async function handler(req, res) {
       if (!project.email_notification_enabled) return false;
       if (!project.email_notification_time) return false;
       const scheduled = String(project.email_notification_time).slice(0, 5);
+      if (currentTime < scheduled) return false;
       const alreadySentToday = project.email_notification_last_sent_at
         ? String(new Date(project.email_notification_last_sent_at).toISOString().slice(0, 10)) === nowKey
         : false;
-      return !alreadySentToday && currentTime >= scheduled;
+      if (alreadySentToday && !isForceSend) return false;
+      return true;
     });
   }
 

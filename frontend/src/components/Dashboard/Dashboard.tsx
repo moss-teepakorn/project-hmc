@@ -275,7 +275,7 @@ export default function Dashboard() {
                       const res = await fetch('/api/send-task-reminders', {
                         method: 'POST',
                         headers,
-                        body: JSON.stringify({}),
+                        body: JSON.stringify({ force: true }),
                       });
                       const result = await res.json();
                       if (!res.ok) throw new Error(result?.error || 'Send email failed');
