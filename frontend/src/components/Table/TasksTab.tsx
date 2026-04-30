@@ -191,7 +191,7 @@ export default function TasksTab({ projectId }: Props) {
     .filter((code) => code.codeType === 'task_phase' && code.active)
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((code) => code.codeValue);
-  const effectivePhaseOptions = phaseOptions.length > 0 ? phaseOptions : PHASE_OPTIONS;
+  const effectivePhaseOptions: string[] = phaseOptions.length > 0 ? phaseOptions : [...PHASE_OPTIONS];
   const todayIso = new Date().toISOString().slice(0, 10);
   const nextWeekIso = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 

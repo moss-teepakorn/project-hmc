@@ -9,6 +9,21 @@ const COLORS = ['#4F46E5','#0EA5E9','#10B981','#F59E0B','#EC4899','#EF4444','#8B
 
 interface Props { project?: Project; onClose: () => void; }
 
+interface ProjectForm {
+  name: string;
+  code: string;
+  client: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  color: string;
+  emailNotificationEnabled: boolean;
+  emailNotificationMode: string;
+  emailNotificationRecipients: string;
+  emailNotificationTime: string;
+}
+
 function normalizeDescription(raw: string): string {
   if (!raw?.startsWith('__PM_META__:')) return raw || '';
   try {
@@ -61,6 +76,10 @@ export default function ProjectModal({ project, onClose }: Props) {
     }
     return baseOptions;
   })();
+
+  const up = <K extends keyof ProjectForm>(key: K, value: ProjectForm[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Project name is required'); return; }
