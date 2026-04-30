@@ -603,26 +603,43 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
     return found ? found.label : name || 'Main Task';
   };
 
-  const phaseLabels = [
-    'Project Initiation',
-    'Requirement & Gap Analysis',
-    'Business Blueprint',
-    'System Configuration',
-    'Data Migration',
-    'UAT & Parallel Run',
-    'Go-live & Hypercare',
-  ];
+  const taskPhaseOptions = masterCodes
+    .filter((code) => code.codeType === 'task_phase' && code.active)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((code) => ({ value: code.codeValue, label: code.label }));
+
+  const phaseLabelByValue = taskPhaseOptions.reduce<Record<string, string>>((acc, phase) => {
+    acc[phase.value] = phase.label;
+    return acc;
+  }, {});
+
+  const phaseLabels = taskPhaseOptions.length > 0
+    ? taskPhaseOptions.map((phase) => phase.label)
+    : [
+      'Project Initiation',
+      'Requirement & Gap Analysis',
+      'Business Blueprint',
+      'System Configuration',
+      'Data Migration',
+      'UAT & Parallel Run',
+      'Go-live & Hypercare',
+    ];
 
   const phaseProgress = rootTasksSorted.reduce<Record<string, { total: number; count: number }>>((acc, t) => {
-    const phaseName = t.phase && String(t.phase).trim() ? String(t.phase).trim() : getStageLabel(t.taskName);
-    const label = phaseLabels.includes(phaseName) ? phaseName : getStageLabel(t.taskName);
+    const phaseValue = t.phase && String(t.phase).trim() ? String(t.phase).trim() : '';
+    const rawPhaseLabel = phaseValue ? (phaseLabelByValue[phaseValue] ?? phaseValue) : getStageLabel(t.taskName);
+    const label = phaseLabels.includes(rawPhaseLabel) ? rawPhaseLabel : getStageLabel(t.taskName);
     if (!acc[label]) acc[label] = { total: 0, count: 0 };
     acc[label].total += t.percentComplete;
     acc[label].count += 1;
     return acc;
   }, {});
 
-  const stageTasks = phaseLabels
+  const stageTasks = [
+    ...phaseLabels.map((label) => label),
+    ...Object.keys(phaseProgress).filter((label) => !phaseLabels.includes(label)),
+  ]
+    .filter((label, index, list) => list.indexOf(label) === index)
     .filter((label) => phaseProgress[label]?.count)
     .map((label) => ({
       id: label,
