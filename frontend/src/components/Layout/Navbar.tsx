@@ -10,7 +10,7 @@ import { Bell, Home, LogOut, Moon, Sun } from 'lucide-react';
 const F = 'Poppins, sans-serif';
 
 export default function Navbar() {
-  const { activeProject, setActiveProject, projects, tasks, milestones } = useStore();
+  const { activeProject, setActiveProject, projects, tasks, milestones, fetchMasterCodes } = useStore();
   const { user, profile, signOut, configured } = useAuth();
   const { theme, toggle } = useTheme();
   const [isMobile, setIsMobile] = React.useState(false);
@@ -168,7 +168,10 @@ export default function Navbar() {
         )}
         {profile?.role === 'admin' && (
           <button
-            onClick={() => setSetupOpen(true)}
+            onClick={() => {
+              setSetupOpen(true);
+              fetchMasterCodes();
+            }}
             title="Open admin setup"
             style={{
               padding: '8px 12px', borderRadius: 10, border: `1px solid ${isDark ? C.border2 : C.border}`,

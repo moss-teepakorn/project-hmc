@@ -25,9 +25,23 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
     sortOrder: 100,
     active: true,
   });
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchMasterCodes();
+    let mounted = true;
+    setLoading(true);
+    setLoadError(null);
+    fetchMasterCodes()
+      .catch((error) => {
+        if (!mounted) return;
+        setLoadError((error as Error).message || 'Unable to load lookup values');
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLoading(false);
+      });
+    return () => { mounted = false; };
   }, [fetchMasterCodes]);
 
   const codeTypes = useMemo(() => {
@@ -113,23 +127,51 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const refreshMasterCodes = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      await fetchMasterCodes();
+    } catch (error) {
+      setLoadError((error as Error).message || 'Unable to load lookup values');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal title="Admin Setup" onClose={onClose} width={900}>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
-        {codeTypes.map((type) => (
-          <button key={type} type="button" onClick={() => setActiveType(type)}
-            style={{
-              padding: '8px 14px', borderRadius: 10, border: `1px solid ${activeType === type ? C.primary : C.border}`,
-              background: activeType === type ? C.primaryBg : C.white, color: activeType === type ? C.primary : C.text,
-              cursor: 'pointer', fontWeight: 700,
-            }}>
-            {TYPE_LABELS[type] ?? type}
-          </button>
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {codeTypes.map((type) => (
+            <button key={type} type="button" onClick={() => setActiveType(type)}
+              style={{
+                padding: '8px 14px', borderRadius: 10, border: `1px solid ${activeType === type ? C.primary : C.border}`,
+                background: activeType === type ? C.primaryBg : C.white, color: activeType === type ? C.primary : C.text,
+                cursor: 'pointer', fontWeight: 700,
+              }}>
+              {TYPE_LABELS[type] ?? type}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={refreshMasterCodes}
+          style={{ padding: '8px 14px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.white, color: C.text, cursor: 'pointer', fontSize: 12 }}>
+          {loading ? 'Reloading…' : 'Refresh'}
+        </button>
       </div>
       <div style={{ fontSize: 13, color: C.text2, marginBottom: 10 }}>
         Manage shared lookup values used by project and task dropdowns. Only admin users can change these values.
       </div>
+      {loading && (
+        <div style={{ padding: 16, borderRadius: 12, background: C.bg2, color: C.text3, marginBottom: 12 }}>
+          Loading lookup values…
+        </div>
+      )}
+      {loadError && (
+        <div style={{ padding: 16, borderRadius: 12, background: C.redBg, color: C.red, marginBottom: 12 }}>
+          Failed to load lookup values. <button type="button" onClick={refreshMasterCodes} style={{ border: 'none', background: 'transparent', color: C.primary, textDecoration: 'underline', cursor: 'pointer' }}>Try again</button>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 90px 90px 90px 70px', gap: 10, fontSize: 11, color: C.text2, marginBottom: 8 }}>
         <div>Code Key</div>
         <div>Code Value</div>
