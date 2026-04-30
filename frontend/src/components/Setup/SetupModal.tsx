@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
+import { Edit3, Trash2 } from 'lucide-react';
 import { Modal, Input, Btn, C } from '../Common';
 import type { MasterCode } from '../../types';
 
@@ -26,7 +27,9 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
     sortOrder: 100,
     active: true,
   });
-  const SMALL_INPUT_STYLE: React.CSSProperties = { fontSize: 10, padding: '6px 8px', lineHeight: 1.3 };
+  const ROW_HEIGHT = 36;
+  const SMALL_INPUT_STYLE: React.CSSProperties = { fontSize: 10, padding: '4px 8px', lineHeight: 1.3 };
+  const ICON_BUTTON_STYLE: React.CSSProperties = { width: 28, height: 28, borderRadius: 8, border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: C.bg2, color: C.text2 };
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -189,8 +192,8 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
             {codes.map((code) => {
               const draft = editing[code.id];
               return (
-                <tr key={code.id} style={{ borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 10 }}>
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                <tr key={code.id} style={{ borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 10, height: ROW_HEIGHT }}>
+                  <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
                     {draft ? (
                       <Input value={draft.codeKey} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], codeKey: v } }))} style={SMALL_INPUT_STYLE} />
                     ) : (
@@ -211,20 +214,20 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
                       <span style={{ color: C.text }}>{code.label}</span>
                     )}
                   </td>
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                  <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
                     {draft ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Input type="color" value={draft.textColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], textColor: v } }))} style={{ width: 38, padding: 3, height: 30 }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Input type="color" value={draft.textColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], textColor: v } }))} style={{ width: 28, padding: 2, height: 26 }} />
                         <span style={{ color: C.text, fontSize: 10 }}>{draft.textColor}</span>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 20, height: 20, borderRadius: 4, background: code.textColor, border: '1px solid #CBD5E1' }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 18, height: 18, borderRadius: 4, background: code.textColor, border: '1px solid #CBD5E1' }} />
                         <span style={{ color: C.text }}>{code.textColor}</span>
                       </div>
                     )}
                   </td>
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                  <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
                     {draft ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <Input type="color" value={draft.bgColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], bgColor: v } }))} style={{ width: 38, padding: 3, height: 30 }} />
@@ -251,27 +254,27 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
                       <span>{code.active ? 'Yes' : 'No'}</span>
                     )}
                   </td>
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+                  <td style={{ padding: '4px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
                     {draft ? (
                       <>
                         <button type="button" onClick={() => saveEdit(code.id)}
-                          style={{ border: 'none', background: C.primary, color: '#fff', borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
-                          Save
+                          style={{ ...ICON_BUTTON_STYLE, background: C.primary, color: '#fff', width: 28, height: 28, padding: 0 }}>
+                          <Edit3 size={14} />
                         </button>
                         <button type="button" onClick={() => cancelEdit(code.id)}
-                          style={{ border: `1px solid ${C.border}`, background: C.white, color: C.text, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12, marginLeft: 6 }}>
-                          Cancel
+                          style={{ ...ICON_BUTTON_STYLE, marginLeft: 6, padding: 0 }}>
+                          <Trash2 size={14} />
                         </button>
                       </>
                     ) : (
                       <>
                         <button type="button" onClick={() => startEdit(code)}
-                          style={{ border: 'none', background: C.primaryBg, color: C.primary, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12, marginRight: 6 }}>
-                          Edit
+                          style={{ ...ICON_BUTTON_STYLE, marginRight: 6, padding: 0 }}>
+                          <Edit3 size={14} />
                         </button>
                         <button type="button" onClick={() => handleDelete(code.id)}
-                          style={{ border: 'none', background: C.redBg, color: C.red, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
-                          Delete
+                          style={{ ...ICON_BUTTON_STYLE, background: C.redBg, color: C.red, padding: 0 }}>
+                          <Trash2 size={14} />
                         </button>
                       </>
                     )}
