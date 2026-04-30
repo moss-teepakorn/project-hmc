@@ -54,8 +54,8 @@ create table if not exists public.projects (
   code        text not null default '',
   client      text not null default '',
   software_version text not null default '',
-  status      text not null default 'planning'
-                check (status in ('planning','req_design','setup','testing','go_live','hyper_care')),
+  status      text not null default 'Planning'
+                check (status in ('Planning','Req & Design','Setup','Testing','Go Live','Hyper Care')),
   start_date  text not null default '',
   end_date    text not null default '',
   description text not null default '',

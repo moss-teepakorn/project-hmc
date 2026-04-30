@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS projects (
   name VARCHAR(255) NOT NULL,
   code VARCHAR(50) UNIQUE NOT NULL,
   client VARCHAR(255),
-  status VARCHAR(50) DEFAULT 'planning' CHECK (status IN ('planning', 'req_design', 'setup', 'testing', 'go_live', 'hyper_care')),
+  status VARCHAR(50) DEFAULT 'Planning' CHECK (status IN ('Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care')),
   color VARCHAR(20),
   start_date DATE,
   end_date DATE,
