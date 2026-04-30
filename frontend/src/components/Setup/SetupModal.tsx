@@ -172,112 +172,122 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
         </div>
       )}
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 14, fontSize: 10 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 90px 90px 90px 70px', gap: 10, fontSize: 10, color: C.text2, background: C.bg2, padding: '10px 12px', fontWeight: 700, alignItems: 'center' }}>
-          <div>Code Key</div>
-          <div>Code Value</div>
-          <div>Label</div>
-          <div>Text Color</div>
-          <div>Background</div>
-          <div>Sort Order</div>
-          <div />
-        </div>
-        <div style={{ display: 'grid', gap: 0 }}>
-        {codes.map((code) => {
-          const draft = editing[code.id];
-          return (
-            <div key={code.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 90px 90px 90px 70px', gap: 10, alignItems: 'center', padding: '10px 12px', borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 10 }}>
-              <div>
-                {draft ? (
-                  <Input value={draft.codeKey} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], codeKey: v } }))} style={SMALL_INPUT_STYLE} />
-                ) : (
-                  <span style={{ color: C.text }}>{code.codeKey}</span>
-                )}
-              </div>
-              <div>
-                {draft ? (
-                  <Input value={draft.codeValue} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], codeValue: v } }))} style={SMALL_INPUT_STYLE} />
-                ) : (
-                  <span style={{ color: C.text }}>{code.codeValue}</span>
-                )}
-              </div>
-              <div>
-                {draft ? (
-                  <Input value={draft.label} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], label: v } }))} style={SMALL_INPUT_STYLE} />
-                ) : (
-                  <span style={{ color: C.text }}>{code.label}</span>
-                )}
-              </div>
-              <div>
-                {draft ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Input type="color" value={draft.textColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], textColor: v } }))} style={{ width: 38, padding: 3, height: 30 }} />
-                    <span style={{ color: C.text, fontSize: 12 }}>{draft.textColor}</span>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ width: 20, height: 20, borderRadius: 4, background: code.textColor, border: '1px solid #CBD5E1' }} />
-                    <span style={{ color: C.text }}>{code.textColor}</span>
-                  </div>
-                )}
-              </div>
-              <div>
-                {draft ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Input type="color" value={draft.bgColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], bgColor: v } }))} style={{ width: 38, padding: 3, height: 30 }} />
-                    <span style={{ color: C.text, fontSize: 12 }}>{draft.bgColor}</span>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ width: 20, height: 20, borderRadius: 4, background: code.bgColor, border: '1px solid #CBD5E1' }} />
-                    <span style={{ color: C.text }}>{code.bgColor}</span>
-                  </div>
-                )}
-              </div>
-              <div>
-                {draft ? (
-                  <Input value={String(draft.sortOrder)} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], sortOrder: Number(v) || 0 } }))} style={SMALL_INPUT_STYLE} />
-                ) : (
-                  <span style={{ color: C.text }}>{code.sortOrder}</span>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {draft ? (
-                  <input type="checkbox" checked={draft.active} onChange={(e) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], active: e.target.checked } }))} />
-                ) : (
-                  <span>{code.active ? 'Yes' : 'No'}</span>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {draft ? (
-                  <>
-                    <button type="button" onClick={() => saveEdit(code.id)}
-                      style={{ border: 'none', background: C.primary, color: '#fff', borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
-                      Save
-                    </button>
-                    <button type="button" onClick={() => cancelEdit(code.id)}
-                      style={{ border: `1px solid ${C.border}`, background: C.white, color: C.text, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button type="button" onClick={() => startEdit(code)}
-                      style={{ border: 'none', background: C.primaryBg, color: C.primary, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
-                      Edit
-                    </button>
-                    <button type="button" onClick={() => handleDelete(code.id)}
-                      style={{ border: 'none', background: C.redBg, color: C.red, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
-        {codes.length === 0 && (
-          <div style={{ padding: 16, borderRadius: 12, background: C.bg2, color: C.text3 }}>No values found for this lookup type.</div>
-        )}
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+          <thead>
+            <tr style={{ background: C.bg2, color: C.text2, fontWeight: 700, fontSize: 10 }}>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>Code Key</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>Code Value</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>Label</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', width: 90 }}>Text Color</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', width: 90 }}>Background</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', width: 90 }}>Sort Order</th>
+              <th style={{ padding: '10px 12px', textAlign: 'center', width: 70 }}>Active</th>
+              <th style={{ padding: '10px 12px', textAlign: 'center', width: 90 }} />
+            </tr>
+          </thead>
+          <tbody>
+            {codes.map((code) => {
+              const draft = editing[code.id];
+              return (
+                <tr key={code.id} style={{ borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 10 }}>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                    {draft ? (
+                      <Input value={draft.codeKey} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], codeKey: v } }))} style={SMALL_INPUT_STYLE} />
+                    ) : (
+                      <span style={{ color: C.text }}>{code.codeKey}</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                    {draft ? (
+                      <Input value={draft.codeValue} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], codeValue: v } }))} style={SMALL_INPUT_STYLE} />
+                    ) : (
+                      <span style={{ color: C.text }}>{code.codeValue}</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                    {draft ? (
+                      <Input value={draft.label} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], label: v } }))} style={SMALL_INPUT_STYLE} />
+                    ) : (
+                      <span style={{ color: C.text }}>{code.label}</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                    {draft ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Input type="color" value={draft.textColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], textColor: v } }))} style={{ width: 38, padding: 3, height: 30 }} />
+                        <span style={{ color: C.text, fontSize: 10 }}>{draft.textColor}</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 20, height: 20, borderRadius: 4, background: code.textColor, border: '1px solid #CBD5E1' }} />
+                        <span style={{ color: C.text }}>{code.textColor}</span>
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                    {draft ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Input type="color" value={draft.bgColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], bgColor: v } }))} style={{ width: 38, padding: 3, height: 30 }} />
+                        <span style={{ color: C.text, fontSize: 10 }}>{draft.bgColor}</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 20, height: 20, borderRadius: 4, background: code.bgColor, border: '1px solid #CBD5E1' }} />
+                        <span style={{ color: C.text }}>{code.bgColor}</span>
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                    {draft ? (
+                      <Input value={String(draft.sortOrder)} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], sortOrder: Number(v) || 0 } }))} style={SMALL_INPUT_STYLE} />
+                    ) : (
+                      <span style={{ color: C.text }}>{code.sortOrder}</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', textAlign: 'center' }}>
+                    {draft ? (
+                      <input type="checkbox" checked={draft.active} onChange={(e) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], active: e.target.checked } }))} />
+                    ) : (
+                      <span>{code.active ? 'Yes' : 'No'}</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+                    {draft ? (
+                      <>
+                        <button type="button" onClick={() => saveEdit(code.id)}
+                          style={{ border: 'none', background: C.primary, color: '#fff', borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
+                          Save
+                        </button>
+                        <button type="button" onClick={() => cancelEdit(code.id)}
+                          style={{ border: `1px solid ${C.border}`, background: C.white, color: C.text, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12, marginLeft: 6 }}>
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" onClick={() => startEdit(code)}
+                          style={{ border: 'none', background: C.primaryBg, color: C.primary, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12, marginRight: 6 }}>
+                          Edit
+                        </button>
+                        <button type="button" onClick={() => handleDelete(code.id)}
+                          style={{ border: 'none', background: C.redBg, color: C.red, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+            {codes.length === 0 && (
+              <tr>
+                <td colSpan={8} style={{ padding: 16, textAlign: 'center', color: C.text3, background: C.bg2 }}>
+                  No values found for this lookup type.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, marginTop: 16 }}>
