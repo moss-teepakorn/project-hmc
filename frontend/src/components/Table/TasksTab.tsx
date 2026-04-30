@@ -1246,6 +1246,15 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
   const phaseDropdownOptions = form.phase && !phaseOptions.includes(String(form.phase))
     ? [String(form.phase), ...phaseOptions]
     : phaseOptions;
+  useEffect(() => {
+    if (phaseOptions.length === 0) return;
+    if (!form.phase || (PHASE_OPTIONS.includes(String(form.phase)) && !phaseOptions.includes(String(form.phase)))) {
+      setForm((prev) => ({
+        ...prev,
+        phase: selectedTask?.phase ? String(selectedTask.phase) : phaseOptions[0],
+      }));
+    }
+  }, [phaseOptions, selectedTask?.phase, form.phase]);
   const [insertType, setInsertType] = useState<'main' | 'sub'>(preset.mode);
   const [insertPosition, setInsertPosition] = useState<'before' | 'after' | 'append'>(preset.position);
   const up = (k:string,v:string) => setForm(p=>({...p,[k]:v}));
@@ -1401,6 +1410,15 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
   const phaseDropdownOptions = form.phase && !phaseOptions.includes(String(form.phase))
     ? [String(form.phase), ...phaseOptions]
     : phaseOptions;
+  useEffect(() => {
+    if (phaseOptions.length === 0) return;
+    if (!form.phase || (PHASE_OPTIONS.includes(String(form.phase)) && !phaseOptions.includes(String(form.phase)))) {
+      setForm((prev) => ({
+        ...prev,
+        phase: phaseOptions[0],
+      }));
+    }
+  }, [phaseOptions, form.phase]);
   const up = (k:string,v:string|number) => setForm(p=>({...p,[k]:v}));
   const dur = calcDuration(String(form.startDate || ''), String(form.endDate || ''));
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
