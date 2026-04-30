@@ -43,6 +43,7 @@ const PHASE_OPTIONS = [
 const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Block/Delay', 'Done'] as const;
 
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
+export type PhaseOption = { value: string; label: string };
 type TaskRow = Task | NewTaskInsert;
 
 type InsertAction =
@@ -190,8 +191,10 @@ export default function TasksTab({ projectId }: Props) {
   const phaseOptions = masterCodes
     .filter((code) => code.codeType === 'task_phase' && code.active)
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((code) => code.codeValue);
-  const effectivePhaseOptions: string[] = phaseOptions.length > 0 ? phaseOptions : [...PHASE_OPTIONS];
+    .map((code) => ({ value: code.codeValue, label: code.label }));
+  const effectivePhaseOptions: PhaseOption[] = phaseOptions.length > 0
+    ? phaseOptions
+    : PHASE_OPTIONS.map((phase) => ({ value: phase, label: phase }));
   const todayIso = new Date().toISOString().slice(0, 10);
   const nextWeekIso = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
@@ -1230,7 +1233,7 @@ function formatDmyInput(raw: string): string {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
-function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave }: { tasks:Task[]; selectedTask: Task | null; preset: { anchorId: string | null; mode: 'main' | 'sub'; position: 'before' | 'after' | 'append' }; phaseOptions: string[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
+function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave }: { tasks:Task[]; selectedTask: Task | null; preset: { anchorId: string | null; mode: 'main' | 'sub'; position: 'before' | 'after' | 'append' }; phaseOptions: PhaseOption[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
   const { members, activeProject } = useStore();
   const todayIso    = new Date().toISOString().split('T')[0];
   const nextWeekIso = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
@@ -1241,17 +1244,17 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
     resource:'',
     parentId:'',
     relatedTask:'',
-    phase: selectedTask?.phase || phaseOptions[0],
+    phase: selectedTask?.phase || phaseOptions[0]?.value,
   });
-  const phaseDropdownOptions = form.phase && !phaseOptions.includes(String(form.phase))
-    ? [String(form.phase), ...phaseOptions]
+  const phaseDropdownOptions = form.phase && !phaseOptions.some((option) => option.value === String(form.phase))
+    ? [{ value: String(form.phase), label: String(form.phase) }, ...phaseOptions]
     : phaseOptions;
   useEffect(() => {
     if (phaseOptions.length === 0) return;
-    if (!form.phase || (PHASE_OPTIONS.some((p) => p === String(form.phase)) && !phaseOptions.includes(String(form.phase)))) {
+    if (!form.phase || (PHASE_OPTIONS.some((p) => p === String(form.phase)) && !phaseOptions.some((option) => option.value === String(form.phase)))) {
       setForm((prev) => ({
         ...prev,
-        phase: selectedTask?.phase ? String(selectedTask.phase) : phaseOptions[0],
+        phase: selectedTask?.phase ? String(selectedTask.phase) : phaseOptions[0]?.value,
       }));
     }
   }, [phaseOptions, selectedTask?.phase, form.phase]);
@@ -1283,8 +1286,8 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
         </FormRow>
         {insertType === 'main' && (
           <FormRow label="Phase" required>
-            <Select value={String(form.phase || phaseOptions[0])} onChange={v => setForm(f => ({ ...f, phase: v }))}
-              options={phaseDropdownOptions.map(p => ({ value: p, label: p }))} />
+            <Select value={String(form.phase || phaseOptions[0]?.value)} onChange={v => setForm(f => ({ ...f, phase: v }))}
+              options={phaseDropdownOptions.map((p) => ({ value: p.value, label: p.label }))} />
           </FormRow>
         )}
 
@@ -1389,7 +1392,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
               form.phase ||
               selectedParent?.phase ||
               selectedTask?.phase ||
-              phaseOptions[0]
+              phaseOptions[0]?.value
             ),
           });
         }}>Create Task</Btn>
@@ -1398,24 +1401,24 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
   );
 }
 
-function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBefore, onInsertAfter }: { task:Task; tasks:Task[]; phaseOptions: string[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void; onInsertBefore: () => void; onInsertAfter: () => void }) {
+function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBefore, onInsertAfter }: { task:Task; tasks:Task[]; phaseOptions: PhaseOption[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void; onInsertBefore: () => void; onInsertAfter: () => void }) {
   const { members, activeProject } = useStore();
   const [form, setForm] = useState<Partial<Task>>({
     ...task,
     startDate: task.startDate ?? '',
     endDate: task.endDate ?? '',
     actualFinish: task.actualFinish ?? '',
-    phase: task.phase ?? phaseOptions[0],
+    phase: task.phase ?? phaseOptions[0]?.value,
   });
-  const phaseDropdownOptions = form.phase && !phaseOptions.includes(String(form.phase))
-    ? [String(form.phase), ...phaseOptions]
+  const phaseDropdownOptions = form.phase && !phaseOptions.some((option) => option.value === String(form.phase))
+    ? [{ value: String(form.phase), label: String(form.phase) }, ...phaseOptions]
     : phaseOptions;
   useEffect(() => {
     if (phaseOptions.length === 0) return;
-    if (!form.phase || (PHASE_OPTIONS.some((p) => p === String(form.phase)) && !phaseOptions.includes(String(form.phase)))) {
+    if (!form.phase || (PHASE_OPTIONS.some((p) => p === String(form.phase)) && !phaseOptions.some((option) => option.value === String(form.phase)))) {
       setForm((prev) => ({
         ...prev,
-        phase: phaseOptions[0],
+        phase: phaseOptions[0]?.value,
       }));
     }
   }, [phaseOptions, form.phase]);
@@ -1430,8 +1433,8 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
           onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
       </FormRow>
       <FormRow label="Phase">
-        <Select value={String(form.phase || phaseOptions[0])} onChange={v => up('phase', v)}
-          options={phaseDropdownOptions.map(p => ({ value: p, label: p }))} />
+        <Select value={String(form.phase || phaseOptions[0]?.value)} onChange={v => up('phase', v)}
+          options={phaseDropdownOptions.map((p) => ({ value: p.value, label: p.label }))} />
       </FormRow>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <FormRow label="Start Date"><Input type="date" value={form.startDate ?? ''} onChange={v => up('startDate', v)} /></FormRow>
