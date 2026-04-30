@@ -299,7 +299,7 @@ export default function TasksTab({ projectId }: Props) {
       actualFinish: '',
       resource: '',
       percentComplete: 0,
-      phase: anchor.phase || effectivePhaseOptions[0],
+      phase: anchor.phase || effectivePhaseOptions[0]?.value || '',
       level,
     });
     setContextMenu((prev) => ({ ...prev, visible: false }));
