@@ -12,6 +12,7 @@ const TYPE_LABELS: Record<string, string> = {
 export default function SetupModal({ onClose }: { onClose: () => void }) {
   const masterCodes = useStore((s) => s.masterCodes);
   const fetchMasterCodes = useStore((s) => s.fetchMasterCodes);
+  const globalError = useStore((s) => s.error);
   const createMasterCode = useStore((s) => s.createMasterCode);
   const updateMasterCode = useStore((s) => s.updateMasterCode);
   const deleteMasterCode = useStore((s) => s.deleteMasterCode);
@@ -32,17 +33,16 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
     let mounted = true;
     setLoading(true);
     setLoadError(null);
-    fetchMasterCodes()
-      .catch((error) => {
-        if (!mounted) return;
-        setLoadError((error as Error).message || 'Unable to load lookup values');
-      })
-      .finally(() => {
-        if (!mounted) return;
-        setLoading(false);
-      });
+    (async () => {
+      const success = await fetchMasterCodes();
+      if (!mounted) return;
+      if (!success) {
+        setLoadError(globalError || 'Unable to load lookup values');
+      }
+      setLoading(false);
+    })();
     return () => { mounted = false; };
-  }, [fetchMasterCodes]);
+  }, [fetchMasterCodes, globalError]);
 
   const codeTypes = useMemo(() => {
     const types = Array.from(new Set(masterCodes.map((code) => code.codeType)));
@@ -130,13 +130,11 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
   const refreshMasterCodes = async () => {
     setLoading(true);
     setLoadError(null);
-    try {
-      await fetchMasterCodes();
-    } catch (error) {
-      setLoadError((error as Error).message || 'Unable to load lookup values');
-    } finally {
-      setLoading(false);
+    const success = await fetchMasterCodes();
+    if (!success) {
+      setLoadError(globalError || 'Unable to load lookup values');
     }
+    setLoading(false);
   };
 
   return (

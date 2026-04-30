@@ -21,7 +21,7 @@ interface Store {
   error: string | null;
 
   fetchProjects: () => Promise<void>;
-  fetchMasterCodes: () => Promise<void>;
+  fetchMasterCodes: () => Promise<boolean>;
   createMasterCode: (code: Partial<MasterCode>) => Promise<MasterCode>;
   updateMasterCode: (id: string, code: Partial<MasterCode>) => Promise<MasterCode>;
   deleteMasterCode: (id: string) => Promise<void>;
@@ -91,8 +91,13 @@ export const useStore = create<Store>((set, get) => ({
     catch (e) { set({ error: (e as Error).message, projectsLoading: false }); }
   },
   fetchMasterCodes: async () => {
-    try { set({ masterCodes: (await masterCodeApi.getAll()).data }); }
-    catch (e) { set({ error: (e as Error).message }); }
+    try {
+      set({ masterCodes: (await masterCodeApi.getAll()).data });
+      return true;
+    } catch (e) {
+      set({ error: (e as Error).message });
+      return false;
+    }
   },
   createMasterCode: async (code) => {
     const res = await masterCodeApi.create(code);
