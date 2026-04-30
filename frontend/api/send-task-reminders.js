@@ -43,6 +43,45 @@ const formatDate = (value) => {
   return d.toISOString().slice(0, 10);
 };
 
+const getBangkokDateParts = (date) => {
+  const dtf = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const parts = dtf.formatToParts(date).reduce((acc, part) => {
+    if (part.type !== 'literal') acc[part.type] = part.value;
+    return acc;
+  }, {});
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
+};
+
+const getBangkokNow = () => {
+  const parts = getBangkokDateParts(new Date());
+  return {
+    nowKey: `${parts.year.toString().padStart(4, '0')}-${parts.month.toString().padStart(2, '0')}-${parts.day.toString().padStart(2, '0')}`,
+    currentTime: `${parts.hour.toString().padStart(2, '0')}:${parts.minute.toString().padStart(2, '0')}`,
+    today: new Date(parts.year, parts.month - 1, parts.day),
+  };
+};
+
+const formatBangkokDate = (date) => {
+  const parts = getBangkokDateParts(date);
+  return `${parts.year.toString().padStart(4, '0')}-${parts.month.toString().padStart(2, '0')}-${parts.day.toString().padStart(2, '0')}`;
+};
+
 const getGreeting = (recipients, members) => {
   const emailToMember = new Map(members.map((m) => [String(m.email || '').trim().toLowerCase(), m]));
   for (const email of recipients) {
@@ -115,8 +154,7 @@ const buildEmailText = (greeting, rows) => {
 const getStatusLabel = (endDateString) => {
   if (!endDateString) return 'Due Soon';
   const dueDate = new Date(endDateString);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const { today } = getBangkokNow();
   const inThreeDays = new Date(today);
   inThreeDays.setDate(inThreeDays.getDate() + 3);
   const inSevenDays = new Date(today);
@@ -193,9 +231,8 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const now = new Date();
-    const nowKey = now.toISOString().slice(0, 10);
-    const currentTime = now.toISOString().slice(11, 16);
+    const { nowKey, currentTime, today } = getBangkokNow();
+    const todayString = `${today.getFullYear().toString().padStart(4, '0')}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
 
   let projectsResp = await supabase
     .from('projects')
@@ -228,6 +265,8 @@ export default async function handler(req, res) {
   const projectsToUpdate = new Set();
 
   for (const project of projects) {
+    const maxDueDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+    maxDueDate.setUTCDate(maxDueDate.getUTCDate() + 7);
     const tasksResp = await supabase
       .from('tasks')
       .select('id,task_name,end_date,percent_complete,resource,level')
@@ -235,7 +274,7 @@ export default async function handler(req, res) {
       .gt('level', 0)
       .lt('percent_complete', 100)
       .not('end_date', 'is', null)
-      .lte('end_date', new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7).toISOString().slice(0, 10));
+      .lte('end_date', formatBangkokDate(maxDueDate));
     if (tasksResp.error) {
       results.push({ project: project.id, error: tasksResp.error.message });
       continue;
