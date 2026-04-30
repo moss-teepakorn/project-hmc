@@ -635,17 +635,22 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
     return acc;
   }, {});
 
-  const stageTasks = [
-    ...phaseLabels.map((label) => label),
-    ...Object.keys(phaseProgress).filter((label) => !phaseLabels.includes(label)),
-  ]
-    .filter((label, index, list) => list.indexOf(label) === index)
+  const stageTasks = phaseLabels
     .filter((label) => phaseProgress[label]?.count)
     .map((label) => ({
       id: label,
       name: label,
       progress: Math.round(phaseProgress[label].total / phaseProgress[label].count),
-    }));
+    }))
+    .concat(
+      Object.keys(phaseProgress)
+        .filter((label) => !phaseLabels.includes(label))
+        .map((label) => ({
+          id: label,
+          name: label,
+          progress: Math.round(phaseProgress[label].total / phaseProgress[label].count),
+        }))
+    );
 
   const recentFinishedTasks = pt
     .filter((t) => t.actualFinish)
