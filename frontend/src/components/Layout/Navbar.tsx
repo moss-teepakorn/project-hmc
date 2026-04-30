@@ -16,6 +16,7 @@ export default function Navbar() {
   const [isMobile, setIsMobile] = React.useState(false);
   const [notifyOpen, setNotifyOpen] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
+  const [setupLoading, setSetupLoading] = React.useState(false);
   const bellRef = React.useRef<HTMLDivElement | null>(null);
   const isDark = theme === 'dark';
 
@@ -43,6 +44,18 @@ export default function Navbar() {
   const textMuted = isDark ? '#94A3B8' : C.text3;
   const commitIdRaw = (import.meta as any).env?.VITE_COMMIT_ID || 'local';
   const commitId = String(commitIdRaw).slice(0, 8);
+
+  const openSetup = async () => {
+    setSetupLoading(true);
+    try {
+      await fetchMasterCodes();
+      setSetupOpen(true);
+    } catch {
+      setSetupOpen(true);
+    } finally {
+      setSetupLoading(false);
+    }
+  };
 
   const parseDate = (value: string) => {
     if (!value) return null;
@@ -168,17 +181,16 @@ export default function Navbar() {
         )}
         {profile?.role === 'admin' && (
           <button
-            onClick={() => {
-              setSetupOpen(true);
-              fetchMasterCodes();
-            }}
+            onClick={openSetup}
             title="Open admin setup"
+            disabled={setupLoading}
             style={{
               padding: '8px 12px', borderRadius: 10, border: `1px solid ${isDark ? C.border2 : C.border}`,
-              background: isDark ? '#1E293B' : C.white, color: textColor, cursor: 'pointer', fontSize: 12,
+              background: isDark ? '#1E293B' : C.white, color: textColor, cursor: setupLoading ? 'wait' : 'pointer', fontSize: 12,
+              opacity: setupLoading ? 0.6 : 1,
             }}
           >
-            Setup
+            {setupLoading ? 'Loading…' : 'Setup'}
           </button>
         )}
 
