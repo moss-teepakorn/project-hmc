@@ -4,7 +4,7 @@ import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Home } fr
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { supabase } from '../../services/supabase';
-import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, PROJECT_STATUS, MILESTONE_STATUS, TH, TD } from '../Common';
+import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, MILESTONE_STATUS, TH, TD } from '../Common';
 import { fmtDate, fmtMoney, compareWbs, computeBaselineProgress, getHalfMonthSnapshotDates } from '../../utils';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
@@ -166,7 +166,8 @@ export default function Dashboard() {
   };
 
   const renderProjectCard = (p: Project, compact = false) => {
-    const s    = PROJECT_STATUS[p.status] ?? { bg: C.bg2, color: C.text, label: p.status || 'Unknown' };
+    const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === p.status);
+    const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: p.status || 'Unknown' };
     const prog = getProgress(p.id);
     return (
       <div key={p.id}
