@@ -101,7 +101,7 @@ export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId:
 
 import { supabase } from './supabase';
 import { parseISO, isValid } from 'date-fns';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot } from '../types';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode } from '../types';
 
 // ── Snake ↔ Camel conversion helpers ────────────────────────────────────────
 
@@ -284,8 +284,51 @@ export const projectProgressApi = {
     if (error) throw new Error(error.message);
     return { data: rowToObj<ProjectProgressSnapshot>(data) };
   },
+};
+
+export const masterCodeApi = {
+  getAll: async (codeType?: string): Promise<{ data: MasterCode[] }> => {
+    let q = supabase.from('masters_code').select('*');
+    if (codeType) q = q.eq('code_type', codeType);
+    q = q.order('sort_order', { ascending: true }).order('code_value', { ascending: true });
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<MasterCode>(data || []) };
+  },
+
+  create: async (m: Partial<MasterCode>): Promise<{ data: MasterCode }> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+    const row = objToRow(m as Record<string, unknown>);
+    delete row.id;
+    delete row.created_at;
+    delete row.updated_at;
+    const { data, error } = await supabase.from('masters_code').insert(row).select().single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<MasterCode>(data) };
+  },
+
+  update: async (id: string, m: Partial<MasterCode>): Promise<{ data: MasterCode }> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+    const row = objToRow(m as Record<string, unknown>);
+    delete row.id;
+    delete row.created_at;
+    delete row.updated_at;
+    const { data, error } = await supabase.from('masters_code').update(row).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<MasterCode>(data) };
+  },
 
   remove: async (id: string): Promise<void> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+    const { error } = await supabase.from('masters_code').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+};
+
+export const taskApi = {
     const { data, error: fetchErr } = await supabase.from('project_progress_snapshots').select('project_id').eq('id', id).maybeSingle();
     if (fetchErr) throw new Error(fetchErr.message);
     const projectId = (data as any)?.project_id;

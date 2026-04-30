@@ -119,7 +119,7 @@ function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean
 }
 
 export default function TasksTab({ projectId }: Props) {
-  const { tasks, members, activeProject, fetchTasks, createTask, updateTask, deleteTask } = useStore();
+  const { tasks, members, activeProject, fetchTasks, createTask, updateTask, deleteTask, masterCodes } = useStore();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView]         = useState<ViewMode>(() => typeof window !== 'undefined' && window.innerWidth < 768 ? 'table' : 'split');
@@ -187,6 +187,11 @@ export default function TasksTab({ projectId }: Props) {
   }, []);
 
   const projectTasks = tasks.filter(t => t.projectId === projectId);
+  const phaseOptions = masterCodes
+    .filter((code) => code.codeType === 'task_phase' && code.active)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((code) => code.codeValue);
+  const effectivePhaseOptions = phaseOptions.length > 0 ? phaseOptions : PHASE_OPTIONS;
   const todayIso = new Date().toISOString().slice(0, 10);
   const nextWeekIso = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
@@ -291,7 +296,7 @@ export default function TasksTab({ projectId }: Props) {
       actualFinish: '',
       resource: '',
       percentComplete: 0,
-      phase: anchor.phase || PHASE_OPTIONS[0],
+      phase: anchor.phase || effectivePhaseOptions[0],
       level,
     });
     setContextMenu((prev) => ({ ...prev, visible: false }));
@@ -1198,6 +1203,7 @@ export default function TasksTab({ projectId }: Props) {
           tasks={projectTasks}
           selectedTask={projectTasks.find(t => t.id === addPreset.anchorId) ?? null}
           preset={addPreset}
+          phaseOptions={effectivePhaseOptions}
           onClose={()=>setAddModal(false)}
           onSave={handleCreate}
         />
@@ -1206,6 +1212,7 @@ export default function TasksTab({ projectId }: Props) {
         <TaskEditModal
           task={editModal}
           tasks={projectTasks}
+          phaseOptions={effectivePhaseOptions}
           onClose={()=>setEditModal(null)}
           onSave={handleEditSave}
           onInsertBefore={() => openInsertAround(editModal, 'before')}
@@ -1223,7 +1230,7 @@ function formatDmyInput(raw: string): string {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
-function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Task[]; selectedTask: Task | null; preset: { anchorId: string | null; mode: 'main' | 'sub'; position: 'before' | 'after' | 'append' }; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
+function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave }: { tasks:Task[]; selectedTask: Task | null; preset: { anchorId: string | null; mode: 'main' | 'sub'; position: 'before' | 'after' | 'append' }; phaseOptions: string[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
   const { members, activeProject } = useStore();
   const todayIso    = new Date().toISOString().split('T')[0];
   const nextWeekIso = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
@@ -1234,8 +1241,11 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
     resource:'',
     parentId:'',
     relatedTask:'',
-    phase: selectedTask?.phase || PHASE_OPTIONS[0],
+    phase: selectedTask?.phase || phaseOptions[0],
   });
+  const phaseDropdownOptions = form.phase && !phaseOptions.includes(String(form.phase))
+    ? [String(form.phase), ...phaseOptions]
+    : phaseOptions;
   const [insertType, setInsertType] = useState<'main' | 'sub'>(preset.mode);
   const [insertPosition, setInsertPosition] = useState<'before' | 'after' | 'append'>(preset.position);
   const up = (k:string,v:string) => setForm(p=>({...p,[k]:v}));
@@ -1264,8 +1274,8 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
         </FormRow>
         {insertType === 'main' && (
           <FormRow label="Phase" required>
-            <Select value={String(form.phase || PHASE_OPTIONS[0])} onChange={v => setForm(f => ({ ...f, phase: v }))}
-              options={PHASE_OPTIONS.map(p => ({ value: p, label: p }))} />
+            <Select value={String(form.phase || phaseOptions[0])} onChange={v => setForm(f => ({ ...f, phase: v }))}
+              options={phaseDropdownOptions.map(p => ({ value: p, label: p }))} />
           </FormRow>
         )}
 
@@ -1370,7 +1380,7 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
               form.phase ||
               selectedParent?.phase ||
               selectedTask?.phase ||
-              PHASE_OPTIONS[0]
+              phaseOptions[0]
             ),
           });
         }}>Create Task</Btn>
@@ -1379,15 +1389,18 @@ function TaskModal({ tasks, selectedTask, preset, onClose, onSave }: { tasks:Tas
   );
 }
 
-function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertAfter }: { task:Task; tasks:Task[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void; onInsertBefore: () => void; onInsertAfter: () => void }) {
+function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBefore, onInsertAfter }: { task:Task; tasks:Task[]; phaseOptions: string[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void; onInsertBefore: () => void; onInsertAfter: () => void }) {
   const { members, activeProject } = useStore();
   const [form, setForm] = useState<Partial<Task>>({
     ...task,
     startDate: task.startDate ?? '',
     endDate: task.endDate ?? '',
     actualFinish: task.actualFinish ?? '',
-    phase: task.phase ?? PHASE_OPTIONS[0],
+    phase: task.phase ?? phaseOptions[0],
   });
+  const phaseDropdownOptions = form.phase && !phaseOptions.includes(String(form.phase))
+    ? [String(form.phase), ...phaseOptions]
+    : phaseOptions;
   const up = (k:string,v:string|number) => setForm(p=>({...p,[k]:v}));
   const dur = calcDuration(String(form.startDate || ''), String(form.endDate || ''));
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
@@ -1399,8 +1412,8 @@ function TaskEditModal({ task, tasks, onClose, onSave, onInsertBefore, onInsertA
           onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
       </FormRow>
       <FormRow label="Phase">
-        <Select value={String(form.phase || PHASE_OPTIONS[0])} onChange={v => up('phase', v)}
-          options={PHASE_OPTIONS.map(p => ({ value: p, label: p }))} />
+        <Select value={String(form.phase || phaseOptions[0])} onChange={v => up('phase', v)}
+          options={phaseDropdownOptions.map(p => ({ value: p, label: p }))} />
       </FormRow>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <FormRow label="Start Date"><Input type="date" value={form.startDate ?? ''} onChange={v => up('startDate', v)} /></FormRow>

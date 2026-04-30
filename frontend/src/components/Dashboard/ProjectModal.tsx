@@ -20,7 +20,7 @@ function normalizeDescription(raw: string): string {
 }
 
 export default function ProjectModal({ project, onClose }: Props) {
-  const { createProject, updateProject, projects } = useStore();
+  const { createProject, updateProject, projects, masterCodes } = useStore();
   const [saving, setSaving] = useState(false);
   const [copyFromProjectId, setCopyFromProjectId] = useState('');
   const [copyScope, setCopyScope] = useState<'all' | 'main'>('all');
@@ -40,7 +40,27 @@ export default function ProjectModal({ project, onClose }: Props) {
     emailNotificationTime:       project?.emailNotificationTime       ?? '08:00',
   });
 
-  const up = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
+  const statusOptions = masterCodes
+    .filter((code) => code.codeType === 'project_status' && code.active)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((code) => ({ value: code.codeValue, label: code.label }));
+
+  const fallbackStatusOptions = [
+    { value: 'Planning', label: 'Planning' },
+    { value: 'Req & Design', label: 'Req & Design' },
+    { value: 'Setup', label: 'Setup' },
+    { value: 'Testing', label: 'Testing' },
+    { value: 'Go Live', label: 'Go Live' },
+    { value: 'Hyper Care', label: 'Hyper Care' },
+  ];
+
+  const statusDropdownOptions = (() => {
+    const baseOptions = statusOptions.length > 0 ? statusOptions : fallbackStatusOptions;
+    if (form.status && !baseOptions.some((option) => option.value === form.status)) {
+      return [{ value: form.status, label: form.status }, ...baseOptions];
+    }
+    return baseOptions;
+  })();
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Project name is required'); return; }
@@ -98,15 +118,7 @@ export default function ProjectModal({ project, onClose }: Props) {
           <Input value={form.code} onChange={v => up('code', v)} placeholder="e.g. ECP-2024" />
         </FormRow>
         <FormRow label="Status">
-          <Select value={form.status} onChange={v => up('status', v)}
-            options={[
-              { value: 'Planning',     label: 'Planning' },
-              { value: 'Req & Design', label: 'Req & Design' },
-              { value: 'Setup',        label: 'Setup' },
-              { value: 'Testing',      label: 'Testing' },
-              { value: 'Go Live',      label: 'Go Live' },
-              { value: 'Hyper Care',   label: 'Hyper Care' },
-            ]} />
+          <Select value={form.status} onChange={v => up('status', v)} options={statusDropdownOptions} />
         </FormRow>
         <FormRow label="Client">
           <Input value={form.client} onChange={v => up('client', v)} placeholder="Client company name" />

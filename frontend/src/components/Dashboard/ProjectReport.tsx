@@ -64,7 +64,9 @@ export default function ProjectReport({ project }: Props) {
   const openRisks  = rks.filter(r=>r.status==='Monitoring'||r.status==='Mitigating').length;
   const openCRs    = crs.filter(c=>c.status==='Draft'||c.status==='Submitted'||c.status==='Under Review').length;
 
-  const s = PROJECT_STATUS[project.status]??PROJECT_STATUS['Planning'];
+  const { masterCodes } = useStore();
+  const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
+  const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: project.status || 'Unknown' };
   const money2 = (n: number) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 
   // ── PDF export ─────────────────────────────────────────────────────────────

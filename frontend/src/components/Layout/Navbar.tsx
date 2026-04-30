@@ -4,6 +4,7 @@ import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { C } from '../Common';
+import SetupModal from '../Setup/SetupModal';
 import { Bell, Home, LogOut, Moon, Sun } from 'lucide-react';
 
 const F = 'Poppins, sans-serif';
@@ -14,6 +15,7 @@ export default function Navbar() {
   const { theme, toggle } = useTheme();
   const [isMobile, setIsMobile] = React.useState(false);
   const [notifyOpen, setNotifyOpen] = React.useState(false);
+  const [setupOpen, setSetupOpen] = React.useState(false);
   const bellRef = React.useRef<HTMLDivElement | null>(null);
   const isDark = theme === 'dark';
 
@@ -164,6 +166,18 @@ export default function Navbar() {
             </span>
           </>
         )}
+        {profile?.role === 'admin' && (
+          <button
+            onClick={() => setSetupOpen(true)}
+            title="Open admin setup"
+            style={{
+              padding: '8px 12px', borderRadius: 10, border: `1px solid ${isDark ? C.border2 : C.border}`,
+              background: isDark ? '#1E293B' : C.white, color: textColor, cursor: 'pointer', fontSize: 12,
+            }}
+          >
+            Setup
+          </button>
+        )}
 
         <div ref={bellRef} style={{ position: 'relative' }}>
           <button
@@ -280,6 +294,7 @@ export default function Navbar() {
           </div>
         )}
       </div>
+      {setupOpen && <SetupModal onClose={() => setSetupOpen(false)} />}
     </nav>
   );
 }

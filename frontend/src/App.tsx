@@ -14,6 +14,7 @@ export default function App() {
   const { user, loading: authLoading, configured } = useAuth();
   const { theme } = useTheme();
   const fetchProjects = useStore(state => state.fetchProjects);
+  const fetchMasterCodes = useStore(state => state.fetchMasterCodes);
   const activeProject = useStore(state => state.activeProject);
   const projectsLoading = useStore(state => state.projectsLoading);
   const dataLoading = useStore(state => state.dataLoading);
@@ -23,11 +24,12 @@ export default function App() {
   useRealtimeSubscription(activeProject?.id);
 
   useEffect(() => {
-    // Fetch projects if authenticated or if Supabase isn't configured (demo mode)
+    // Fetch projects and lookup codes if authenticated or if Supabase isn't configured (demo mode)
     if (!configured || user) {
       fetchProjects();
+      fetchMasterCodes();
     }
-  }, [fetchProjects, user, configured]);
+  }, [fetchProjects, fetchMasterCodes, user, configured]);
 
   const isDark = theme === 'dark';
 

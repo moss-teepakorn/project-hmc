@@ -4,7 +4,7 @@ export interface Project {
   code: string;
   client: string;
   softwareVersion: '' | 'Humatrix' | 'Workplaze';
-  status: 'Planning' | 'Req & Design' | 'Setup' | 'Testing' | 'Go Live' | 'Hyper Care';
+  status: string;
   startDate: string;
   endDate: string;
   description: string;
@@ -14,6 +14,20 @@ export interface Project {
   emailNotificationRecipients: string;
   emailNotificationTime: string;
   emailNotificationLastSentAt?: string;
+}
+
+export interface MasterCode {
+  id: string;
+  codeType: string;
+  codeKey: string;
+  codeValue: string;
+  label: string;
+  sortOrder: number;
+  active: boolean;
+  textColor: string;
+  bgColor: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProjectEnvironment {

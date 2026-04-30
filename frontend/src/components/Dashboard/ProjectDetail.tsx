@@ -40,7 +40,9 @@ export default function ProjectDetail({ project }: Props) {
     fetchProjectEnvironments,
   } = useStore();
 
-  const s = PROJECT_STATUS[project.status] ?? PROJECT_STATUS['Planning'];
+  const { masterCodes } = useStore();
+  const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
+  const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: project.status || 'Unknown' };
   const projectTasks = tasks.filter((t) => t.projectId === project.id);
   const rootTasks = projectTasks.filter((t) => !t.parentId);
   const overallProgress = rootTasks.length ? Math.round(rootTasks.reduce((sum, t) => sum + t.percentComplete, 0) / rootTasks.length) : 0;

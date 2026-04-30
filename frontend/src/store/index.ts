@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot } from '../types';
-import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi, projectProgressApi } from '../services/api';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode } from '../types';
+import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi, projectProgressApi, masterCodeApi } from '../services/api';
 
 interface Store {
   _pendingMutationCount: number;
@@ -16,10 +16,15 @@ interface Store {
   risks: Risk[];
   projectEnvironments: ProjectEnvironment[];
   projectProgressSnapshots: ProjectProgressSnapshot[];
+  masterCodes: MasterCode[];
   dataLoading: boolean;
   error: string | null;
 
   fetchProjects: () => Promise<void>;
+  fetchMasterCodes: () => Promise<void>;
+  createMasterCode: (code: Partial<MasterCode>) => Promise<MasterCode>;
+  updateMasterCode: (id: string, code: Partial<MasterCode>) => Promise<MasterCode>;
+  deleteMasterCode: (id: string) => Promise<void>;
   createProject: (p: Partial<Project>) => Promise<Project>;
   updateProject: (id: string, p: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
@@ -76,7 +81,7 @@ export const useStore = create<Store>((set, get) => ({
   _pendingMutationCount: 0,
   projects: [], projectsLoading: false, activeProject: null,
   tasks: [], members: [], milestones: [], efforts: [],
-  changeRequests: [], issues: [], risks: [], projectEnvironments: [], projectProgressSnapshots: [],
+  changeRequests: [], issues: [], risks: [], projectEnvironments: [], projectProgressSnapshots: [], masterCodes: [],
   dataLoading: false, error: null,
 
   // ── Projects ───────────────────────────────────────────────────────────────
@@ -84,6 +89,24 @@ export const useStore = create<Store>((set, get) => ({
     set({ projectsLoading: true, error: null });
     try { set({ projects: (await projectApi.getAll()).data, projectsLoading: false }); }
     catch (e) { set({ error: (e as Error).message, projectsLoading: false }); }
+  },
+  fetchMasterCodes: async () => {
+    try { set({ masterCodes: (await masterCodeApi.getAll()).data }); }
+    catch (e) { set({ error: (e as Error).message }); }
+  },
+  createMasterCode: async (code) => {
+    const res = await masterCodeApi.create(code);
+    set((s) => ({ masterCodes: [...s.masterCodes, res.data] }));
+    return res.data;
+  },
+  updateMasterCode: async (id, code) => {
+    const res = await masterCodeApi.update(id, code);
+    set((s) => ({ masterCodes: s.masterCodes.map((item) => item.id === id ? res.data : item) }));
+    return res.data;
+  },
+  deleteMasterCode: async (id) => {
+    await masterCodeApi.remove(id);
+    set((s) => ({ masterCodes: s.masterCodes.filter((item) => item.id !== id) }));
   },
   createProject: async (p) => {
     set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));

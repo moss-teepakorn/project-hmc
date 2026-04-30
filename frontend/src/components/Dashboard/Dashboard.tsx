@@ -13,7 +13,7 @@ import PortfolioReportSummary from './PortfolioReportSummary';
 const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care'];
 
 export default function Dashboard() {
-  const { projects, tasks, milestones, issues, risks, changeRequests, activeProject, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts } = useStore();
+  const { projects, tasks, milestones, issues, risks, changeRequests, activeProject, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts, masterCodes } = useStore();
   const [selected,   setSelected]   = useState<Project | null>(null);
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
@@ -139,9 +139,19 @@ export default function Dashboard() {
   }, [selected?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]);
 
   // Separate normal projects from Hypercare
-  const normalProjects = projects.filter(p => p.status !== 'Hyper Care').sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+  const statusOrder = masterCodes
+    .filter((code) => code.codeType === 'project_status' && code.active)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((code) => code.codeValue);
+
+  const getStatusOrder = (status: string) => {
+    const index = statusOrder.indexOf(status);
+    return index >= 0 ? index : statusOrder.length;
+  };
+
+  const normalProjects = projects.filter(p => p.status !== 'Hyper Care').sort((a, b) => getStatusOrder(a.status) - getStatusOrder(b.status));
   const hypercareProjects = projects.filter(p => p.status === 'Hyper Care').sort((a, b) => a.name.localeCompare(b.name));
-  const allProjects = projects.sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+  const allProjects = [...projects].sort((a, b) => getStatusOrder(a.status) - getStatusOrder(b.status));
 
   const getProgress = (pid: string) => {
     const roots = tasks.filter(t => t.projectId === pid && !t.parentId);
@@ -156,7 +166,7 @@ export default function Dashboard() {
   };
 
   const renderProjectCard = (p: Project, compact = false) => {
-    const s    = PROJECT_STATUS[p.status] ?? PROJECT_STATUS['Planning'];
+    const s    = PROJECT_STATUS[p.status] ?? { bg: C.bg2, color: C.text, label: p.status || 'Unknown' };
     const prog = getProgress(p.id);
     return (
       <div key={p.id}
@@ -325,6 +335,7 @@ export default function Dashboard() {
 
 // ── Welcome / global summary ──────────────────────────────────────────────────
 function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void; onEdit: (p: Project) => void; onDelete: (p: Project) => void; isMobile: boolean }) {
+  const { masterCodes } = useStore();
   const [showHC, setShowHC] = useState(false);
   const [projectView, setProjectView] = useState<'card' | 'table'>('card');
   const normalProjects = projects.filter(p => p.status !== 'Hyper Care');
@@ -338,7 +349,8 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
   const renderOverviewProjectCard = (p: Project, fallbackColor = C.primary) => {
     const roots = tasks.filter(t => t.projectId === p.id && !t.parentId);
     const prog  = roots.length ? Math.round(roots.reduce((s: number, t: any) => s + t.percentComplete, 0) / roots.length) : 0;
-    const s     = PROJECT_STATUS[p.status] ?? PROJECT_STATUS['Planning'];
+    const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === p.status);
+    const s     = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: p.status || 'Unknown' };
 
     return (
       <div key={p.id}
@@ -456,7 +468,8 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
               {normalProjects.map((p) => {
                 const roots = tasks.filter((t) => t.projectId === p.id && !t.parentId);
                 const prog = roots.length ? Math.round(roots.reduce((s: number, t: any) => s + t.percentComplete, 0) / roots.length) : 0;
-                const stage = PROJECT_STATUS[p.status]?.label ?? p.status;
+                const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === p.status);
+                const stage = statusCode?.label ?? p.status;
                 return (
                   <tr key={p.id} onClick={() => onOpen(p)} style={{ cursor: 'pointer', background: C.white, transition: 'background 0.15s' }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = '#F8FAFF'; }}
@@ -498,8 +511,9 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
 
 // ── Per-project summary panel ─────────────────────────────────────────────────
 function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; onOpen: () => void; isMobile: boolean }) {
-  const { tasks, milestones, members, efforts, changeRequests, issues, risks } = useStore();
-  const s = PROJECT_STATUS[project.status] ?? PROJECT_STATUS['Planning'];
+  const { tasks, milestones, members, efforts, changeRequests, issues, risks, masterCodes } = useStore();
+  const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
+  const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: project.status || 'Unknown' };
 
   const pt = tasks.filter((t) => t.projectId === project.id);
   const ms = milestones.filter((m) => m.projectId === project.id);
