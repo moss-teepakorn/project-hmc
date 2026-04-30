@@ -1248,7 +1248,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
     : phaseOptions;
   useEffect(() => {
     if (phaseOptions.length === 0) return;
-    if (!form.phase || (PHASE_OPTIONS.includes(String(form.phase)) && !phaseOptions.includes(String(form.phase)))) {
+    if (!form.phase || (PHASE_OPTIONS.some((p) => p === String(form.phase)) && !phaseOptions.includes(String(form.phase)))) {
       setForm((prev) => ({
         ...prev,
         phase: selectedTask?.phase ? String(selectedTask.phase) : phaseOptions[0],
@@ -1412,7 +1412,7 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
     : phaseOptions;
   useEffect(() => {
     if (phaseOptions.length === 0) return;
-    if (!form.phase || (PHASE_OPTIONS.includes(String(form.phase)) && !phaseOptions.includes(String(form.phase)))) {
+    if (!form.phase || (PHASE_OPTIONS.some((p) => p === String(form.phase)) && !phaseOptions.includes(String(form.phase)))) {
       setForm((prev) => ({
         ...prev,
         phase: phaseOptions[0],
