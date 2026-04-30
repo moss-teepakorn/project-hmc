@@ -216,28 +216,16 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
                   </td>
                   <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
                     {draft ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Input type="color" value={draft.textColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], textColor: v } }))} style={{ width: 28, padding: 2, height: 26 }} />
-                        <span style={{ color: C.text, fontSize: 10 }}>{draft.textColor}</span>
-                      </div>
+                      <Input type="color" value={draft.textColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], textColor: v } }))} style={{ width: 28, padding: 2, height: 26 }} />
                     ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ width: 18, height: 18, borderRadius: 4, background: code.textColor, border: '1px solid #CBD5E1' }} />
-                        <span style={{ color: C.text }}>{code.textColor}</span>
-                      </div>
+                      <span style={{ width: 18, height: 18, display: 'inline-block', borderRadius: 4, background: code.textColor, border: '1px solid #CBD5E1' }} />
                     )}
                   </td>
                   <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
                     {draft ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Input type="color" value={draft.bgColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], bgColor: v } }))} style={{ width: 38, padding: 3, height: 30 }} />
-                        <span style={{ color: C.text, fontSize: 10 }}>{draft.bgColor}</span>
-                      </div>
+                      <Input type="color" value={draft.bgColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], bgColor: v } }))} style={{ width: 28, padding: 2, height: 26 }} />
                     ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 20, height: 20, borderRadius: 4, background: code.bgColor, border: '1px solid #CBD5E1' }} />
-                        <span style={{ color: C.text }}>{code.bgColor}</span>
-                      </div>
+                      <span style={{ width: 18, height: 18, display: 'inline-block', borderRadius: 4, background: code.bgColor, border: '1px solid #CBD5E1' }} />
                     )}
                   </td>
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
@@ -299,12 +287,10 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
           <Input value={newCode.codeValue || ''} onChange={(v) => setNewCode((prev) => ({ ...prev, codeValue: v }))} placeholder="New code value" style={SMALL_INPUT_STYLE} />
           <Input value={newCode.label || ''} onChange={(v) => setNewCode((prev) => ({ ...prev, label: v }))} placeholder="Label (optional)" style={SMALL_INPUT_STYLE} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Input type="color" value={newCode.textColor || '#0F172A'} onChange={(v) => setNewCode((prev) => ({ ...prev, textColor: v }))} style={{ width: 38, padding: 3, height: 30 }} />
-            <Input value={newCode.textColor || '#0F172A'} onChange={(v) => setNewCode((prev) => ({ ...prev, textColor: v }))} placeholder="Text color" style={{ width: '100%', ...SMALL_INPUT_STYLE }} />
+            <Input type="color" value={newCode.textColor || '#0F172A'} onChange={(v) => setNewCode((prev) => ({ ...prev, textColor: v }))} style={{ width: 28, padding: 2, height: 26 }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Input type="color" value={newCode.bgColor || '#EEF2FF'} onChange={(v) => setNewCode((prev) => ({ ...prev, bgColor: v }))} style={{ width: 38, padding: 3, height: 30 }} />
-            <Input value={newCode.bgColor || '#EEF2FF'} onChange={(v) => setNewCode((prev) => ({ ...prev, bgColor: v }))} placeholder="Background" style={{ width: '100%', ...SMALL_INPUT_STYLE }} />
+            <Input type="color" value={newCode.bgColor || '#EEF2FF'} onChange={(v) => setNewCode((prev) => ({ ...prev, bgColor: v }))} style={{ width: 28, padding: 2, height: 26 }} />
           </div>
           <Input value={String(newCode.sortOrder ?? 100)} onChange={(v) => setNewCode((prev) => ({ ...prev, sortOrder: Number(v) || 100 }))} placeholder="Order" style={SMALL_INPUT_STYLE} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
