@@ -339,13 +339,38 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
   const { masterCodes } = useStore();
   const [showHC, setShowHC] = useState(false);
   const [projectView, setProjectView] = useState<'card' | 'table'>('card');
-  const normalProjects = projects.filter(p => p.status !== 'Hyper Care');
-  const hypercareProjects = projects.filter(p => p.status === 'Hyper Care');
-  const planning   = projects.filter(p => p.status === 'Planning');
-  const reqDesign  = projects.filter(p => p.status === 'Req & Design');
-  const setup      = projects.filter(p => p.status === 'Setup');
-  const testing    = projects.filter(p => p.status === 'Testing');
-  const goLive     = projects.filter(p => p.status === 'Go Live');
+  const projectStatusOptions = masterCodes
+    .filter((code) => code.codeType === 'project_status' && code.active)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const statusCounts = projects.reduce<Record<string, number>>((acc, project) => {
+    acc[project.status] = (acc[project.status] || 0) + 1;
+    return acc;
+  }, {});
+  const statusCards = projectStatusOptions.length > 0
+    ? projectStatusOptions.map((code) => ({
+        label: code.label,
+        value: statusCounts[code.codeValue] || 0,
+        bg: code.bgColor || C.bg2,
+        color: code.textColor || C.text,
+        codeValue: code.codeValue,
+        icon: '📌',
+      }))
+    : [
+        { label: 'Planning', value: projects.filter(p => p.status === 'Planning').length, bg: C.amberBg, color: C.amber, codeValue: 'Planning' },
+        { label: 'Req & Design', value: projects.filter(p => p.status === 'Req & Design').length, bg: C.primaryBg, color: C.primary, codeValue: 'Req & Design' },
+        { label: 'Setup', value: projects.filter(p => p.status === 'Setup').length, bg: '#FED7AA', color: '#9A3412', codeValue: 'Setup' },
+        { label: 'Testing', value: projects.filter(p => p.status === 'Testing').length, bg: '#E9D5FF', color: '#6B21A8', codeValue: 'Testing' },
+        { label: 'Go Live', value: projects.filter(p => p.status === 'Go Live').length, bg: C.greenBg, color: C.green, codeValue: 'Go Live' },
+        { label: 'Hyper Care', value: projects.filter(p => p.status === 'Hyper Care').length, bg: C.amberBg, color: C.amber, codeValue: 'Hyper Care' },
+      ];
+  const normalProjects = projects.filter((p) => {
+    const status = projectStatusOptions.find((code) => code.codeValue === p.status);
+    return status ? status.label !== 'Hyper Care' : p.status !== 'Hyper Care';
+  });
+  const hypercareProjects = projects.filter((p) => {
+    const status = projectStatusOptions.find((code) => code.codeValue === p.status);
+    return status ? status.label === 'Hyper Care' : p.status === 'Hyper Care';
+  });
 
   const renderOverviewProjectCard = (p: Project, fallbackColor = C.primary) => {
     const roots = tasks.filter(t => t.projectId === p.id && !t.parentId);
@@ -414,14 +439,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
       <p style={{ color: C.text2, fontSize: 13, marginBottom: 24 }}>Select a project from the list below to view its executive summary.</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 14, marginBottom: 28 }}>
-        {[
-          { label: 'Planning',     value: planning.length,          color: C.amber,   bg: C.amberBg,   icon: '📋' },
-          { label: 'Req & Design', value: reqDesign.length,         color: C.primary, bg: C.primaryBg, icon: '🚀' },
-          { label: 'Setup',        value: setup.length,             color: '#9A3412', bg: '#FED7AA', icon: '🧩' },
-          { label: 'Testing',      value: testing.length,           color: '#6B21A8', bg: '#E9D5FF', icon: '🧪' },
-          { label: 'Go Live',      value: goLive.length,            color: C.green,   bg: C.greenBg,   icon: '✅' },
-          { label: 'Hyper Care',   value: hypercareProjects.length, color: C.amber,   bg: C.amberBg,   icon: '🛡️' },
-        ].map(s => (
+        {statusCards.map((s) => (
           <Card key={s.label} style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 42, height: 42, borderRadius: 11, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{s.icon}</div>
             <div><div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
