@@ -635,22 +635,22 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
     return acc;
   }, {});
 
-  const stageTasks = phaseLabels
-    .filter((label) => phaseProgress[label]?.count)
+  const stageTasks = Object.keys(phaseProgress)
     .map((label) => ({
       id: label,
       name: label,
       progress: Math.round(phaseProgress[label].total / phaseProgress[label].count),
     }))
-    .concat(
-      Object.keys(phaseProgress)
-        .filter((label) => !phaseLabels.includes(label))
-        .map((label) => ({
-          id: label,
-          name: label,
-          progress: Math.round(phaseProgress[label].total / phaseProgress[label].count),
-        }))
-    );
+    .sort((a, b) => {
+      const aIndex = phaseLabels.indexOf(a.name);
+      const bIndex = phaseLabels.indexOf(b.name);
+      if (aIndex !== -1 || bIndex !== -1) {
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      }
+      return a.name.localeCompare(b.name);
+    });
 
   const recentFinishedTasks = pt
     .filter((t) => t.actualFinish)
