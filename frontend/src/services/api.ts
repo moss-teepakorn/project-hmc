@@ -284,6 +284,17 @@ export const projectProgressApi = {
     if (error) throw new Error(error.message);
     return { data: rowToObj<ProjectProgressSnapshot>(data) };
   },
+
+  remove: async (id: string): Promise<void> => {
+    const { data, error: fetchErr } = await supabase.from('project_progress_snapshots').select('project_id').eq('id', id).maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
+    const projectId = (data as any)?.project_id;
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const can = await checkProjectPermission(projectId, 'write');
+    if (!can) throw new Error('FORBIDDEN');
+    const { error } = await supabase.from('project_progress_snapshots').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
 };
 
 export const masterCodeApi = {
@@ -329,16 +340,6 @@ export const masterCodeApi = {
 };
 
 export const taskApi = {
-    const { data, error: fetchErr } = await supabase.from('project_progress_snapshots').select('project_id').eq('id', id).maybeSingle();
-    if (fetchErr) throw new Error(fetchErr.message);
-    const projectId = (data as any)?.project_id;
-    if (!projectId) throw new Error('MISSING_PROJECT_ID');
-    const can = await checkProjectPermission(projectId, 'write');
-    if (!can) throw new Error('FORBIDDEN');
-    const { error } = await supabase.from('project_progress_snapshots').delete().eq('id', id);
-    if (error) throw new Error(error.message);
-  },
-};
 
 // ── Tasks ───────────────────────────────────────────────────────────────────
 
