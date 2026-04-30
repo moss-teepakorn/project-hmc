@@ -41,6 +41,11 @@ export default function ProjectModal({ project, onClose }: Props) {
   const [copyScope, setCopyScope] = useState<'all' | 'main'>('all');
   const [testing, setTesting] = useState(false);
 
+  const statusOptions = masterCodes
+    .filter((code) => code.codeType === 'project_status' && code.active)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((code) => ({ value: code.codeValue, label: code.label }));
+
   const [form, setForm] = useState({
     name:                        project?.name                        ?? '',
     code:                        project?.code                        ?? '',
@@ -55,11 +60,6 @@ export default function ProjectModal({ project, onClose }: Props) {
     emailNotificationRecipients: project?.emailNotificationRecipients ?? '',
     emailNotificationTime:       project?.emailNotificationTime       ?? '08:00',
   });
-
-  const statusOptions = masterCodes
-    .filter((code) => code.codeType === 'project_status' && code.active)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((code) => ({ value: code.codeValue, label: code.label }));
 
   const fallbackStatusOptions = [
     { value: 'Planning', label: 'Planning' },

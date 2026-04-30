@@ -296,7 +296,7 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <input type="checkbox" checked={newCode.active ?? true} onChange={(e) => setNewCode((prev) => ({ ...prev, active: e.target.checked }))} />
           </div>
-          <Btn onClick={handleAdd} style={{ width: '100%' }}>Add</Btn>
+          <Btn onClick={handleAdd} style={{ width: '100%' }}>Save</Btn>
         </div>
       </div>
     </Modal>
