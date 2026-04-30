@@ -27,7 +27,7 @@ BEGIN
       FOR INSERT
       WITH CHECK (
         EXISTS (
-          SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true
+          SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
         )
       );
   END IF;
@@ -43,12 +43,12 @@ BEGIN
       FOR UPDATE
       USING (
         EXISTS (
-          SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true
+          SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
         )
       )
       WITH CHECK (
         EXISTS (
-          SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true
+          SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
         )
       );
   END IF;
@@ -64,7 +64,7 @@ BEGIN
       FOR DELETE
       USING (
         EXISTS (
-          SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true
+          SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
         )
       );
   END IF;
