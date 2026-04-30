@@ -603,13 +603,26 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
     return found ? found.label : name || 'Main Task';
   };
 
+  const normalizeText = (value: string) => String(value || '').trim();
+  const normalizeKey = (value: string) => normalizeText(value).toLowerCase();
+
   const taskPhaseOptions = masterCodes
     .filter((code) => code.codeType === 'task_phase' && code.active)
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((code) => ({ value: code.codeValue, label: code.label }));
+    .map((code) => ({ value: normalizeText(code.codeValue), label: normalizeText(code.label) }));
 
   const phaseLabelByValue = taskPhaseOptions.reduce<Record<string, string>>((acc, phase) => {
     acc[phase.value] = phase.label;
+    return acc;
+  }, {});
+
+  const phaseLabelByText = taskPhaseOptions.reduce<Record<string, string>>((acc, phase) => {
+    acc[normalizeKey(phase.label)] = phase.label;
+    return acc;
+  }, {});
+
+  const phaseSortIndex = taskPhaseOptions.reduce<Record<string, number>>((acc, phase, index) => {
+    acc[normalizeKey(phase.label)] = index;
     return acc;
   }, {});
 
@@ -625,10 +638,26 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
       'Go-live & Hypercare',
     ];
 
+  const resolvePhaseLabel = (phaseValue: string, taskName: string) => {
+    const rawValue = normalizeText(phaseValue);
+    if (!rawValue) return getStageLabel(taskName);
+
+    const mappedByValue = phaseLabelByValue[rawValue];
+    if (mappedByValue) return mappedByValue;
+
+    const mappedByText = phaseLabelByText[normalizeKey(rawValue)];
+    if (mappedByText) return mappedByText;
+
+    const stageLabel = getStageLabel(taskName);
+    const normalizedStageLabel = normalizeKey(stageLabel);
+    if (phaseLabelByText[normalizedStageLabel]) return phaseLabelByText[normalizedStageLabel];
+
+    return stageLabel;
+  };
+
   const phaseProgress = rootTasksSorted.reduce<Record<string, { total: number; count: number }>>((acc, t) => {
-    const phaseValue = t.phase && String(t.phase).trim() ? String(t.phase).trim() : '';
-    const rawPhaseLabel = phaseValue ? (phaseLabelByValue[phaseValue] ?? phaseValue) : getStageLabel(t.taskName);
-    const label = phaseLabels.includes(rawPhaseLabel) ? rawPhaseLabel : getStageLabel(t.taskName);
+    const phaseValue = normalizeText(t.phase || '');
+    const label = resolvePhaseLabel(phaseValue, t.taskName);
     if (!acc[label]) acc[label] = { total: 0, count: 0 };
     acc[label].total += t.percentComplete;
     acc[label].count += 1;
@@ -642,11 +671,11 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
       progress: Math.round(phaseProgress[label].total / phaseProgress[label].count),
     }))
     .sort((a, b) => {
-      const aIndex = phaseLabels.indexOf(a.name);
-      const bIndex = phaseLabels.indexOf(b.name);
-      if (aIndex !== -1 || bIndex !== -1) {
-        if (aIndex === -1) return 1;
-        if (bIndex === -1) return -1;
+      const aIndex = phaseSortIndex[normalizeKey(a.name)];
+      const bIndex = phaseSortIndex[normalizeKey(b.name)];
+      if (aIndex != null || bIndex != null) {
+        if (aIndex == null) return 1;
+        if (bIndex == null) return -1;
         return aIndex - bIndex;
       }
       return a.name.localeCompare(b.name);
