@@ -207,16 +207,28 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
               </div>
               <div>
                 {draft ? (
-                  <Input value={draft.textColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], textColor: v } }))} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Input type="color" value={draft.textColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], textColor: v } }))} style={{ width: 48, padding: 4, height: 38 }} />
+                    <span style={{ color: C.text, fontSize: 12 }}>{draft.textColor}</span>
+                  </div>
                 ) : (
-                  <span style={{ color: C.text }}>{code.textColor}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 20, height: 20, borderRadius: 4, background: code.textColor, border: '1px solid #CBD5E1' }} />
+                    <span style={{ color: C.text }}>{code.textColor}</span>
+                  </div>
                 )}
               </div>
               <div>
                 {draft ? (
-                  <Input value={draft.bgColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], bgColor: v } }))} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Input type="color" value={draft.bgColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], bgColor: v } }))} style={{ width: 48, padding: 4, height: 38 }} />
+                    <span style={{ color: C.text, fontSize: 12 }}>{draft.bgColor}</span>
+                  </div>
                 ) : (
-                  <span style={{ color: C.text }}>{code.bgColor}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 20, height: 20, borderRadius: 4, background: code.bgColor, border: '1px solid #CBD5E1' }} />
+                    <span style={{ color: C.text }}>{code.bgColor}</span>
+                  </div>
                 )}
               </div>
               <div>
@@ -271,8 +283,14 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
           <Input value={newCode.codeKey || ''} onChange={(v) => setNewCode((prev) => ({ ...prev, codeKey: v }))} placeholder="New code key" />
           <Input value={newCode.codeValue || ''} onChange={(v) => setNewCode((prev) => ({ ...prev, codeValue: v }))} placeholder="New code value" />
           <Input value={newCode.label || ''} onChange={(v) => setNewCode((prev) => ({ ...prev, label: v }))} placeholder="Label (optional)" />
-          <Input value={newCode.textColor || '#0F172A'} onChange={(v) => setNewCode((prev) => ({ ...prev, textColor: v }))} placeholder="Text color" />
-          <Input value={newCode.bgColor || '#EEF2FF'} onChange={(v) => setNewCode((prev) => ({ ...prev, bgColor: v }))} placeholder="Background" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Input type="color" value={newCode.textColor || '#0F172A'} onChange={(v) => setNewCode((prev) => ({ ...prev, textColor: v }))} style={{ width: 48, padding: 4, height: 38 }} />
+            <Input value={newCode.textColor || '#0F172A'} onChange={(v) => setNewCode((prev) => ({ ...prev, textColor: v }))} placeholder="Text color" style={{ width: '100%' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Input type="color" value={newCode.bgColor || '#EEF2FF'} onChange={(v) => setNewCode((prev) => ({ ...prev, bgColor: v }))} style={{ width: 48, padding: 4, height: 38 }} />
+            <Input value={newCode.bgColor || '#EEF2FF'} onChange={(v) => setNewCode((prev) => ({ ...prev, bgColor: v }))} placeholder="Background" style={{ width: '100%' }} />
+          </div>
           <Input value={String(newCode.sortOrder ?? 100)} onChange={(v) => setNewCode((prev) => ({ ...prev, sortOrder: Number(v) || 100 }))} placeholder="Order" />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <input type="checkbox" checked={newCode.active ?? true} onChange={(e) => setNewCode((prev) => ({ ...prev, active: e.target.checked }))} />
