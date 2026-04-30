@@ -356,12 +356,12 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
         icon: '📌',
       }))
     : [
-        { label: 'Planning', value: projects.filter(p => p.status === 'Planning').length, bg: C.amberBg, color: C.amber, codeValue: 'Planning' },
-        { label: 'Req & Design', value: projects.filter(p => p.status === 'Req & Design').length, bg: C.primaryBg, color: C.primary, codeValue: 'Req & Design' },
-        { label: 'Setup', value: projects.filter(p => p.status === 'Setup').length, bg: '#FED7AA', color: '#9A3412', codeValue: 'Setup' },
-        { label: 'Testing', value: projects.filter(p => p.status === 'Testing').length, bg: '#E9D5FF', color: '#6B21A8', codeValue: 'Testing' },
-        { label: 'Go Live', value: projects.filter(p => p.status === 'Go Live').length, bg: C.greenBg, color: C.green, codeValue: 'Go Live' },
-        { label: 'Hyper Care', value: projects.filter(p => p.status === 'Hyper Care').length, bg: C.amberBg, color: C.amber, codeValue: 'Hyper Care' },
+        { label: 'Planning', value: projects.filter(p => p.status === 'Planning').length, bg: C.amberBg, color: C.amber, codeValue: 'Planning', icon: '📌' },
+        { label: 'Req & Design', value: projects.filter(p => p.status === 'Req & Design').length, bg: C.primaryBg, color: C.primary, codeValue: 'Req & Design', icon: '📌' },
+        { label: 'Setup', value: projects.filter(p => p.status === 'Setup').length, bg: '#FED7AA', color: '#9A3412', codeValue: 'Setup', icon: '📌' },
+        { label: 'Testing', value: projects.filter(p => p.status === 'Testing').length, bg: '#E9D5FF', color: '#6B21A8', codeValue: 'Testing', icon: '📌' },
+        { label: 'Go Live', value: projects.filter(p => p.status === 'Go Live').length, bg: C.greenBg, color: C.green, codeValue: 'Go Live', icon: '📌' },
+        { label: 'Hyper Care', value: projects.filter(p => p.status === 'Hyper Care').length, bg: C.amberBg, color: C.amber, codeValue: 'Hyper Care', icon: '📌' },
       ];
   const normalProjects = projects.filter((p) => {
     const status = projectStatusOptions.find((code) => code.codeValue === p.status);
