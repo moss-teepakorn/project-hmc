@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS public.masters_code (
 
 CREATE UNIQUE INDEX IF NOT EXISTS masters_code_code_type_key_idx ON public.masters_code (code_type, code_key);
 
+ALTER TABLE public.masters_code ADD COLUMN IF NOT EXISTS text_color text NOT NULL DEFAULT '#0F172A';
+ALTER TABLE public.masters_code ADD COLUMN IF NOT EXISTS bg_color text NOT NULL DEFAULT '#EEF2FF';
+
 INSERT INTO public.masters_code (code_type, code_key, code_value, label, sort_order, text_color, bg_color)
 VALUES
   ('project_status', 'planning',     'Planning',               'Planning',     10, '#92400E', '#FEF3C7'),
