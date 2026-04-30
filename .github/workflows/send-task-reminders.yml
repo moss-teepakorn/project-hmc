@@ -1,0 +1,19 @@
+name: Scheduled Send Task Reminders
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger reminder send endpoint
+        run: |
+          echo "Triggering task reminder send at $(date)"
+          curl -X POST "https://${{ secrets.VERCEL_DOMAIN }}/api/send-task-reminders" \
+            -H "Content-Type: application/json" \
+            -H "x-reminder-secret: ${{ secrets.REMINDER_API_SECRET }}" \
+            -d '{}' \
+            --fail --show-error
