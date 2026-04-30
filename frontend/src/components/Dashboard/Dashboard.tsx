@@ -645,14 +645,19 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
     const mappedByValue = phaseLabelByValue[rawValue];
     if (mappedByValue) return mappedByValue;
 
-    const mappedByText = phaseLabelByText[normalizeKey(rawValue)];
+    const normalizedRaw = normalizeKey(rawValue);
+    const mappedByText = phaseLabelByText[normalizedRaw];
     if (mappedByText) return mappedByText;
 
-    const stageLabel = getStageLabel(taskName);
-    const normalizedStageLabel = normalizeKey(stageLabel);
-    if (phaseLabelByText[normalizedStageLabel]) return phaseLabelByText[normalizedStageLabel];
+    const rawStageLabel = getStageLabel(rawValue);
+    const normalizedRawStage = normalizeKey(rawStageLabel);
+    if (phaseLabelByText[normalizedRawStage]) return phaseLabelByText[normalizedRawStage];
+    if (phaseLabels.includes(rawStageLabel)) return rawStageLabel;
 
-    return stageLabel;
+    const taskNameStageLabel = getStageLabel(taskName);
+    const normalizedTaskNameStage = normalizeKey(taskNameStageLabel);
+    if (phaseLabelByText[normalizedTaskNameStage]) return phaseLabelByText[normalizedTaskNameStage];
+    return taskNameStageLabel;
   };
 
   const phaseProgress = rootTasksSorted.reduce<Record<string, { total: number; count: number }>>((acc, t) => {
