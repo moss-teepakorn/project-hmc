@@ -695,7 +695,6 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Executive Summary</div>
               <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.45, marginTop: 10, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{overviewText}</div>
             </div>
-            <Badge bg={C.primaryBg} color={C.primary}>Decision Needed: Confirm Phase 1 Timeline</Badge>
           </div>
         </Card>
       </div>
