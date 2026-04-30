@@ -44,7 +44,7 @@ export default function ProjectModal({ project, onClose }: Props) {
     name:                        project?.name                        ?? '',
     code:                        project?.code                        ?? '',
     client:                      project?.client                      ?? '',
-    status:                      project?.status                      ?? 'Planning',
+    status:                      project?.status                      ?? 'planning',
     startDate:                   project?.startDate                   ?? '',
     endDate:                     project?.endDate                     ?? '',
     description:                 normalizeDescription(project?.description ?? ''),
@@ -61,12 +61,12 @@ export default function ProjectModal({ project, onClose }: Props) {
     .map((code) => ({ value: code.codeValue, label: code.label }));
 
   const fallbackStatusOptions = [
-    { value: 'Planning', label: 'Planning' },
-    { value: 'Req & Design', label: 'Req & Design' },
-    { value: 'Setup', label: 'Setup' },
-    { value: 'Testing', label: 'Testing' },
-    { value: 'Go Live', label: 'Go Live' },
-    { value: 'Hyper Care', label: 'Hyper Care' },
+    { value: 'planning', label: 'Planning' },
+    { value: 'req_design', label: 'Req & Design' },
+    { value: 'setup', label: 'Setup' },
+    { value: 'testing', label: 'Testing' },
+    { value: 'go_live', label: 'Go Live' },
+    { value: 'hyper_care', label: 'Hyper Care' },
   ];
 
   const statusDropdownOptions = (() => {
