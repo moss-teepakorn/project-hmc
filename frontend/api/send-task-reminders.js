@@ -267,20 +267,30 @@ export default async function handler(req, res) {
   if (!isTestMode) {
     projects = projects.filter((project) => {
       if (!project.email_notification_enabled) return false;
+
+      const alreadySentToday = project.email_notification_last_sent_at
+        ? getBangkokDateKey(project.email_notification_last_sent_at) === nowKey
+        : false;
+      if (alreadySentToday && !isForceSend) return false;
+
+      if (isForceSend) {
+        return true;
+      }
+
       if (!project.email_notification_time) return false;
 
-        const scheduledMinutes = parseTimeToMinutes(project.email_notification_time);
-        if (scheduledMinutes == null) return false;
+      const scheduledMinutes = parseTimeToMinutes(project.email_notification_time);
+      if (scheduledMinutes == null) return false;
 
-        const currentParts = currentTime.split(':').map((part) => Number(part));
-        const currentMinutes = currentParts.length >= 2 && !Number.isNaN(currentParts[0]) && !Number.isNaN(currentParts[1])
-          ? currentParts[0] * 60 + currentParts[1]
-          : null;
-        if (currentMinutes == null) return false;
-        if (currentMinutes < scheduledMinutes) return false;
+      const currentParts = currentTime.split(':').map((part) => Number(part));
+      const currentMinutes = currentParts.length >= 2 && !Number.isNaN(currentParts[0]) && !Number.isNaN(currentParts[1])
+        ? currentParts[0] * 60 + currentParts[1]
+        : null;
+      if (currentMinutes == null) return false;
+      if (currentMinutes < scheduledMinutes) return false;
 
-        const alreadySentToday = project.email_notification_last_sent_at
-          ? getBangkokDateKey(project.email_notification_last_sent_at) === nowKey
+      return true;
+    });
   }
 
   const results = [];
