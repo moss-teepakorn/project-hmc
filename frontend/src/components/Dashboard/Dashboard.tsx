@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { parseISO, isValid, addDays } from 'date-fns';
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Home } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Home, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { supabase } from '../../services/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, MILESTONE_STATUS, TH, TD } from '../Common';
 import { fmtDate, fmtMoney, compareWbs, computeBaselineProgress, getHalfMonthSnapshotDates } from '../../utils';
 import type { Project } from '../../types';
@@ -14,6 +15,8 @@ const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live',
 
 export default function Dashboard() {
   const { projects, tasks, milestones, issues, risks, changeRequests, activeProject, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts, masterCodes } = useStore();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const [selected,   setSelected]   = useState<Project | null>(null);
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
@@ -23,6 +26,7 @@ export default function Dashboard() {
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [notificationsShown, setNotificationsShown] = useState(false);
   const [sendingAll, setSendingAll] = useState(false);
+  const [showEmailLogs, setShowEmailLogs] = useState(false);
   const isMobile = windowWidth < 768;
 
   React.useEffect(() => {
@@ -304,6 +308,11 @@ export default function Dashboard() {
                     {sendingAll ? 'Sending…' : 'Send Email'}
                   </Btn>
                 )}
+                {isAdmin && dashboardTab === 'overview' && (
+                  <Btn variant="outline" onClick={() => setShowEmailLogs(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Mail size={13} /> Email Logs
+                  </Btn>
+                )}
                 <Btn onClick={() => setShowAdd(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }}>
                   <Plus size={12} style={{ marginRight: 6 }} /> Add Project
                 </Btn>
@@ -330,6 +339,7 @@ export default function Dashboard() {
           onCancel={() => setDeleting(null)}
         />
       )}
+      {showEmailLogs && <EmailLogsModal onClose={() => setShowEmailLogs(false)} />}
     </div>
   );
 }
@@ -890,6 +900,151 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
             ))}
           </div>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+// ── Email Logs Modal ──────────────────────────────────────────────────────────
+type EmailLog = {
+  id: string;
+  project_id: string | null;
+  project_name: string | null;
+  project_code: string | null;
+  type: 'auto' | 'manual';
+  scheduled_time: string | null;
+  sent_at: string | null;
+  status: 'sent' | 'skipped' | 'failed';
+  recipient: string | null;
+  tasks_count: number;
+  error_message: string | null;
+  created_at: string;
+};
+
+function EmailLogsModal({ onClose }: { onClose: () => void }) {
+  const [logs, setLogs] = React.useState<EmailLog[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [filterProject, setFilterProject] = React.useState('');
+
+  React.useEffect(() => {
+    const loadLogs = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+        const headers: Record<string, string> = {};
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+        const res = await fetch('/api/email-reminder-logs?limit=200', { headers });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result?.error || 'Failed to load logs');
+        setLogs(result.logs || []);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load');
+      }
+      setLoading(false);
+    };
+    loadLogs();
+  }, []);
+
+  const filteredLogs = filterProject
+    ? logs.filter((l) =>
+        (l.project_name || '').toLowerCase().includes(filterProject.toLowerCase()) ||
+        (l.project_code || '').toLowerCase().includes(filterProject.toLowerCase())
+      )
+    : logs;
+
+  const statusColor = (s: string) => {
+    if (s === 'sent') return C.green;
+    if (s === 'failed') return C.red;
+    return C.text3;
+  };
+  const statusBg = (s: string) => {
+    if (s === 'sent') return C.greenBg;
+    if (s === 'failed') return '#FEE2E2';
+    return C.bg2;
+  };
+
+  const fmtTime = (iso: string | null) => {
+    if (!iso) return '-';
+    try {
+      return new Date(iso).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return iso;
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 960, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: C.shadow }}>
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Mail size={16} color={C.primary} />
+            <span style={{ fontSize: 15, fontWeight: 700, color: C.text, fontFamily: 'Poppins, sans-serif' }}>Email Send Logs</span>
+            <span style={{ fontSize: 12, color: C.text2 }}>({filteredLogs.length} records)</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="text"
+              placeholder="Filter by project..."
+              value={filterProject}
+              onChange={(e) => setFilterProject(e.target.value)}
+              style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, color: C.text, outline: 'none', width: 180 }}
+            />
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, fontSize: 20, lineHeight: 1, padding: 2 }}>×</button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflow: 'auto', flex: 1 }}>
+          {loading && (
+            <div style={{ padding: 40, textAlign: 'center', color: C.text2, fontSize: 13 }}>Loading…</div>
+          )}
+          {!loading && error && (
+            <div style={{ padding: 40, textAlign: 'center', color: C.red, fontSize: 13 }}>{error}</div>
+          )}
+          {!loading && !error && filteredLogs.length === 0 && (
+            <div style={{ padding: 40, textAlign: 'center', color: C.text2, fontSize: 13 }}>No logs found.</div>
+          )}
+          {!loading && !error && filteredLogs.length > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
+                  {['Project ID', 'Project Name', 'Type', 'Scheduled', 'Sent At', 'Recipient', 'Tasks', 'Status', 'Error'].map((h) => (
+                    <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLogs.map((log) => (
+                  <tr key={log.id} style={{ borderBottom: `1px solid ${C.border}` }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = '#F8FAFF'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'; }}>
+                    <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif', whiteSpace: 'nowrap' }}>{log.project_code || '-'}</td>
+                    <td style={{ padding: '9px 12px', color: C.text, maxWidth: 200 }}>{log.project_name || '-'}</td>
+                    <td style={{ padding: '9px 12px' }}>
+                      <span style={{ background: log.type === 'manual' ? C.primaryBg : C.bg2, color: log.type === 'manual' ? C.primary : C.text2, borderRadius: 6, padding: '2px 7px', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>
+                        {log.type === 'manual' ? 'Manual' : 'Auto'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{log.scheduled_time || '-'}</td>
+                    <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{fmtTime(log.sent_at)}</td>
+                    <td style={{ padding: '9px 12px', color: C.text, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.recipient || '-'}</td>
+                    <td style={{ padding: '9px 12px', color: C.text, textAlign: 'center' }}>{log.tasks_count}</td>
+                    <td style={{ padding: '9px 12px' }}>
+                      <span style={{ background: statusBg(log.status), color: statusColor(log.status), borderRadius: 6, padding: '2px 8px', fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>
+                        {log.status.charAt(0).toUpperCase() + log.status.slice(1)}
+                      </span>
+                    </td>
+                    <td style={{ padding: '9px 12px', color: C.red, fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.error_message || ''}>{log.error_message || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

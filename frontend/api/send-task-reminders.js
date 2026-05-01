@@ -375,8 +375,45 @@ export default async function handler(req, res) {
   }
 
   if (recipientTasks.size === 0) {
+    // Log skipped entries for projects that had no recipients / no tasks
+    if (!isTestMode) {
+      const skippedLogs = results
+        .filter((r) => r.skipped)
+        .map((r) => {
+          const proj = projects.find((p) => p.id === r.project);
+          return {
+            project_id: r.project || null,
+            project_name: proj?.name || null,
+            project_code: proj?.code || null,
+            type: isForceSend ? 'manual' : 'auto',
+            scheduled_time: proj?.email_notification_time || null,
+            sent_at: null,
+            status: 'skipped',
+            recipient: null,
+            tasks_count: 0,
+            error_message: r.skipped,
+          };
+        });
+      if (skippedLogs.length > 0) {
+        await supabase.from('email_reminder_logs').insert(skippedLogs);
+      }
+    }
     return res.status(200).json({ results });
   }
+
+  // Build per-project recipient counts for logging
+  const projectRecipientCount = new Map();
+  const projectRecipientList = new Map();
+  for (const { recipient, rows, projectIds } of recipientTasks.values()) {
+    for (const pid of projectIds) {
+      projectRecipientCount.set(pid, (projectRecipientCount.get(pid) || 0) + rows.filter((r) => r.project_code === (projects.find((p) => p.id === pid)?.code || '')).length);
+      const list = projectRecipientList.get(pid) || [];
+      list.push(recipient);
+      projectRecipientList.set(pid, list);
+    }
+  }
+
+  const sendErrors = new Map(); // recipientEmail -> error string
 
   for (const { recipient, rows, projectIds } of recipientTasks.values()) {
     const greeting = getGreeting([recipient], Array.from(allMembers.values()));
@@ -387,15 +424,46 @@ export default async function handler(req, res) {
       await sendMail({ to: recipient, bcc: [], html, text });
       results.push({ recipient, sentTasks: rows.length, projects: Array.from(projectIds), test: isTestMode });
     } catch (error) {
+      sendErrors.set(recipient, String(error));
       results.push({ recipient, error: String(error) });
     }
   }
 
-  if (!isTestMode && projectsToUpdate.size > 0) {
-    await supabase
-      .from('projects')
-      .update({ email_notification_last_sent_at: new Date().toISOString() })
-      .in('id', Array.from(projectsToUpdate));
+  if (!isTestMode) {
+    // Write log rows
+    const logRows = [];
+    const sentAt = new Date().toISOString();
+
+    for (const { recipient, rows, projectIds } of recipientTasks.values()) {
+      const errMsg = sendErrors.get(recipient) || null;
+      for (const pid of projectIds) {
+        const proj = projects.find((p) => p.id === pid);
+        const projectRows = rows.filter((r) => r.project_code === (proj?.code || '') || projectIds.size === 1);
+        logRows.push({
+          project_id: pid,
+          project_name: proj?.name || null,
+          project_code: proj?.code || null,
+          type: isForceSend ? 'manual' : 'auto',
+          scheduled_time: proj?.email_notification_time || null,
+          sent_at: errMsg ? null : sentAt,
+          status: errMsg ? 'failed' : 'sent',
+          recipient,
+          tasks_count: projectRows.length,
+          error_message: errMsg,
+        });
+      }
+    }
+
+    if (logRows.length > 0) {
+      await supabase.from('email_reminder_logs').insert(logRows);
+    }
+
+    if (projectsToUpdate.size > 0) {
+      await supabase
+        .from('projects')
+        .update({ email_notification_last_sent_at: sentAt })
+        .in('id', Array.from(projectsToUpdate));
+    }
   }
 
   return res.status(200).json({ results });
