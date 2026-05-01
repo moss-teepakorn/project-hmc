@@ -77,6 +77,25 @@ const getBangkokNow = () => {
   };
 };
 
+const parseTimeToMinutes = (raw) => {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+  const parts = value.split(':').map((part) => Number(part));
+  if (parts.length < 2 || Number.isNaN(parts[0]) || Number.isNaN(parts[1])) return null;
+  const hours = parts[0];
+  const minutes = parts[1];
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+};
+
+const getBangkokDateKey = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  const parts = getBangkokDateParts(d);
+  return `${parts.year.toString().padStart(4, '0')}-${parts.month.toString().padStart(2, '0')}-${parts.day.toString().padStart(2, '0')}`;
+};
+
 const formatBangkokDate = (date) => {
   const parts = getBangkokDateParts(date);
   return `${parts.year.toString().padStart(4, '0')}-${parts.month.toString().padStart(2, '0')}-${parts.day.toString().padStart(2, '0')}`;
@@ -249,14 +268,19 @@ export default async function handler(req, res) {
     projects = projects.filter((project) => {
       if (!project.email_notification_enabled) return false;
       if (!project.email_notification_time) return false;
-      const scheduled = String(project.email_notification_time).slice(0, 5);
-      if (currentTime < scheduled) return false;
-      const alreadySentToday = project.email_notification_last_sent_at
-        ? String(new Date(project.email_notification_last_sent_at).toISOString().slice(0, 10)) === nowKey
-        : false;
-      if (alreadySentToday && !isForceSend) return false;
-      return true;
-    });
+
+        const scheduledMinutes = parseTimeToMinutes(project.email_notification_time);
+        if (scheduledMinutes == null) return false;
+
+        const currentParts = currentTime.split(':').map((part) => Number(part));
+        const currentMinutes = currentParts.length >= 2 && !Number.isNaN(currentParts[0]) && !Number.isNaN(currentParts[1])
+          ? currentParts[0] * 60 + currentParts[1]
+          : null;
+        if (currentMinutes == null) return false;
+        if (currentMinutes < scheduledMinutes) return false;
+
+        const alreadySentToday = project.email_notification_last_sent_at
+          ? getBangkokDateKey(project.email_notification_last_sent_at) === nowKey
   }
 
   const results = [];
