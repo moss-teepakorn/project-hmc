@@ -233,20 +233,29 @@ export default function EffortTab({ projectId }: Props) {
                 </div>
               ) : (
                 <Card style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 800 }}>
+                    <colgroup>
+                      <col style={{ width: 160 }} />
+                      <col style={{ width: 110 }} />
+                      <col style={{ width: 80 }} />
+                      {months.map(mo => <col key={mo} style={{ width: 72 }} />)}
+                      <col style={{ width: 80 }} />
+                      <col style={{ width: 90 }} />
+                      <col style={{ width: 80 }} />
+                    </colgroup>
                     <thead>
                       <tr style={{ background: C.bg }}>
-                        <th style={{ ...TH, minWidth: 160 }}>Module</th>
-                        <th style={{ ...TH, minWidth: 110 }}>Budget (฿)</th>
-                        <th style={{ ...TH, textAlign: 'center', minWidth: 80 }}>Budget MD</th>
+                        <th style={{ ...TH }}>Module</th>
+                        <th style={{ ...TH }}>Budget (฿)</th>
+                        <th style={{ ...TH, textAlign: 'center' }}>Budget MD</th>
                         {months.map(mo => (
-                          <th key={mo} style={{ ...TH, background: C.primaryBg, color: C.primary, textAlign: 'center', minWidth: 72 }}>
+                          <th key={mo} style={{ ...TH, background: C.primaryBg, color: C.primary, textAlign: 'center' }}>
                             {fmtMonth(mo)}
                           </th>
                         ))}
-                        <th style={{ ...TH, background: '#FFFBEB', color: C.amber, textAlign: 'center', minWidth: 80 }}>Used MD</th>
-                        <th style={{ ...TH, background: '#F0FDF4', color: C.green, textAlign: 'center', minWidth: 90 }}>Remaining</th>
-                        <th style={{ ...TH, minWidth: 80 }}></th>
+                        <th style={{ ...TH, background: '#FFFBEB', color: C.amber, textAlign: 'center' }}>Used MD</th>
+                        <th style={{ ...TH, background: '#F0FDF4', color: C.green, textAlign: 'center' }}>Remaining</th>
+                        <th style={{ ...TH }}></th>
                       </tr>
                     </thead>
                     <tbody>
