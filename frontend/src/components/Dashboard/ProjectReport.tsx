@@ -116,7 +116,19 @@ export default function ProjectReport({ project }: Props) {
     const el = document.querySelector('.exec-report') as HTMLElement | null;
     if (!el) return;
     try {
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#fff', useCORS: true });
+      // Temporarily remove overflow:hidden so html2canvas captures full content
+      const prev = el.style.overflow;
+      el.style.overflow = 'visible';
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        backgroundColor: '#fff',
+        useCORS: true,
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+      });
+      el.style.overflow = prev;
       const link = document.createElement('a');
       link.href = canvas.toDataURL('image/png');
       link.download = `executive-report-${project.code}-${now.toISOString().split('T')[0]}.png`;
@@ -132,28 +144,27 @@ export default function ProjectReport({ project }: Props) {
   const userName = profile?.fullName ?? profile?.email ?? '';
 
   return (
-    <div className="exec-report-wrapper" style={{ padding: 16, background: '#F1F5F9', fontFamily: 'Inter,Arial,Helvetica,sans-serif', minHeight: '100%' }}>
+    <div className="exec-report-wrapper" style={{ padding: 16, background: '#F1F5F9', fontFamily: 'Poppins,sans-serif', minHeight: '100%' }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
+        .exec-report, .exec-report * { font-family: Poppins, sans-serif !important; }
         @media print {
-          @page { size: A4 landscape; margin: 5mm; }
-          body > * { display: none !important; }
+          @page { size: A4 landscape; margin: 4mm; }
+          body * { visibility: hidden !important; }
+          .exec-report-wrapper, .exec-report-wrapper * { visibility: visible !important; }
+          .exec-report-toolbar { display: none !important; visibility: hidden !important; }
           .exec-report-wrapper {
-            display: block !important;
-            position: fixed !important;
-            top: 0; left: 0;
-            width: 100% !important;
+            position: absolute !important;
+            left: 0; top: 0;
             padding: 0 !important;
             background: #fff !important;
+            width: 100% !important;
           }
-          .exec-report-toolbar { display: none !important; }
           .exec-report {
-            transform: scale(0.66);
-            transform-origin: top left;
-            width: 151% !important;
-            max-width: none !important;
+            zoom: 0.62;
             border-radius: 0 !important;
             box-shadow: none !important;
-            margin: 0 !important;
+            overflow: visible !important;
           }
         }
       `}</style>
