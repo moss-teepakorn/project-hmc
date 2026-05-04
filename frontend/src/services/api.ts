@@ -917,26 +917,19 @@ export const effortApi = {
   },
 
   create: async (e: Partial<Effort>): Promise<{ data: Effort }> => {
-    const row = objToRow(e as Record<string, unknown>);
-    delete row.id;
-    delete row.created_at;
-    let { data, error } = await supabase
-      .from('efforts')
-      .insert(row)
-      .select()
-      .single();
-
-    if (error && row.phase !== undefined) {
-      delete row.phase;
-      const retry = await supabase
-        .from('efforts')
-        .insert(row)
-        .select()
-        .single();
+    const base: Record<string, unknown> = {
+      project_id: e.projectId,
+      module: e.module ?? '',
+      budget_amount: e.budgetAmount ?? 0,
+      budget_manday: e.budgetManday ?? 0,
+    };
+    // Try with phase; fall back without it if DB column is absent
+    let { data, error } = await supabase.from('efforts').insert({ ...base, phase: e.phase ?? '' }).select().single();
+    if (error) {
+      const retry = await supabase.from('efforts').insert(base).select().single();
       data = retry.data;
       error = retry.error;
     }
-
     if (error) throw new Error(error.message);
     const effort = rowToObj<Effort>(data);
     effort.monthly = {};
@@ -944,28 +937,18 @@ export const effortApi = {
   },
 
   update: async (id: string, e: Partial<Effort>): Promise<{ data: Effort }> => {
-    const row = objToRow(e as Record<string, unknown>);
-    delete row.id;
-    delete row.created_at;
-    let { data, error } = await supabase
-      .from('efforts')
-      .update(row)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error && row.phase !== undefined) {
-      delete row.phase;
-      const retry = await supabase
-        .from('efforts')
-        .update(row)
-        .eq('id', id)
-        .select()
-        .single();
+    const base: Record<string, unknown> = {
+      module: e.module ?? '',
+      budget_amount: e.budgetAmount ?? 0,
+      budget_manday: e.budgetManday ?? 0,
+    };
+    // Try with phase; fall back without it if DB column is absent
+    let { data, error } = await supabase.from('efforts').update({ ...base, phase: e.phase ?? '' }).eq('id', id).select().single();
+    if (error) {
+      const retry = await supabase.from('efforts').update(base).eq('id', id).select().single();
       data = retry.data;
       error = retry.error;
     }
-
     if (error) throw new Error(error.message);
     const effort = rowToObj<Effort>(data);
     effort.monthly = {};
