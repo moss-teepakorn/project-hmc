@@ -891,6 +891,11 @@ export const milestoneApi = {
 // ── Efforts ─────────────────────────────────────────────────────────────────
 
 export const effortApi = {
+  isMissingPhaseColumnError: (message: string): boolean => {
+    const msg = message.toLowerCase();
+    return msg.includes('phase') && (msg.includes('column') || msg.includes('schema cache') || msg.includes('does not exist'));
+  },
+
   getByProject: async (pid?: string): Promise<{ data: Effort[] }> => {
     let q = supabase.from('efforts').select('*, effort_monthly(*)');
     if (pid) q = q.eq('project_id', pid);
@@ -920,11 +925,23 @@ export const effortApi = {
     const row = objToRow(e as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('efforts')
       .insert(row)
       .select()
       .single();
+
+    if (error && row.phase !== undefined && effortApi.isMissingPhaseColumnError(error.message)) {
+      delete row.phase;
+      const retry = await supabase
+        .from('efforts')
+        .insert(row)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) throw new Error(error.message);
     const effort = rowToObj<Effort>(data);
     effort.monthly = {};
@@ -935,12 +952,25 @@ export const effortApi = {
     const row = objToRow(e as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('efforts')
       .update(row)
       .eq('id', id)
       .select()
       .single();
+
+    if (error && row.phase !== undefined && effortApi.isMissingPhaseColumnError(error.message)) {
+      delete row.phase;
+      const retry = await supabase
+        .from('efforts')
+        .update(row)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) throw new Error(error.message);
     const effort = rowToObj<Effort>(data);
     effort.monthly = {};
