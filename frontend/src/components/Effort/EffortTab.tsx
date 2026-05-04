@@ -86,8 +86,8 @@ export default function EffortTab({ projectId }: Props) {
 
   const handleSave = async (form: Partial<Effort>) => {
     try {
-      if (form.id) { await updateEffort(form.id, form); toast.success('Module updated'); }
-      else         { await createEffort({ ...form, projectId }); toast.success('Module added'); }
+      if (form.id) { await updateEffort(form.id, form); toast.success('Task updated'); }
+      else         { await createEffort({ ...form, projectId }); toast.success('Task added'); }
       setModal(null);
     } catch { toast.error('Failed to save'); }
   };
@@ -154,13 +154,13 @@ export default function EffortTab({ projectId }: Props) {
       </Card>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
-        <Btn onClick={() => setModal({})} small style={{ width: isMobile ? '100%' : 'auto' }}><Plus size={14} /> Add Module</Btn>
+        <Btn onClick={() => setModal({})} small style={{ width: isMobile ? '100%' : 'auto' }}><Plus size={14} /> Add Task</Btn>
       </div>
 
       {/* Effort grid */}
       {efforts.length === 0 ? (
         <Card style={{ padding: 40, textAlign: 'center', color: C.text3 }}>
-          No modules yet. Click <strong>Add Module</strong> to start tracking effort.
+          No tasks yet. Click <strong>Add Task</strong> to start tracking effort.
         </Card>
       ) : (
         phases.map((phase) => {
@@ -177,7 +177,7 @@ export default function EffortTab({ projectId }: Props) {
                 </div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 12, color: C.text2 }}>฿{fmtMoney(totals.budgetAmount)}</div>
-                  <div style={{ fontSize: 12, color: C.text2 }}>{phaseEfforts.length} modules</div>
+                  <div style={{ fontSize: 12, color: C.text2 }}>{phaseEfforts.length} tasks</div>
                 </div>
               </div>
               {isMobile ? (
@@ -245,7 +245,7 @@ export default function EffortTab({ projectId }: Props) {
                     </colgroup>
                     <thead>
                       <tr style={{ background: C.bg }}>
-                        <th style={{ ...TH }}>Module</th>
+                        <th style={{ ...TH }}>Task</th>
                         <th style={{ ...TH }}>Budget (฿)</th>
                         <th style={{ ...TH, textAlign: 'center' }}>Budget MD</th>
                         {months.map(mo => (
@@ -328,7 +328,7 @@ export default function EffortTab({ projectId }: Props) {
       )}
 
       {modal !== null && <EffortModal data={modal} phaseOptions={phaseOptions} isMobile={isMobile} onClose={() => setModal(null)} onSave={handleSave} />}
-      {deleting && <ConfirmModal message={`Delete module "${deleting.module}"?`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
+      {deleting && <ConfirmModal message={`Delete task "${deleting.module}"?`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
     </div>
 
   );
@@ -339,8 +339,8 @@ function EffortModal({ data, phaseOptions, isMobile, onClose, onSave }: { data: 
   const [form, setForm] = useState<Partial<Effort>>({ phase: phaseOptions[0]?.value ?? 'Phase 1', module: '', budgetAmount: 0, budgetManday: 0, ...data });
   const up = (k: string, v: string | number) => setForm(p => ({ ...p, [k]: v }));
   return (
-    <Modal title={form.id ? 'Edit Module' : 'Add Module'} onClose={onClose} width={440}>
-      <FormRow label="Module Name" required>
+    <Modal title={form.id ? 'Edit Task' : 'Add Task'} onClose={onClose} width={440}>
+      <FormRow label="Task Name" required>
         <Input autoFocus value={form.module ?? ''} onChange={v => up('module', v)} placeholder="e.g. Frontend Development" />
       </FormRow>
       <FormRow label="Phase" required>
@@ -364,7 +364,7 @@ function EffortModal({ data, phaseOptions, isMobile, onClose, onSave }: { data: 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={() => {
-          if (!form.module?.trim()) return toast.error('Please enter module name');
+          if (!form.module?.trim()) return toast.error('Please enter task name');
           const normalizedPhase = phaseOptions.some((o) => o.value === form.phase) ? String(form.phase) : (phaseOptions[0]?.value ?? 'Phase 1');
           onSave({ ...form, phase: normalizedPhase });
         }}>Save</Btn>
