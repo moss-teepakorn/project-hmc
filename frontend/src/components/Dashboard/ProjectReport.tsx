@@ -328,7 +328,7 @@ export default function ProjectReport({ project }: Props) {
             {effortByPhase.map(ep => (
               <div key={ep.phase} style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Pill label={ep.phase} bg={C.primaryBg} color={C.primary} />
+                  <Pill label={ep.phase ?? ''} bg={C.primaryBg} color={C.primary} />
                   <span style={{ fontSize: 8, color: '#64748B' }}>Total {ep.budMD} MD ยท Used <b style={{ color: '#F59E0B' }}>{ep.usedMD}.0</b> ยท Remain <b style={{ color: ep.remaining < 0 ? '#DC2626' : '#16A34A' }}>{ep.remaining}.0</b></span>
                 </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8 }}>
