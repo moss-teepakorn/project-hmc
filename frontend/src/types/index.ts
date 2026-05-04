@@ -101,6 +101,7 @@ export interface Effort {
   id: string;
   projectId: string;
   module: string;
+  phase?: string;
   budgetAmount: number;
   budgetManday: number;
   monthly: Record<string, number>;

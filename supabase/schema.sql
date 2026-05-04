@@ -182,6 +182,7 @@ create table if not exists public.efforts (
   id             uuid primary key default uuid_generate_v4(),
   project_id     uuid not null references public.projects(id) on delete cascade,
   module         text not null default '',
+  phase          text not null default '',
   budget_amount  numeric not null default 0,
   budget_manday  numeric not null default 0,
   created_at     timestamptz not null default now()
