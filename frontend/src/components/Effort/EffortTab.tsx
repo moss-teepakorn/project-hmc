@@ -78,12 +78,14 @@ export default function EffortTab({ projectId }: Props) {
 
   const phaseTotals = phases.reduce((acc, phase) => {
     const list = efforts.filter((e) => phaseKey(e.phase) === phase);
+    const usedManday = list.reduce((s, e) => s + Object.values(e.monthly || {}).reduce((a, v) => a + v, 0), 0);
+    const budgetManday = list.reduce((s, e) => s + e.budgetManday, 0);
     acc[phase] = {
       budgetAmount: list.reduce((s, e) => s + e.budgetAmount, 0),
-      budgetManday: list.reduce((s, e) => s + e.budgetManday, 0),
-      usedManday: list.reduce((s, e) => s + Object.values(e.monthly || {}).reduce((a, v) => a + v, 0), 0),
+      budgetManday,
+      usedManday,
+      remaining: budgetManday - usedManday,
     };
-    acc[phase].remaining = acc[phase].budgetManday - acc[phase].usedManday;
     return acc;
   }, {} as Record<string, { budgetAmount: number; budgetManday: number; usedManday: number; remaining: number }>);
 
