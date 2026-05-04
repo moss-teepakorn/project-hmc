@@ -8,9 +8,10 @@ import type { Effort } from '../../types';
 import { format, addMonths, subMonths } from 'date-fns';
 
 interface Props { projectId: string; }
+const PHASE_OPTIONS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
 
 export default function EffortTab({ projectId }: Props) {
-  const { efforts, fetchEfforts, createEffort, updateEffort, updateEffortMonthly, deleteEffort, masterCodes } = useStore();
+  const { efforts, fetchEfforts, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
   const [modal, setModal]       = useState<Partial<Effort> | null>(null);
   const [deleting, setDeleting] = useState<Effort | null>(null);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -49,32 +50,19 @@ export default function EffortTab({ projectId }: Props) {
 
   const months = getMonths();
 
-  const phaseOptions = masterCodes
-    .filter((code) => code.codeType === 'task_phase' && code.active)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((code) => ({ value: code.codeValue, label: code.label }));
-
-  const phaseLabelByValue = phaseOptions.reduce<Record<string, string>>((acc, option) => {
-    acc[option.value] = option.label;
-    return acc;
-  }, {});
+  const phaseOptions = PHASE_OPTIONS.map((phase) => ({ value: phase, label: phase }));
 
   const phaseSortIndex = phaseOptions.reduce<Record<string, number>>((acc, option, index) => {
     acc[option.value] = index;
     return acc;
   }, {});
 
-  const phaseKey = (phase?: string) => (phase && phase.trim() ? phase : 'Unassigned');
+  const phaseKey = (phase?: string) => (phase && PHASE_OPTIONS.includes(phase) ? phase : 'Phase 1');
 
-  const phases = useMemo(() => {
-    const unique = Array.from(new Set(efforts.map((e) => phaseKey(e.phase))));
-    return unique.sort((a, b) => {
-      const idxA = phaseSortIndex[a] ?? 999;
-      const idxB = phaseSortIndex[b] ?? 999;
-      if (idxA !== idxB) return idxA - idxB;
-      return a.localeCompare(b);
-    });
-  }, [efforts.length, efforts.map((e) => phaseKey(e.phase)).join('|'), phaseOptions.map((o) => o.value).join('|')]);
+  const phases = useMemo(
+    () => PHASE_OPTIONS.filter((phase) => efforts.some((e) => phaseKey(e.phase) === phase)),
+    [efforts.length, efforts.map((e) => phaseKey(e.phase)).join('|')]
+  );
 
   const phaseTotals = phases.reduce((acc, phase) => {
     const list = efforts.filter((e) => phaseKey(e.phase) === phase);
@@ -141,7 +129,7 @@ export default function EffortTab({ projectId }: Props) {
             const totals = phaseTotals[phase];
             return (
               <Card key={phase} style={{ padding: '14px 18px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{phaseLabelByValue[phase] ?? phase}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{phase}</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: C.primary, margin: '8px 0' }}>{totals.budgetManday} MD</div>
                 <div style={{ fontSize: 11, color: C.text2, lineHeight: 1.6 }}>
                   Budget ฿{fmtMoney(totals.budgetAmount)}
@@ -182,7 +170,7 @@ export default function EffortTab({ projectId }: Props) {
             <div key={phase} style={{ marginBottom: isMobile ? 18 : 24 }}>
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: 10, marginBottom: 12 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>{phaseLabelByValue[phase] ?? phase}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>{phase}</div>
                   <div style={{ fontSize: 12, color: C.text2 }}>
                     Budget {totals.budgetManday} MD • Used {totals.usedManday} MD • Remaining {totals.remaining} MD
                   </div>
@@ -339,7 +327,7 @@ export default function EffortTab({ projectId }: Props) {
 
 // ── Effort Modal ──────────────────────────────────────────────────────────────
 function EffortModal({ data, phaseOptions, isMobile, onClose, onSave }: { data: Partial<Effort>; phaseOptions: { value: string; label: string }[]; isMobile: boolean; onClose: () => void; onSave: (f: Partial<Effort>) => void }) {
-  const [form, setForm] = useState<Partial<Effort>>({ phase: phaseOptions[0]?.value ?? '', module: '', budgetAmount: 0, budgetManday: 0, ...data });
+  const [form, setForm] = useState<Partial<Effort>>({ phase: phaseOptions[0]?.value ?? 'Phase 1', module: '', budgetAmount: 0, budgetManday: 0, ...data });
   const up = (k: string, v: string | number) => setForm(p => ({ ...p, [k]: v }));
   return (
     <Modal title={form.id ? 'Edit Module' : 'Add Module'} onClose={onClose} width={440}>
@@ -347,15 +335,11 @@ function EffortModal({ data, phaseOptions, isMobile, onClose, onSave }: { data: 
         <Input autoFocus value={form.module ?? ''} onChange={v => up('module', v)} placeholder="e.g. Frontend Development" />
       </FormRow>
       <FormRow label="Phase" required>
-        {phaseOptions.length > 0 ? (
-          <Select
-            value={form.phase ?? phaseOptions[0]?.value ?? ''}
-            onChange={v => up('phase', v)}
-            options={phaseOptions}
-          />
-        ) : (
-          <Input value={form.phase ?? ''} onChange={v => up('phase', v)} placeholder="Phase 1" />
-        )}
+        <Select
+          value={phaseOptions.some((o) => o.value === form.phase) ? String(form.phase) : (phaseOptions[0]?.value ?? 'Phase 1')}
+          onChange={v => up('phase', v)}
+          options={phaseOptions}
+        />
       </FormRow>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
         <FormRow label="Budget Manday">
@@ -372,7 +356,8 @@ function EffortModal({ data, phaseOptions, isMobile, onClose, onSave }: { data: 
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={() => {
           if (!form.module?.trim()) return toast.error('Please enter module name');
-          onSave(form);
+          const normalizedPhase = phaseOptions.some((o) => o.value === form.phase) ? String(form.phase) : (phaseOptions[0]?.value ?? 'Phase 1');
+          onSave({ ...form, phase: normalizedPhase });
         }}>Save</Btn>
       </div>
     </Modal>
