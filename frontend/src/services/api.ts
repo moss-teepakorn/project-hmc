@@ -891,11 +891,6 @@ export const milestoneApi = {
 // ── Efforts ─────────────────────────────────────────────────────────────────
 
 export const effortApi = {
-  isMissingPhaseColumnError: (message: string): boolean => {
-    const msg = message.toLowerCase();
-    return msg.includes('phase') && (msg.includes('column') || msg.includes('schema cache') || msg.includes('does not exist'));
-  },
-
   getByProject: async (pid?: string): Promise<{ data: Effort[] }> => {
     let q = supabase.from('efforts').select('*, effort_monthly(*)');
     if (pid) q = q.eq('project_id', pid);
@@ -931,7 +926,7 @@ export const effortApi = {
       .select()
       .single();
 
-    if (error && row.phase !== undefined && effortApi.isMissingPhaseColumnError(error.message)) {
+    if (error && row.phase !== undefined) {
       delete row.phase;
       const retry = await supabase
         .from('efforts')
@@ -959,7 +954,7 @@ export const effortApi = {
       .select()
       .single();
 
-    if (error && row.phase !== undefined && effortApi.isMissingPhaseColumnError(error.message)) {
+    if (error && row.phase !== undefined) {
       delete row.phase;
       const retry = await supabase
         .from('efforts')
