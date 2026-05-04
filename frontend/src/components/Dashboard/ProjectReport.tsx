@@ -132,9 +132,33 @@ export default function ProjectReport({ project }: Props) {
   const userName = profile?.fullName ?? profile?.email ?? '';
 
   return (
-    <div style={{ padding: 24, background: '#F1F5F9', fontFamily: 'Poppins,sans-serif', minHeight: '100%' }}>
+    <div className="exec-report-wrapper" style={{ padding: 16, background: '#F1F5F9', fontFamily: 'Inter,Arial,Helvetica,sans-serif', minHeight: '100%' }}>
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 5mm; }
+          body > * { display: none !important; }
+          .exec-report-wrapper {
+            display: block !important;
+            position: fixed !important;
+            top: 0; left: 0;
+            width: 100% !important;
+            padding: 0 !important;
+            background: #fff !important;
+          }
+          .exec-report-toolbar { display: none !important; }
+          .exec-report {
+            transform: scale(0.66);
+            transform-origin: top left;
+            width: 151% !important;
+            max-width: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+          }
+        }
+      `}</style>
       {/* Toolbar */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 14 }}>
+      <div className="exec-report-toolbar" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 14 }}>
         <button onClick={printPage} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: C.primary, border: 'none', borderRadius: 8, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}>
           <Printer size={14} /> Print / PDF
         </button>
@@ -144,11 +168,11 @@ export default function ProjectReport({ project }: Props) {
       </div>
 
       {/* โ”€โ”€ Report Page โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€ */}
-      <div className="exec-report" style={{ background: '#fff', borderRadius: 16, boxShadow: '0 4px 32px rgba(0,0,0,0.08)', overflow: 'hidden', maxWidth: 900, margin: '0 auto' }}>
+      <div className="exec-report" style={{ background: '#fff', borderRadius: 16, boxShadow: '0 4px 32px rgba(0,0,0,0.08)', overflow: 'hidden', width: '100%' }}>
 
         {/* โ”€โ”€ Top header bar โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€ */}
         <div style={{ background: '#1E293B', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 9, fontWeight: 600, color: '#94A3B8', letterSpacing: 1.5, textTransform: 'uppercase' }}>Executive Report โ€” One Page</span>
+          <span style={{ fontSize: 9, fontWeight: 600, color: '#94A3B8', letterSpacing: 1.5, textTransform: 'uppercase' }}>EXECUTIVE REPORT - ONE PAGE</span>
           <span style={{ fontSize: 9, color: '#94A3B8' }}>{reportDate}</span>
         </div>
 
@@ -161,9 +185,9 @@ export default function ProjectReport({ project }: Props) {
             <div style={{ display: 'flex', gap: 16, marginTop: 5, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 10, color: '#64748B' }}>HPO{project.code}-201</span>
               <span style={{ fontSize: 10, color: '#64748B' }}>{project.client}</span>
-              <span style={{ fontSize: 10, color: '#64748B' }}>{fmtDate(project.startDate)} โ€“ {fmtDate(project.endDate)}</span>
+              <span style={{ fontSize: 10, color: '#64748B' }}>{fmtDate(project.startDate)} to {fmtDate(project.endDate)}</span>
               <span style={{ fontSize: 10, fontWeight: 700, color: onTrack ? '#16A34A' : '#DC2626', background: onTrack ? '#F0FDF4' : '#FFF1F2', padding: '2px 10px', borderRadius: 99 }}>
-                {onTrack ? 'โ— On Track' : 'โ— Behind'}
+                {onTrack ? '+ On Track' : '! Behind'}
               </span>
               <Pill label={statusLabel} bg={statusBg} color={statusColor} />
             </div>
@@ -180,7 +204,7 @@ export default function ProjectReport({ project }: Props) {
           <div style={{ padding: '12px 18px', borderRight: '1px solid #F1F5F9' }}>
             <div style={{ fontSize: 9, color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Overall Progress</div>
             <div style={{ fontSize: 32, fontWeight: 900, color: C.primary, lineHeight: 1 }}>{prog}%</div>
-            <div style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>{done} done ยท {inP} in progress {inP > 0 ? 'โ‘' : ''}</div>
+            <div style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>{done} done / {inP} in progress</div>
             <Bar value={prog} color={C.primary} height={5} />
             <div style={{ fontSize: 9, color: onTrack ? '#16A34A' : '#DC2626', marginTop: 4, fontWeight: 600 }}>
               {onTrack ? `Ahead of target (${prog - dayPct}%)` : `Behind target (${dayPct - prog}%)`}
@@ -191,7 +215,7 @@ export default function ProjectReport({ project }: Props) {
           <div style={{ padding: '12px 18px', borderRight: '1px solid #F1F5F9' }}>
             <div style={{ fontSize: 9, color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Payment</div>
             <div style={{ fontSize: 32, fontWeight: 900, color: '#16A34A', lineHeight: 1 }}>{payPct}%</div>
-            <div style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>{money(collected)} THB collected ยท {ms.length} milestones</div>
+            <div style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>{money(collected)} THB collected / {ms.length} milestones</div>
             <Bar value={payPct} color="#16A34A" height={5} />
           </div>
 
@@ -199,7 +223,7 @@ export default function ProjectReport({ project }: Props) {
           <div style={{ padding: '12px 18px', borderRight: '1px solid #F1F5F9' }}>
             <div style={{ fontSize: 9, color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Manday Used</div>
             <div style={{ fontSize: 32, fontWeight: 900, color: efPct > 90 ? '#DC2626' : '#F59E0B', lineHeight: 1 }}>{tUsedMD}<span style={{ fontSize: 14, fontWeight: 600, color: '#94A3B8' }}>/{tBudMD}</span></div>
-            <div style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>{efPct}% utilized ยท {mb.filter(m => m.type === 'internal').length} team members</div>
+            <div style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>{efPct}% utilized / {mb.filter(m => m.type === 'internal').length} members</div>
             <Bar value={efPct} color={efPct > 90 ? '#DC2626' : '#F59E0B'} height={5} />
           </div>
 
@@ -207,7 +231,7 @@ export default function ProjectReport({ project }: Props) {
           <div style={{ padding: '12px 18px' }}>
             <div style={{ fontSize: 9, color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Issues / Risks</div>
             <div style={{ fontSize: 32, fontWeight: 900, color: openIss > 0 ? '#DC2626' : '#16A34A', lineHeight: 1 }}>{openIss} <span style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8' }}>issues</span></div>
-            <div style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>{openRks} risks ยท {rks.filter(r => r.status === 'Monitoring').length > 0 ? 'all monitoring' : 'under control'}</div>
+            <div style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>{openRks} risks / {rks.filter(r => r.status === 'Monitoring').length > 0 ? 'monitoring' : 'under control'}</div>
             <Bar value={openIss > 0 ? 100 : 0} color="#DC2626" height={5} />
           </div>
         </div>
@@ -216,7 +240,7 @@ export default function ProjectReport({ project }: Props) {
         <div style={{ padding: '10px 20px', borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ fontSize: 9, color: '#64748B' }}>Project Timeline</span>
-            <span style={{ fontSize: 9, fontWeight: 700, color: C.primary }}>Day {elapsedDays} of {totalDays} ยท {dayPct}% elapsed</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: C.primary }}>Day {elapsedDays} of {totalDays} / {dayPct}% elapsed</span>
           </div>
           <div style={{ position: 'relative', height: 8 }}>
             <div style={{ background: '#E2E8F0', borderRadius: 99, height: 8, overflow: 'hidden' }}>
@@ -225,9 +249,9 @@ export default function ProjectReport({ project }: Props) {
             <div style={{ position: 'absolute', left: `${dayPct}%`, top: -3, transform: 'translateX(-50%)', width: 14, height: 14, borderRadius: '50%', background: C.primary, border: '2px solid #fff', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-            <span style={{ fontSize: 8, color: '#94A3B8' }}>{fmtDate(project.startDate)} ยท Start</span>
-            <span style={{ fontSize: 8, color: C.primary, fontWeight: 600 }}>โ–ฒ Today ยท {now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-            <span style={{ fontSize: 8, color: '#94A3B8' }}>{fmtDate(project.endDate)} ยท End</span>
+            <span style={{ fontSize: 8, color: '#94A3B8' }}>Start: {fmtDate(project.startDate)}</span>
+            <span style={{ fontSize: 8, color: C.primary, fontWeight: 600 }}>Today: {now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+            <span style={{ fontSize: 8, color: '#94A3B8' }}>End: {fmtDate(project.endDate)}</span>
           </div>
         </div>
 
@@ -254,8 +278,8 @@ export default function ProjectReport({ project }: Props) {
                     <tr key={t.id} style={{ borderBottom: '1px solid #F8FAFC' }}>
                       <td style={{ padding: '5px 6px 5px 0', color: '#94A3B8' }}>{i + 1}</td>
                       <td style={{ padding: '5px 6px', fontWeight: 500, color: isOverdue ? '#DC2626' : '#0F172A' }}>{t.taskName}</td>
-                      <td style={{ padding: '5px 6px', textAlign: 'center', color: '#64748B' }}>{t.startDate ? t.startDate.slice(5).replace('-', '/') : 'โ€”'}</td>
-                      <td style={{ padding: '5px 6px', textAlign: 'center', color: isOverdue ? '#DC2626' : '#64748B', fontWeight: isOverdue ? 700 : 400 }}>{t.endDate ? t.endDate.slice(5).replace('-', '/') : 'โ€”'}</td>
+                      <td style={{ padding: '5px 6px', textAlign: 'center', color: '#64748B' }}>{t.startDate ? t.startDate.slice(5).replace('-', '/') : '-'}</td>
+                      <td style={{ padding: '5px 6px', textAlign: 'center', color: isOverdue ? '#DC2626' : '#64748B', fontWeight: isOverdue ? 700 : 400 }}>{t.endDate ? t.endDate.slice(5).replace('-', '/') : '-'}</td>
                       <td style={{ padding: '5px 0', textAlign: 'right' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end' }}>
                           <div style={{ width: 60, background: '#E2E8F0', borderRadius: 99, height: 5, overflow: 'hidden' }}>
@@ -282,8 +306,8 @@ export default function ProjectReport({ project }: Props) {
                   <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid #F8FAFC' }}>
                     <Pill label={m.phase || 'Phase'} bg={C.primaryBg} color={C.primary} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 8, fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
-                      <div style={{ fontSize: 8, color: '#94A3B8' }}>Due {fmtDate(m.dueDate) || 'TBD'}</div>
+                      <div style={{ fontSize: 8, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
+                      <div style={{ fontSize: 8, color: '#94A3B8' }}>Due: {fmtDate(m.dueDate) || 'TBD'}</div>
                     </div>
                     <div style={{ textAlign: 'right', minWidth: 60 }}>
                       <div style={{ fontSize: 9, fontWeight: 700, color: '#0F172A' }}>{money(m.amount)}</div>
@@ -311,7 +335,7 @@ export default function ProjectReport({ project }: Props) {
                   <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '5px 0', borderBottom: '1px solid #F8FAFC' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 9, fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</div>
-                      <div style={{ fontSize: 8, color: '#94A3B8' }}>P:{r.probability} ยท I:{r.impact} ยท {r.owner || 'โ€”'}</div>
+                      <div style={{ fontSize: 8, color: '#94A3B8' }}>P:{r.probability} / I:{r.impact} / {r.owner || '-'}</div>
                     </div>
                     <Pill label={r.impact.toUpperCase()} bg={impactBg} color={impactColor} />
                   </div>
@@ -329,7 +353,7 @@ export default function ProjectReport({ project }: Props) {
               <div key={ep.phase} style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                   <Pill label={ep.phase ?? ''} bg={C.primaryBg} color={C.primary} />
-                  <span style={{ fontSize: 8, color: '#64748B' }}>Total {ep.budMD} MD ยท Used <b style={{ color: '#F59E0B' }}>{ep.usedMD}.0</b> ยท Remain <b style={{ color: ep.remaining < 0 ? '#DC2626' : '#16A34A' }}>{ep.remaining}.0</b></span>
+                  <span style={{ fontSize: 8, color: '#64748B' }}>Total {ep.budMD} / Used <b style={{ color: '#F59E0B' }}>{ep.usedMD}</b> / Remain <b style={{ color: ep.remaining < 0 ? '#DC2626' : '#16A34A' }}>{ep.remaining}</b></span>
                 </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8 }}>
                   <thead>
@@ -356,7 +380,7 @@ export default function ProjectReport({ project }: Props) {
                               <span style={{ fontWeight: 700, color: mo.usage > 0 ? '#F59E0B' : '#CBD5E1' }}>{mo.usage}</span>
                             </span>
                           </td>
-                          <td style={{ padding: '3px 4px', textAlign: 'right', color: mo.usage > 0 ? '#0F172A' : '#CBD5E1', fontWeight: mo.usage > 0 ? 700 : 400 }}>{mo.usage > 0 ? mo.usage.toFixed(1) : 'โ€”'}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', color: mo.usage > 0 ? '#0F172A' : '#CBD5E1', fontWeight: mo.usage > 0 ? 700 : 400 }}>{mo.usage > 0 ? mo.usage.toFixed(1) : '-'}</td>
                           <td style={{ padding: '3px 4px', textAlign: 'right', color: '#64748B' }}>{accum.toFixed(1)}</td>
                           <td style={{ padding: '3px 4px', textAlign: 'right', color: remain < 0 ? '#DC2626' : '#16A34A', fontWeight: 600 }}>{remain.toFixed(1)}</td>
                         </tr>
@@ -380,7 +404,7 @@ export default function ProjectReport({ project }: Props) {
 
             {/* Health indicator */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: onTrack ? '#F0FDF4' : '#FFF1F2', borderRadius: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 16 }}>{onTrack ? 'โ…' : 'โ ๏ธ'}</span>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: onTrack ? '#16A34A' : '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 900, flexShrink: 0 }}>{onTrack ? '+' : '!'}</div>
               <div>
                 <div style={{ fontSize: 9, fontWeight: 700, color: onTrack ? '#16A34A' : '#DC2626' }}>Project Health: {onTrack ? 'On Track' : 'Behind Schedule'}</div>
                 <div style={{ fontSize: 8, color: '#64748B' }}>Progress {prog}% {onTrack ? 'exceeds' : 'below'} target {dayPct}%</div>
@@ -422,8 +446,8 @@ export default function ProjectReport({ project }: Props) {
 
         {/* โ”€โ”€ Footer โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€ */}
         <div style={{ padding: '8px 20px', background: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 8, color: '#94A3B8' }}>{project.name} ({project.code}) ยท HPO{project.code}-201 ยท Confidential Executive Report</span>
-          <span style={{ fontSize: 8, color: '#94A3B8' }}>Tasks: {pt.length} ยท Members: {mb.length} ยท Milestones: {ms.length} ยท Risks: {rks.length} ยท {onTrack ? 'โ— On Track' : 'โ— Behind'}</span>
+          <span style={{ fontSize: 8, color: '#94A3B8' }}>{project.name} ({project.code}) - HPO{project.code}-201 - Confidential Executive Report</span>
+          <span style={{ fontSize: 8, color: '#94A3B8' }}>Tasks: {pt.length} / Members: {mb.length} / Milestones: {ms.length} / Risks: {rks.length} / {onTrack ? 'On Track' : 'Behind'}</span>
         </div>
       </div>
     </div>
