@@ -1308,7 +1308,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
   const dur = calcDuration(String(form.startDate || ''), String(form.endDate || ''));
   return (
-    <Modal title="New Task" onClose={onClose} width={480}>
+    <Modal title="New Task" onClose={onClose} width={980}>
       <FormRow label="Task Name" required>
         <input autoFocus value={form.taskName??''} onChange={e=>up('taskName',e.target.value)} placeholder="Enter task name"
           style={{ fontFamily:'Poppins, sans-serif', fontSize:13, padding:'8px 12px', border:`1.5px solid ${C.border}`, borderRadius:8, outline:'none', width:'100%', boxSizing:'border-box' }}
@@ -1354,12 +1354,11 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
           Anchor: {selectedTask ? `${selectedTask.wbs} ${selectedTask.taskName}` : 'No selected task'}
         </div>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:12 }}>
         <FormRow label="Start Date"><Input type="date" value={form.startDate ?? ''} onChange={v => up('startDate', v)} /></FormRow>
         <FormRow label="End Date"><Input type="date" value={form.endDate ?? ''} onChange={v => up('endDate', v)} /></FormRow>
-      </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8 }}>
         <FormRow label="Actual Finish Date"><Input type="date" value={form.actualFinish ?? ''} onChange={v => up('actualFinish', v)} /></FormRow>
+
         <FormRow label="Effort Manday">
           {insertType === 'main' ? (
             <input
@@ -1380,33 +1379,34 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
             />
           )}
         </FormRow>
+
+        <FormRow label="Resource">
+          <>
+            <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
+              list="task-resource-options"
+              style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+              onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
+            <datalist id="task-resource-options">
+              {members.filter(m => m.projectId === activeProject?.id).map((member) => {
+                const displayName = formatNameWithLastInitial(member.name || member.nickname || '');
+                return <option key={member.id} value={displayName} />;
+              })}
+            </datalist>
+          </>
+        </FormRow>
+
+        <FormRow label="Parent Task">
+          <Select value={form.parentId??''} onChange={v=>up('parentId',v)} options={[{value:'',label:'— None —'},...sortedTasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+        </FormRow>
+
+        <FormRow label="Predecessor (FS)">
+          <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)} options={[{value:'',label:'— None —'},...sortedTasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+        </FormRow>
       </div>
       <div style={{ fontSize: 11, color: C.text3, marginTop: -4, marginBottom: 8 }}>
         {insertType === 'main' ? 'Main task effort is auto-calculated and locked (0 when no child).' : `Use increments of ${EFFORT_STEP} MD`}
       </div>
       {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
-      <FormRow label="Resource">
-        <>
-          <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
-            list="task-resource-options"
-            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
-            onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
-          <datalist id="task-resource-options">
-            {members.filter(m => m.projectId === activeProject?.id).map((member) => {
-              const displayName = formatNameWithLastInitial(member.name || member.nickname || '');
-              return <option key={member.id} value={displayName} />;
-            })}
-          </datalist>
-        </>
-      </FormRow>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <FormRow label="Parent Task">
-          <Select value={form.parentId??''} onChange={v=>up('parentId',v)} options={[{value:'',label:'— None —'},...sortedTasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
-        </FormRow>
-        <FormRow label="Predecessor (FS)">
-          <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)} options={[{value:'',label:'— None —'},...sortedTasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
-        </FormRow>
-      </div>
       <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={()=>{
@@ -1495,7 +1495,7 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
   const dur = calcDuration(String(form.startDate || ''), String(form.endDate || ''));
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
   return (
-    <Modal title="Edit Task" onClose={onClose} width={520}>
+    <Modal title="Edit Task" onClose={onClose} width={980}>
       <FormRow label="Task Name" required>
         <input autoFocus value={form.taskName??''} onChange={e=>up('taskName',e.target.value)}
           style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
@@ -1505,64 +1505,67 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
         <Select value={String(form.phase || phaseOptions[0]?.value)} onChange={v => up('phase', v)}
           options={phaseDropdownOptions.map((p) => ({ value: p.value, label: p.label }))} />
       </FormRow>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:12 }}>
         <FormRow label="Start Date"><Input type="date" value={form.startDate ?? ''} onChange={v => up('startDate', v)} /></FormRow>
         <FormRow label="End Date"><Input type="date" value={form.endDate ?? ''} onChange={v => up('endDate', v)} /></FormRow>
-      </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <FormRow label="Actual Finish Date">
           <Input type="date" value={form.actualFinish ?? ''} onChange={v => up('actualFinish', v)} />
         </FormRow>
+
         <FormRow label="% Complete">
           <input type="number" min={0} max={100} value={form.percentComplete??0} onChange={e=>up('percentComplete',Math.min(100,Math.max(0,Number(e.target.value))))}
             style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/>
         </FormRow>
+
+        <FormRow label="Effort Manday">
+          {canEditEffort ? (
+            <input
+              type="number"
+              min={0}
+              step={EFFORT_STEP}
+              value={Number(form.effortManday ?? 0)}
+              onChange={e => up('effortManday', e.target.value)}
+              placeholder="0"
+              style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+            />
+          ) : (
+            <input
+              type="number"
+              value={Number(task.effortManday || 0)}
+              disabled
+              style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',opacity:0.6,background:C.bg }}
+            />
+          )}
+        </FormRow>
+
+        <FormRow label="Resource">
+          <>
+            <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
+              list="task-resource-options"
+              style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+              onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
+            <datalist id="task-resource-options">
+              {members.filter(m => m.projectId === activeProject?.id).map((member) => {
+                const displayName = formatNameWithLastInitial(member.name || member.nickname || '');
+                return <option key={member.id} value={displayName} />;
+              })}
+            </datalist>
+          </>
+        </FormRow>
+
+        <FormRow label="Parent Task (change to restructure)">
+          <Select value={form.parentId??''} onChange={v=>up('parentId',v)}
+            options={[{value:'',label:'— None (Root) —'},...sortedTasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+        </FormRow>
+
+        <FormRow label="Predecessor (FS)">
+          <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)}
+            options={[{value:'',label:'— None —'},...sortedTasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+        </FormRow>
       </div>
-      <FormRow label="Effort Manday">
-        {canEditEffort ? (
-          <input
-            type="number"
-            min={0}
-            step={EFFORT_STEP}
-            value={Number(form.effortManday ?? 0)}
-            onChange={e => up('effortManday', e.target.value)}
-            placeholder="0"
-            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
-          />
-        ) : (
-          <input
-            type="number"
-            value={Number(task.effortManday || 0)}
-            disabled
-            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',opacity:0.6,background:C.bg }}
-          />
-        )}
-      </FormRow>
       <div style={{ fontSize: 11, color: C.text3, marginTop: -4, marginBottom: 8 }}>
         {canEditEffort ? `Use increments of ${EFFORT_STEP} MD` : 'Parent/main task effort is auto-calculated and cannot be edited.'}
       </div>
-      <FormRow label="Resource">
-        <>
-          <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
-            list="task-resource-options"
-            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
-            onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
-          <datalist id="task-resource-options">
-            {members.filter(m => m.projectId === activeProject?.id).map((member) => {
-              const displayName = formatNameWithLastInitial(member.name || member.nickname || '');
-              return <option key={member.id} value={displayName} />;
-            })}
-          </datalist>
-        </>
-      </FormRow>
-      <FormRow label="Parent Task (change to restructure)">
-        <Select value={form.parentId??''} onChange={v=>up('parentId',v)}
-          options={[{value:'',label:'— None (Root) —'},...sortedTasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
-      </FormRow>
-      <FormRow label="Predecessor (FS)">
-        <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)}
-          options={[{value:'',label:'— None —'},...sortedTasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
-      </FormRow>
 
       <FormRow label="Quick Insert">
         <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
