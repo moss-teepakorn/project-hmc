@@ -350,9 +350,13 @@ export const taskApi = {
     if (error) throw new Error(error.message);
     const tasks = rowsToObjs<Task>(data || []);
     const normalized = tasks.map((task) => {
-      if (!task.startDate || !task.endDate) return task;
+      const normalizedEffort = normalizeEffortManday((task as any).effortManday);
+      const withEffort = normalizedEffort !== Number((task as any).effortManday || 0)
+        ? { ...task, effortManday: normalizedEffort }
+        : { ...task, effortManday: Number((task as any).effortManday || 0) };
+      if (!task.startDate || !task.endDate) return withEffort;
       const calculated = calcDurationFromDates(task);
-      return task.duration !== calculated ? { ...task, duration: calculated } : task;
+      return withEffort.duration !== calculated ? { ...withEffort, duration: calculated } : withEffort;
     });
     const mismatches = normalized.filter((task, index) => task.duration !== tasks[index].duration);
     if (mismatches.length > 0) {
@@ -365,6 +369,10 @@ export const taskApi = {
 
   create: async (t: Partial<Task>): Promise<{ data: Task; allTasks: Task[] }> => {
     const row = objToRow(t as Record<string, unknown>);
+        if (row.effort_manday !== undefined) {
+          row.effort_manday = normalizeEffortManday(row.effort_manday);
+        }
+
     delete row.id;
     delete row.created_at;
 
@@ -427,6 +435,10 @@ export const taskApi = {
 
   update: async (id: string, t: Partial<Task>): Promise<{ data: Task; allTasks: Task[] }> => {
     const row = objToRow(t as Record<string, unknown>);
+        if (row.effort_manday !== undefined) {
+          row.effort_manday = normalizeEffortManday(row.effort_manday);
+        }
+
     delete row.id;
     delete row.created_at;
     // permission: must have write access to project
@@ -649,6 +661,7 @@ async function persistTaskChanges(origTasks: Task[], newTasks: Task[]): Promise<
     if (orig.percentComplete !== t.percentComplete) updates.percent_complete = t.percentComplete;
     if (orig.startDate !== t.startDate) updates.start_date = t.startDate;
     if (orig.endDate !== t.endDate) updates.end_date = t.endDate;
+    if (Number(orig.effortManday || 0) !== Number(t.effortManday || 0)) updates.effort_manday = normalizeEffortManday(t.effortManday);
     const calculatedDuration = calcDurationFromDates(t);
     if (t.startDate && t.endDate && orig.duration !== calculatedDuration) updates.duration = calculatedDuration;
     if ((orig.actualFinish || '') !== (t.actualFinish || '')) updates.actual_finish = t.actualFinish || '';
@@ -712,7 +725,13 @@ function recalcParents(tasks: Task[]): Task[] {
       const parent = result.find((t) => t.id === pid);
       if (!parent) continue;
       const children = result.filter((t) => t.parentId === pid);
-      if (children.length === 0) continue;
+      if (children.length === 0) {
+        if (!parent.parentId && Number(parent.effortManday || 0) !== 0) {
+          parent.effortManday = 0;
+          changed = true;
+        }
+        continue;
+      }
 
       // Recalc percent complete (weighted by duration)
       const totalDuration = children.reduce((s, c) => s + (c.duration || 1), 0);
@@ -721,6 +740,13 @@ function recalcParents(tasks: Task[]): Task[] {
       const newPct = allChildrenComplete ? 100 : (totalDuration > 0 ? Math.round(weighted / totalDuration) : 0);
       if (parent.percentComplete !== newPct) {
         parent.percentComplete = newPct;
+        changed = true;
+      }
+
+      // Recalc parent effort manday as sum of direct children.
+      const summedEffort = normalizeEffortManday(children.reduce((s, c) => s + Number(c.effortManday || 0), 0));
+      if (Number(parent.effortManday || 0) !== summedEffort) {
+        parent.effortManday = summedEffort;
         changed = true;
       }
 
@@ -759,6 +785,14 @@ function recalcParents(tasks: Task[]): Task[] {
     }
   }
   return result;
+}
+
+function normalizeEffortManday(value: unknown): number {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const step = 0.025;
+  const rounded = Math.round(n / step) * step;
+  return Number(rounded.toFixed(3));
 }
 
 function calcDurationFromDates(task: Task): number {

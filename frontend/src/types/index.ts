@@ -55,6 +55,7 @@ export interface Task {
   projectId: string;
   wbs: string;
   taskName: string;
+  effortManday: number;
   startDate: string;
   endDate: string;
   actualFinish: string;   // ← new: actual finish date

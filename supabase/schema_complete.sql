@@ -170,6 +170,7 @@ create table if not exists public.tasks (
   wbs              text not null default '',
   task_name        text not null default '',
   phase            varchar(100) not null default '',
+  effort_manday    numeric(12,3) not null default 0,
   start_date       text not null default '',
   end_date         text not null default '',
   actual_finish    text not null default '',

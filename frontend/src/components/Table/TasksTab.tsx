@@ -25,10 +25,12 @@ const COLS = [
   { label: 'Actual Finish', w: 120 },
   { label: 'Days',          w: 46  },
   { label: '% Done',        w: 120 },
+  { label: 'Effort (MD)',   w: 94  },
   { label: 'Resource',      w: 160 },
   { label: '',              w: 76  },
 ];
-const TABLE_FIXED_W = 52 + 94 + 94 + 120 + 46 + 120 + 160 + 76;
+const TABLE_FIXED_W = 52 + 94 + 94 + 120 + 46 + 120 + 94 + 160 + 76;
+const EFFORT_STEP = 0.025;
 
 const PHASE_OPTIONS = [
   'Project Initiation',
@@ -62,6 +64,7 @@ interface NewTaskInsert {
   action: InsertAction;
   order: number;
   taskName: string;
+  effortManday: number;
   startDate: string;
   endDate: string;
   actualFinish: string;
@@ -84,6 +87,11 @@ function getTaskStatus(task: Task): TaskStatus {
   if (task.percentComplete === 0) return 'Todo';
   if (task.percentComplete === 100) return 'Done';
   return 'In Progress';
+}
+
+function roundEffortManday(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Number((Math.round(value / EFFORT_STEP) * EFFORT_STEP).toFixed(3));
 }
 
 // Inline % editor
@@ -294,6 +302,7 @@ export default function TasksTab({ projectId }: Props) {
       action,
       order,
       taskName: '',
+      effortManday: 0,
       startDate: todayIso,
       endDate: nextWeekIso,
       actualFinish: '',
@@ -319,6 +328,7 @@ export default function TasksTab({ projectId }: Props) {
         parentId: newTaskInsert.parentId,
         order: newTaskInsert.order,
         taskName: newTaskInsert.taskName,
+        effortManday: roundEffortManday(newTaskInsert.effortManday),
         startDate: newTaskInsert.startDate,
         endDate: newTaskInsert.endDate,
         actualFinish: newTaskInsert.actualFinish,
@@ -522,10 +532,10 @@ export default function TasksTab({ projectId }: Props) {
   // ── XLSX export ──────────────────────────────────────────────────────────
   const exportXLSX = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['WBS','Task Name','Start','Finish','Actual Finish','Days','% Done','Resource'],
-      ...projectTasks.map(t => [t.wbs, t.taskName, t.startDate, t.endDate, t.actualFinish || '', t.duration, t.percentComplete, t.resource]),
+      ['WBS','Task Name','Start','Finish','Actual Finish','Days','% Done','Effort (MD)','Resource'],
+      ...projectTasks.map(t => [t.wbs, t.taskName, t.startDate, t.endDate, t.actualFinish || '', t.duration, t.percentComplete, Number(t.effortManday || 0), t.resource]),
     ]);
-    ws['!cols'] = [{wch:8},{wch:35},{wch:14},{wch:14},{wch:14},{wch:8},{wch:10},{wch:20}];
+    ws['!cols'] = [{wch:8},{wch:35},{wch:14},{wch:14},{wch:14},{wch:8},{wch:10},{wch:12},{wch:20}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
     XLSX.writeFile(wb, `tasks-${projectId}.xlsx`);
@@ -551,7 +561,7 @@ export default function TasksTab({ projectId }: Props) {
     doc.setTextColor(0);
 
     const startY = 22;
-    const tableW = 168; // include resource column
+    const tableW = 180; // include effort + resource columns
     const ganttX = tableW + 12; // start of gantt area
     const ganttW = W - ganttX - 6;
     const baseRowH = 5.2; // mm per row (minimum)
@@ -609,8 +619,9 @@ export default function TasksTab({ projectId }: Props) {
         { label: 'Start', x: 102 },
         { label: 'Finish',x: 117 },
         { label: 'Days',  x: 132 },
-        { label: '%',     x: 142 },
-        { label: 'Resource', x: 150 },
+        { label: '%',     x: 141 },
+        { label: 'Eff',   x: 149 },
+        { label: 'Resource', x: 158 },
       ];
       cols.forEach(c => doc.text(c.label, c.x, startY + 5));
 
@@ -670,12 +681,15 @@ export default function TasksTab({ projectId }: Props) {
         const pct = task.percentComplete;
         const [pr,pg,pb] = pct >= 100 ? [16,185,129] : pct >= 60 ? [59,130,246] : [79,70,229];
         doc.setFont('helvetica','bold'); doc.setTextColor(pr,pg,pb); doc.setFontSize(5.2);
-        doc.text(`${pct}%`, 142, ym);
+        doc.text(`${pct}%`, 141, ym);
+
+        doc.setFont('helvetica','normal'); doc.setTextColor(80); doc.setFontSize(5.0);
+        doc.text(`${Number(task.effortManday || 0).toFixed(3)}`, 149, ym);
 
         doc.setFont('helvetica','normal'); doc.setTextColor(80); doc.setFontSize(5.0);
         const resourceText = String(task.resource || '-');
-        const resourceOneLine = doc.splitTextToSize(resourceText, 14)[0] || '-';
-        doc.text(resourceOneLine, 150, ym);
+        const resourceOneLine = doc.splitTextToSize(resourceText, 13)[0] || '-';
+        doc.text(resourceOneLine, 158, ym);
 
         // Gantt bar
         doc.setDrawColor(226,232,240); doc.setLineWidth(0.1);
@@ -761,11 +775,13 @@ export default function TasksTab({ projectId }: Props) {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: C.text2 }}>
                     <span>{task.resource || 'No owner'}</span>
                     <span>{task.startDate ? isoToDmy(task.startDate) : 'TBD'} — {task.endDate ? isoToDmy(task.endDate) : 'TBD'}</span>
+                    <span>{Number(task.effortManday || 0).toFixed(3)} MD</span>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: C.text2 }}>
                     <span>Resource: {task.resource || '—'}</span>
                     <span>Level: {task.level ?? 0}</span>
+                    <span>Effort: {Number(task.effortManday || 0).toFixed(3)} MD</span>
                   </div>
                 )}
               </div>
@@ -839,6 +855,7 @@ export default function TasksTab({ projectId }: Props) {
                 const isSel = selected === task.id;
                 const rowTask = task as Task;
                 const newRow = task as NewTaskInsert;
+                const canEditEffort = isNew ? !!newRow.parentId : (!isPar && !!rowTask.parentId);
                 const level = isNew ? newRow.level : rowTask.level ?? 0;
                 const durationDays = isNew ? calcDuration(newRow.startDate, newRow.endDate) : rowTask.duration;
                 return (
@@ -919,7 +936,32 @@ export default function TasksTab({ projectId }: Props) {
                         <PctCell value={rowTask.percentComplete} isParent={isPar} onSave={(n) => handlePct(rowTask.id, n)} />
                       )}
                     </div>
-                    <div style={{ width:colWidths[7], minWidth:colWidths[7], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+                    <div style={{ width:colWidths[7], minWidth:colWidths[7], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>
+                      {isNew ? (
+                        <EditableCell
+                          value={String(newRow.effortManday || 0)}
+                          placeholder="0"
+                          onSave={(v) => {
+                            const next = roundEffortManday(Number(v) || 0);
+                            setNewTaskInsert((prev) => prev ? { ...prev, effortManday: next } : prev);
+                          }}
+                          style={{ color: canEditEffort ? C.text : C.text3 }}
+                        />
+                      ) : (
+                        canEditEffort ? (
+                          <EditableCell
+                            value={String(Number(rowTask.effortManday || 0))}
+                            placeholder="0"
+                            onSave={(v) => handleUpdate(rowTask.id, { effortManday: roundEffortManday(Number(v) || 0) })}
+                          />
+                        ) : (
+                          <span title="Auto-calculated from child tasks" style={{ color: C.text3, fontWeight: 600 }}>
+                            {Number(rowTask.effortManday || 0).toFixed(3)}
+                          </span>
+                        )
+                      )}
+                    </div>
+                    <div style={{ width:colWidths[8], minWidth:colWidths[8], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
                       {!isNew && rowTask.resource && <Avatar name={rowTask.resource} size={20} />}
                       <EditableCell
                         value={isNew ? newRow.resource : rowTask.resource}
@@ -930,7 +972,7 @@ export default function TasksTab({ projectId }: Props) {
                         placeholder="Assign..."
                       />
                     </div>
-                    <div style={{ width:colWidths[8], minWidth:colWidths[8], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
+                    <div style={{ width:colWidths[9], minWidth:colWidths[9], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
                       {isNew ? (
                         <>
                           <button onClick={e => { e.stopPropagation(); saveNewTask(); }}
@@ -1014,6 +1056,7 @@ export default function TasksTab({ projectId }: Props) {
                           <span>{task.wbs || '—'}</span>
                           <span>{task.duration}d</span>
                           <span>{task.percentComplete}%</span>
+                          <span>{Number(task.effortManday || 0).toFixed(3)} MD</span>
                         </div>
                       )}
                       {isExpanded && (
@@ -1239,6 +1282,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
   const nextWeekIso = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
   const [form, setForm] = useState<Partial<Task>>({
     taskName:'',
+    effortManday: 0,
     startDate: todayIso,
     endDate: nextWeekIso,
     resource:'',
@@ -1316,7 +1360,29 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8 }}>
         <FormRow label="Actual Finish Date"><Input type="date" value={form.actualFinish ?? ''} onChange={v => up('actualFinish', v)} /></FormRow>
-        <div />
+        <FormRow label="Effort Manday">
+          {insertType === 'main' ? (
+            <input
+              type="number"
+              value={0}
+              disabled
+              style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',opacity:0.6,background:C.bg }}
+            />
+          ) : (
+            <input
+              type="number"
+              min={0}
+              step={EFFORT_STEP}
+              value={Number(form.effortManday ?? 0)}
+              onChange={e => up('effortManday', e.target.value)}
+              placeholder="0"
+              style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+            />
+          )}
+        </FormRow>
+      </div>
+      <div style={{ fontSize: 11, color: C.text3, marginTop: -4, marginBottom: 8 }}>
+        {insertType === 'main' ? 'Main task effort is auto-calculated and locked (0 when no child).' : `Use increments of ${EFFORT_STEP} MD`}
       </div>
       {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
       <FormRow label="Resource">
@@ -1385,6 +1451,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
             ...form,
             parentId,
             order,
+            effortManday: insertType === 'main' ? 0 : roundEffortManday(Number(form.effortManday || 0)),
             startDate,
             endDate,
             duration: dur,
@@ -1403,6 +1470,8 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
 
 function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBefore, onInsertAfter }: { task:Task; tasks:Task[]; phaseOptions: PhaseOption[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void; onInsertBefore: () => void; onInsertAfter: () => void }) {
   const { members, activeProject } = useStore();
+  const isParentTask = hasChildren(tasks, task.id);
+  const canEditEffort = !isParentTask && !!task.parentId;
   const [form, setForm] = useState<Partial<Task>>({
     ...task,
     startDate: task.startDate ?? '',
@@ -1449,6 +1518,29 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
             style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/>
         </FormRow>
       </div>
+      <FormRow label="Effort Manday">
+        {canEditEffort ? (
+          <input
+            type="number"
+            min={0}
+            step={EFFORT_STEP}
+            value={Number(form.effortManday ?? 0)}
+            onChange={e => up('effortManday', e.target.value)}
+            placeholder="0"
+            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+          />
+        ) : (
+          <input
+            type="number"
+            value={Number(task.effortManday || 0)}
+            disabled
+            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',opacity:0.6,background:C.bg }}
+          />
+        )}
+      </FormRow>
+      <div style={{ fontSize: 11, color: C.text3, marginTop: -4, marginBottom: 8 }}>
+        {canEditEffort ? `Use increments of ${EFFORT_STEP} MD` : 'Parent/main task effort is auto-calculated and cannot be edited.'}
+      </div>
       <FormRow label="Resource">
         <>
           <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
@@ -1490,6 +1582,7 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
           if(!form.taskName?.trim()) return;
           onSave({
             ...form,
+            effortManday: canEditEffort ? roundEffortManday(Number(form.effortManday || 0)) : Number(task.effortManday || 0),
             startDate: String(form.startDate || ''),
             endDate: String(form.endDate || ''),
             actualFinish: String(form.actualFinish || ''),

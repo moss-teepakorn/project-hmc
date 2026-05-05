@@ -13,6 +13,7 @@ const PHASE_OPTIONS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
 export default function EffortTab({ projectId }: Props) {
   const { efforts, fetchEfforts, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
   const [modal, setModal]       = useState<Partial<Effort> | null>(null);
+  const [phaseSummaryOpen, setPhaseSummaryOpen] = useState(false);
   const [deleting, setDeleting] = useState<Effort | null>(null);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
@@ -154,7 +155,10 @@ export default function EffortTab({ projectId }: Props) {
       </Card>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
-        <Btn onClick={() => setModal({})} small style={{ width: isMobile ? '100%' : 'auto' }}><Plus size={14} /> Add Task</Btn>
+        <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto' }}>
+          <Btn variant="ghost" onClick={() => setPhaseSummaryOpen(true)} small style={{ width: isMobile ? '100%' : 'auto' }}>Phase Summary</Btn>
+          <Btn onClick={() => setModal({})} small style={{ width: isMobile ? '100%' : 'auto' }}><Plus size={14} /> Add Task</Btn>
+        </div>
       </div>
 
       {/* Effort grid */}
@@ -328,6 +332,25 @@ export default function EffortTab({ projectId }: Props) {
       )}
 
       {modal !== null && <EffortModal data={modal} phaseOptions={phaseOptions} isMobile={isMobile} onClose={() => setModal(null)} onSave={handleSave} />}
+      {phaseSummaryOpen && (
+        <Modal title="Planned Manday by Phase" onClose={() => setPhaseSummaryOpen(false)} width={420}>
+          {PHASE_OPTIONS.map((phase) => {
+            const planned = efforts
+              .filter((e) => phaseKey(e.phase) === phase)
+              .reduce((sum, e) => sum + Number(e.budgetManday || 0), 0);
+            return (
+              <div key={phase} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{phase}</span>
+                <span style={{ fontSize: 13, color: C.primary, fontWeight: 700 }}>{planned} MD</span>
+              </div>
+            );
+          })}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 8, borderTop: `2px solid ${C.border2}` }}>
+            <span style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>TOTAL</span>
+            <span style={{ fontSize: 14, color: C.primary, fontWeight: 800 }}>{efforts.reduce((sum, e) => sum + Number(e.budgetManday || 0), 0)} MD</span>
+          </div>
+        </Modal>
+      )}
       {deleting && <ConfirmModal message={`Delete task "${deleting.module}"?`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
     </div>
 
