@@ -24,12 +24,13 @@ export default function App() {
   useRealtimeSubscription(activeProject?.id);
 
   useEffect(() => {
-    // Fetch projects and lookup codes if authenticated or if Supabase isn't configured (demo mode)
+    // Fetch projects and lookup codes if authenticated or if Supabase isn't configured (demo mode).
+    // Use user?.id (not user object) to avoid re-fetching on every token refresh (tab switch).
     if (!configured || user) {
       fetchProjects();
       fetchMasterCodes();
     }
-  }, [fetchProjects, fetchMasterCodes, user, configured]);
+  }, [fetchProjects, fetchMasterCodes, user?.id, configured]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isDark = theme === 'dark';
 

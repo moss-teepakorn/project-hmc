@@ -48,10 +48,9 @@ export default function Dashboard() {
   // Note: fetchProjects is called from App.tsx, not needed here
 
   React.useEffect(() => {
-    // Load all tasks once so progress % can show for all project cards in portfolio overview.
-    fetchTasks();
+    // Load milestones for portfolio overview (tasks are loaded by the selection effect below).
     fetchMilestones();
-  }, [fetchTasks, fetchMilestones]);
+  }, [fetchMilestones]);
   
   React.useEffect(() => {
     if (notificationsShown) return;
@@ -140,7 +139,7 @@ export default function Dashboard() {
     fetchCRs(selected.id);
     fetchMilestones(selected.id);
     fetchEfforts(selected.id);
-  }, [selected?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]);
+  }, [selected?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Separate normal projects from Hypercare
   const statusOrder = masterCodes
@@ -376,11 +375,11 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
   const normalProjects = projects.filter((p) => {
     const status = projectStatusOptions.find((code) => code.codeValue === p.status);
     return status ? status.label !== 'Hyper Care' : p.status !== 'Hyper Care';
-  });
+  }).sort((a, b) => new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime());
   const hypercareProjects = projects.filter((p) => {
     const status = projectStatusOptions.find((code) => code.codeValue === p.status);
     return status ? status.label === 'Hyper Care' : p.status === 'Hyper Care';
-  });
+  }).sort((a, b) => new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime());
 
   const renderOverviewProjectCard = (p: Project, fallbackColor = C.primary) => {
     const roots = tasks.filter(t => t.projectId === p.id && !t.parentId);
