@@ -11,7 +11,7 @@ interface Props { projectId: string; }
 const PHASE_OPTIONS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
 
 export default function EffortTab({ projectId }: Props) {
-  const { efforts, tasks, fetchEfforts, fetchTasks, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
+  const { efforts, tasks, masterCodes, fetchEfforts, fetchTasks, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
   const [modal, setModal]       = useState<Partial<Effort> | null>(null);
   const [phaseSummaryOpen, setPhaseSummaryOpen] = useState(false);
   const [deleting, setDeleting] = useState<Effort | null>(null);
@@ -68,6 +68,33 @@ export default function EffortTab({ projectId }: Props) {
     });
     return map;
   }, [tasks, projectId]);
+
+  const phaseSummaryRows = useMemo(() => {
+    const taskPhaseCodes = masterCodes
+      .filter((code) => code.codeType === 'task_phase')
+      .sort((a, b) => a.codeKey.localeCompare(b.codeKey));
+
+    const rankByPhase = new Map<string, number>();
+    taskPhaseCodes.forEach((code, i) => {
+      const codeValue = (code.codeValue || '').trim();
+      const label = (code.label || '').trim();
+      const codeKey = (code.codeKey || '').trim();
+      if (codeValue) rankByPhase.set(codeValue, i);
+      if (label && !rankByPhase.has(label)) rankByPhase.set(label, i);
+      if (codeKey && !rankByPhase.has(codeKey)) rankByPhase.set(codeKey, i);
+    });
+
+    return Object.entries(taskPhaseGroups)
+      .filter(([, md]) => md >= 0)
+      .sort(([phaseA], [phaseB]) => {
+        const rankA = rankByPhase.get(phaseA);
+        const rankB = rankByPhase.get(phaseB);
+        if (rankA !== undefined && rankB !== undefined) return rankA - rankB;
+        if (rankA !== undefined) return -1;
+        if (rankB !== undefined) return 1;
+        return phaseA.localeCompare(phaseB);
+      });
+  }, [taskPhaseGroups, masterCodes]);
 
   // Phases and totals from Efforts table only
   const phases = useMemo(() => {
@@ -343,16 +370,13 @@ export default function EffortTab({ projectId }: Props) {
       {modal !== null && <EffortModal data={modal} phaseOptions={phaseOptions} isMobile={isMobile} onClose={() => setModal(null)} onSave={handleSave} />}
       {phaseSummaryOpen && (
         <Modal title="Planned Manday by Phase" onClose={() => setPhaseSummaryOpen(false)} width={420}>
-          {Object.entries(taskPhaseGroups)
-            .filter(([, md]) => md > 0)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([phase, md]) => (
+          {phaseSummaryRows.map(([phase, md]) => (
               <div key={phase} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
                 <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{phase}</span>
                 <span style={{ fontSize: 13, color: C.primary, fontWeight: 700 }}>{md} MD</span>
               </div>
             ))}
-          {Object.values(taskPhaseGroups).every((v) => v === 0) && (
+          {phaseSummaryRows.length === 0 && (
             <div style={{ padding: '16px 0', textAlign: 'center', color: C.text3, fontSize: 13 }}>No effort manday data in tasks</div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 8, borderTop: `2px solid ${C.border2}` }}>
