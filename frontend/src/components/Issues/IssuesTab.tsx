@@ -27,7 +27,12 @@ export default function IssuesTab({ projectId }: Props) {
   useEffect(() => { fetchIssues(projectId); fetchMembers(projectId); }, [projectId]);
 
   const memberNames = members.map(m => m.name);
-  const shown = filterStatus === 'all' ? issues : issues.filter(i => i.status === filterStatus);
+  const sortedIssues = [...issues].sort((a, b) => {
+    const ta = a.issueDate ? new Date(a.issueDate).getTime() : 0;
+    const tb = b.issueDate ? new Date(b.issueDate).getTime() : 0;
+    return tb - ta;
+  });
+  const shown = filterStatus === 'all' ? sortedIssues : sortedIssues.filter(i => i.status === filterStatus);
 
   const openCount = issues.filter(i => i.status === 'Open' || i.status === 'In Progress').length;
 
