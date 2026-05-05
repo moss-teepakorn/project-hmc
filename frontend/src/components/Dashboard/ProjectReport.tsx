@@ -412,7 +412,6 @@ export default function ProjectReport({ project }: Props) {
                   <thead>
                     <tr style={{ color: '#94A3B8' }}>
                       <th style={{ textAlign: 'left', padding: '2px 4px', fontWeight: 600 }}>MONTH</th>
-                      <th style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 600 }}>USAGE</th>
                       <th style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 600 }}>USED</th>
                       <th style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 600 }}>ACCUMULA</th>
                       <th style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 600 }}>REMAIN</th>
@@ -427,12 +426,6 @@ export default function ProjectReport({ project }: Props) {
                           <td style={{ padding: '3px 4px', color: '#64748B' }}>
                             {new Date(mo.month + '-01').toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }).replace(' ', ' \'')}
                           </td>
-                          <td style={{ padding: '3px 4px', textAlign: 'right' }}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                              <span style={{ fontSize: 7, color: '#CBD5E1' }}>{mo.budget}/</span>
-                              <span style={{ fontWeight: 700, color: mo.usage > 0 ? '#F59E0B' : '#CBD5E1' }}>{mo.usage}</span>
-                            </span>
-                          </td>
                           <td style={{ padding: '3px 4px', textAlign: 'right', color: mo.usage > 0 ? '#0F172A' : '#CBD5E1', fontWeight: mo.usage > 0 ? 700 : 400 }}>{mo.usage > 0 ? mo.usage.toFixed(1) : '-'}</td>
                           <td style={{ padding: '3px 4px', textAlign: 'right', color: '#64748B' }}>{accum.toFixed(1)}</td>
                           <td style={{ padding: '3px 4px', textAlign: 'right', color: remain < 0 ? '#DC2626' : '#16A34A', fontWeight: 600 }}>{remain.toFixed(1)}</td>
@@ -441,7 +434,7 @@ export default function ProjectReport({ project }: Props) {
                     })}
                     <tr style={{ borderTop: '2px solid #E2E8F0', background: '#F8FAFC' }}>
                       <td style={{ padding: '4px', fontWeight: 700, fontSize: 8 }}>TOTAL</td>
-                      <td colSpan={2} style={{ padding: '4px', textAlign: 'right', fontWeight: 700, color: '#F59E0B', fontSize: 8 }}>{ep.usedMD.toFixed(1)}</td>
+                      <td style={{ padding: '4px', textAlign: 'right', fontWeight: 700, color: '#F59E0B', fontSize: 8 }}>{ep.usedMD.toFixed(1)}</td>
                       <td style={{ padding: '4px', textAlign: 'right', fontWeight: 700, fontSize: 8 }}>{ep.usedMD.toFixed(1)}</td>
                       <td style={{ padding: '4px', textAlign: 'right', fontWeight: 700, color: ep.remaining < 0 ? '#DC2626' : '#16A34A', fontSize: 8 }}>{ep.remaining.toFixed(1)}</td>
                     </tr>
