@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { clearAuthCache } from '../services/api';
 import { useStore } from '../store';
 import type { Profile, UserRole } from '../types';
 
@@ -165,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    clearAuthCache();
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);

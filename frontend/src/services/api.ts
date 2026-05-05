@@ -77,23 +77,44 @@ async function isProjectMember(projectId: string, userId: string, email: string 
   return Array.isArray(memberData) && memberData.length > 0;
 }
 
-// helper: get current user id and role
+// helper: get current user id and role (with short-lived cache to avoid lock contention)
+let _authCache: { role: string; userId: string; email: string | null; expiresAt: number } | null = null;
+const AUTH_CACHE_TTL_MS = 30_000;
+
+export function clearAuthCache(): void {
+  _authCache = null;
+}
+
+// Deduplicate concurrent calls: if a fetch is in-flight, queue behind it
+let _authFetchPromise: Promise<{ role: string; userId: string; email: string | null }> | null = null;
+
 export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId: string; email: string | null }> {
-  const { data: userData } = await supabase.auth.getUser();
-  let role = 'member';
-  let userId = '';
-  let email: string | null = null;
-  if (userData?.user?.id) {
-    userId = userData.user.id;
-    const { data: profile, error } = await supabase.from('profiles').select('role,email').eq('id', userId).maybeSingle();
-    if (error) throw new Error(error.message);
-    if ((profile as any)?.role) role = (profile as any).role;
-    if ((profile as any)?.email) email = (profile as any).email;
-    if (!email && userData.user.email) {
-      email = userData.user.email;
-    }
+  const now = Date.now();
+  if (_authCache && _authCache.expiresAt > now) {
+    return { role: _authCache.role, userId: _authCache.userId, email: _authCache.email };
   }
-  return { role, userId, email };
+  if (_authFetchPromise) return _authFetchPromise;
+
+  _authFetchPromise = (async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    let role = 'member';
+    let userId = '';
+    let email: string | null = null;
+    if (userData?.user?.id) {
+      userId = userData.user.id;
+      const { data: profile, error } = await supabase.from('profiles').select('role,email').eq('id', userId).maybeSingle();
+      if (error) throw new Error(error.message);
+      if ((profile as any)?.role) role = (profile as any).role;
+      if ((profile as any)?.email) email = (profile as any).email;
+      if (!email && userData.user.email) {
+        email = userData.user.email;
+      }
+    }
+    _authCache = { role, userId, email, expiresAt: Date.now() + AUTH_CACHE_TTL_MS };
+    return { role, userId, email };
+  })().finally(() => { _authFetchPromise = null; });
+
+  return _authFetchPromise;
 }
 // ===== SUPABASE API SERVICE =====
 // All data operations go through Supabase PostgreSQL directly.
