@@ -59,10 +59,9 @@ export default function EffortTab({ projectId }: Props) {
   const phaseKey = (phase?: string) => (phase && PHASE_OPTIONS.includes(phase) ? phase : 'Phase 1');
 
   const tasksInProject = tasks.filter((t) => t.projectId === projectId);
-  const parentIds = new Set(tasksInProject.filter((t) => t.parentId).map((t) => t.parentId));
-  const leafSubtasks = tasksInProject.filter((t) => !!t.parentId && !parentIds.has(t.id));
+  const mainTasks = tasksInProject.filter((t) => Number(t.level || 0) === 0);
 
-  const taskPlannedByPhase = leafSubtasks.reduce<Record<string, number>>((acc, t) => {
+  const taskPlannedByPhase = mainTasks.reduce<Record<string, number>>((acc, t) => {
     const phase = phaseKey(t.phase);
     acc[phase] = (acc[phase] || 0) + Number(t.effortManday || 0);
     return acc;
