@@ -147,7 +147,7 @@ function CRModal({ data, onClose, onSave }: { data: Partial<CRWithItems>; onClos
   });
   const [items, setItems] = useState<Partial<CRItem>[]>(data.items ? [...data.items] : [{ detail: '', manday: 0 }]);
   const up = (k: string, v: string | number) => setForm(p => ({ ...p, [k]: v }));
-  const memberOptions = [{ value: '', label: '— Select —' }, ...members.map(m => ({ value: m.name, label: m.name }))];
+  const memberNames = members.map(m => m.name).filter(Boolean);
 
   const addItem   = () => setItems(p => [...p, { detail: '', manday: 0 }]);
   const removeItem = (i: number) => setItems(p => p.filter((_, j) => j !== i));
@@ -163,14 +163,19 @@ function CRModal({ data, onClose, onSave }: { data: Partial<CRWithItems>; onClos
         <FormRow label="Title" required><Input value={form.title ?? ''} onChange={v => up('title', v)} placeholder="Short description of the change" /></FormRow>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        <FormRow label="Requested By"><Select value={form.requestedBy ?? ''} onChange={v => up('requestedBy', v)} options={memberOptions} /></FormRow>
+        <FormRow label="Requested By"><>
+          <Input value={form.requestedBy ?? ''} onChange={v => up('requestedBy', v)} placeholder="Requested by" list="cr-member-options" />
+          <datalist id="cr-member-options">
+            {memberNames.map(name => <option key={name} value={name} />)}
+          </datalist>
+        </></FormRow>
         <FormRow label="Request Date"><Input type="date" value={form.requestDate ?? ''} onChange={v => up('requestDate', v)} /></FormRow>
         <FormRow label="Status">
           <Select value={form.status ?? 'Draft'} onChange={v => up('status', v)} options={STATUSES.map(s => ({ value: s, label: s }))} />
         </FormRow>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        <FormRow label="Approved By"><Select value={form.approvedBy ?? ''} onChange={v => up('approvedBy', v)} options={memberOptions} /></FormRow>
+        <FormRow label="Approved By"><Input value={form.approvedBy ?? ''} onChange={v => up('approvedBy', v)} placeholder="Approved by" list="cr-member-options" /></FormRow>
         <FormRow label="Approval Date"><Input type="date" value={form.approvalDate ?? ''} onChange={v => up('approvalDate', v)} /></FormRow>
         <FormRow label="Discount (฿)"><Input type="number" value={form.discount ?? 0} onChange={v => up('discount', Number(v))} /></FormRow>
       </div>

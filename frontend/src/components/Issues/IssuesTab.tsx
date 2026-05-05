@@ -153,7 +153,7 @@ function IssueModal({ data, memberNames, onClose, onSave }: { data: Partial<Issu
     ...data,
   });
   const up = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
-  const memberOptions = [{ value: '', label: '— Select —' }, ...memberNames.map(n => ({ value: n, label: n }))];
+  const ownerOptions = memberNames.filter(Boolean);
   return (
     <Modal title={form.id ? 'Edit Issue' : 'Log Issue'} onClose={onClose} width={560}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -163,8 +163,15 @@ function IssueModal({ data, memberNames, onClose, onSave }: { data: Partial<Issu
       <FormRow label="Title" required><Input value={form.title ?? ''} onChange={v => up('title', v)} placeholder="Short issue description" /></FormRow>
       <FormRow label="Description"><Textarea value={form.description ?? ''} onChange={v => up('description', v)} rows={2} placeholder="Detailed description…" /></FormRow>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <FormRow label="Reported By"><Select value={form.reportedBy ?? ''} onChange={v => up('reportedBy', v)} options={memberOptions} /></FormRow>
-        <FormRow label="Assigned To"><Select value={form.assignedTo ?? ''} onChange={v => up('assignedTo', v)} options={memberOptions} /></FormRow>
+        <FormRow label="Reported By"><>
+          <Input value={form.reportedBy ?? ''} onChange={v => up('reportedBy', v)} placeholder="Reported by" list="issues-member-options" />
+          <datalist id="issues-member-options">
+            {ownerOptions.map(name => <option key={name} value={name} />)}
+          </datalist>
+        </></FormRow>
+        <FormRow label="Assigned To"><>
+          <Input value={form.assignedTo ?? ''} onChange={v => up('assignedTo', v)} placeholder="Assigned to" list="issues-member-options" />
+        </></FormRow>
       </div>
       <FormRow label="Resolved Date"><Input type="date" value={form.resolvedDate ?? ''} onChange={v => up('resolvedDate', v)} /></FormRow>
       <FormRow label="Notes"><Textarea value={form.notes ?? ''} onChange={v => up('notes', v)} rows={2} placeholder="Additional notes…" /></FormRow>
