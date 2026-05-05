@@ -319,7 +319,7 @@ export default function Dashboard() {
             </div>
             {dashboardTab === 'overview' ? (
               selected ? (
-                <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onViewMilestones={() => { setActiveProject(selected); window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })); }} isMobile={isMobile} />
+                <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} isMobile={isMobile} />
               ) : (
                 <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setSelected} onEdit={setEditing} onDelete={setDeleting} isMobile={isMobile} />
               )
