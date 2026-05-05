@@ -319,7 +319,7 @@ export default function Dashboard() {
             </div>
             {dashboardTab === 'overview' ? (
               selected ? (
-                <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} isMobile={isMobile} />
+                <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onViewMilestones={() => { setActiveProject(selected); window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })); }} isMobile={isMobile} />
               ) : (
                 <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setSelected} onEdit={setEditing} onDelete={setDeleting} isMobile={isMobile} />
               )
@@ -538,7 +538,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
 }
 
 // ── Per-project summary panel ─────────────────────────────────────────────────
-function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; onOpen: () => void; isMobile: boolean }) {
+function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { project: Project; onOpen: () => void; onViewMilestones: () => void; isMobile: boolean }) {
   const { tasks, milestones, members, efforts, changeRequests, issues, risks, masterCodes } = useStore();
   const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
   const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: project.status || 'Unknown' };
@@ -843,7 +843,7 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Upcoming Milestones</div>
               <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Delayed or due within 30 days</div>
             </div>
-            <button style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Milestones</button>
+            <button type="button" onClick={onViewMilestones} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Milestones</button>
           </div>
           <div style={{ display: 'grid', gap: 10 }}>
             {milestoneStatusCards.map((m) => (
@@ -855,7 +855,15 @@ function ProjectSummaryPanel({ project, onOpen, isMobile }: { project: Project; 
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>฿{fmtMoney(m.amount)}</div>
                   <div style={{ fontSize: 11, color: m.isDelayed ? C.red : C.text2, marginTop: 4 }}>{m.dueDate ? fmtDate(m.dueDate) : 'TBD'}</div>
-                  <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: m.isDelayed ? C.redBg : C.amberBg, color: m.isDelayed ? C.red : C.amber, fontSize: 10, fontWeight: 700 }}>{m.isDelayed ? 'Delayed' : 'Pending'}</div>
+                  {(() => {
+                    const ss = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
+                    return (
+                      <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: ss.bg, color: ss.color, fontSize: 10, fontWeight: 700 }}>{ss.label}</div>
+                        {m.isDelayed && <div style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: C.redBg, color: C.red, fontSize: 9, fontWeight: 700 }}>Delayed</div>}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ))}

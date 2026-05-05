@@ -93,6 +93,15 @@ export default function ProjectDetail({ project }: Props) {
   }, []);
 
   React.useEffect(() => {
+    const handleSetTab = (e: Event) => {
+      const tab = (e as CustomEvent<{ tab: string }>).detail?.tab;
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener('app-set-tab', handleSetTab);
+    return () => window.removeEventListener('app-set-tab', handleSetTab);
+  }, []);
+
+  React.useEffect(() => {
     if (!project?.id) return;
 
     // Preload all project datasets so Executive Report and all tabs are complete immediately.
