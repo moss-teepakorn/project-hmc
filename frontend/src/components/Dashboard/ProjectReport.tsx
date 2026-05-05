@@ -116,21 +116,8 @@ export default function ProjectReport({ project }: Props) {
     const el = document.querySelector('.exec-report') as HTMLElement | null;
     if (!el) return;
     try {
-      // Scroll to top so element is at viewport y=0
       window.scrollTo(0, 0);
-      await new Promise(r => setTimeout(r, 60));
-
-      // Temporarily remove overflow:hidden from element and ALL descendants
-      type OEntry = { node: HTMLElement; prev: string };
-      const saved: OEntry[] = [];
-      const allEls: HTMLElement[] = [el, ...Array.from(el.querySelectorAll<HTMLElement>('*'))];
-      allEls.forEach(node => {
-        const cs = window.getComputedStyle(node);
-        if (cs.overflow === 'hidden' || cs.overflowX === 'hidden' || cs.overflowY === 'hidden') {
-          saved.push({ node, prev: node.style.overflow });
-          node.style.setProperty('overflow', 'visible', 'important');
-        }
-      });
+      await new Promise(r => setTimeout(r, 80));
 
       const canvas = await html2canvas(el, {
         scale: 2,
@@ -138,12 +125,24 @@ export default function ProjectReport({ project }: Props) {
         useCORS: true,
         logging: false,
         allowTaint: false,
-      });
-
-      // Restore overflow
-      saved.forEach(({ node, prev }) => {
-        if (prev) { node.style.overflow = prev; }
-        else { node.style.removeProperty('overflow'); }
+        onclone: (_doc, clonedEl) => {
+          // Fix every element in the clone: remove clipping so nothing overlaps
+          const all: HTMLElement[] = [clonedEl, ...Array.from(clonedEl.querySelectorAll<HTMLElement>('*'))];
+          all.forEach(node => {
+            node.style.overflow = 'visible';
+            node.style.overflowX = 'visible';
+            node.style.overflowY = 'visible';
+            node.style.textOverflow = 'clip';
+            node.style.whiteSpace = 'normal';
+            // Remove transform that causes position offset
+            if (node.style.transform && node.style.transform.includes('translateX')) {
+              node.style.transform = 'none';
+            }
+          });
+          // Ensure root is visible and no clipping at top level
+          clonedEl.style.borderRadius = '0';
+          clonedEl.style.boxShadow = 'none';
+        },
       });
 
       const link = document.createElement('a');
