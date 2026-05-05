@@ -247,10 +247,6 @@ function MilestoneModal({ data, phaseBudgetByPhase, isMobile, onClose, onSave }:
           }}
           options={PHASES.map(p => ({ value: p, label: p }))} />
       </FormRow>
-      <FormRow label="Status">
-        <Select value={form.status ?? 'pending'} onChange={v => up('status', v)}
-          options={[{ value: 'pending', label: 'Pending' }, { value: 'billed', label: 'Billed' }, { value: 'paid', label: 'Paid' }]} />
-      </FormRow>
       <FormRow label="Milestone Name" required>
         <Input autoFocus value={form.name ?? ''} onChange={v => up('name', v)} placeholder="e.g. Project Kickoff" />
       </FormRow>
@@ -272,16 +268,16 @@ function MilestoneModal({ data, phaseBudgetByPhase, isMobile, onClose, onSave }:
           <Input type="number" value={form.amount ?? 0} onChange={v => up('amount', Number(v))} placeholder="Auto from phase budget" />
         </FormRow>
       </div>
-      <FormRow label="Status">
-        <Select value={form.status ?? 'pending'} onChange={v => up('status', v)}
-          options={[{ value: 'pending', label: 'Pending' }, { value: 'billed', label: 'Billed' }, { value: 'paid', label: 'Paid' }]} />
-      </FormRow>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12 }}>
         <FormRow label="Due Date">
           <Input type="date" value={form.dueDate ?? ''} onChange={v => up('dueDate', v)} placeholder="dd/mm/yyyy" />
         </FormRow>
         <FormRow label="Billing Date">
           <Input type="date" value={form.billingDate ?? ''} onChange={v => up('billingDate', v)} placeholder="dd/mm/yyyy" />
+        </FormRow>
+        <FormRow label="Status">
+          <Select value={form.status ?? 'pending'} onChange={v => up('status', v)}
+            options={[{ value: 'pending', label: 'Pending' }, { value: 'billed', label: 'Billed' }, { value: 'paid', label: 'Paid' }]} />
         </FormRow>
       </div>
       <FormRow label="Notes">
