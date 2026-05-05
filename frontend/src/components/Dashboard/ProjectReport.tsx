@@ -116,19 +116,36 @@ export default function ProjectReport({ project }: Props) {
     const el = document.querySelector('.exec-report') as HTMLElement | null;
     if (!el) return;
     try {
-      // Temporarily remove overflow:hidden so html2canvas captures full content
-      const prev = el.style.overflow;
-      el.style.overflow = 'visible';
+      // Scroll to top so element is at viewport y=0
+      window.scrollTo(0, 0);
+      await new Promise(r => setTimeout(r, 60));
+
+      // Temporarily remove overflow:hidden from element and ALL descendants
+      type OEntry = { node: HTMLElement; prev: string };
+      const saved: OEntry[] = [];
+      const allEls: HTMLElement[] = [el, ...Array.from(el.querySelectorAll<HTMLElement>('*'))];
+      allEls.forEach(node => {
+        const cs = window.getComputedStyle(node);
+        if (cs.overflow === 'hidden' || cs.overflowX === 'hidden' || cs.overflowY === 'hidden') {
+          saved.push({ node, prev: node.style.overflow });
+          node.style.setProperty('overflow', 'visible', 'important');
+        }
+      });
+
       const canvas = await html2canvas(el, {
         scale: 2,
         backgroundColor: '#fff',
         useCORS: true,
-        scrollX: 0,
-        scrollY: -window.scrollY,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
+        logging: false,
+        allowTaint: false,
       });
-      el.style.overflow = prev;
+
+      // Restore overflow
+      saved.forEach(({ node, prev }) => {
+        if (prev) { node.style.overflow = prev; }
+        else { node.style.removeProperty('overflow'); }
+      });
+
       const link = document.createElement('a');
       link.href = canvas.toDataURL('image/png');
       link.download = `executive-report-${project.code}-${now.toISOString().split('T')[0]}.png`;
