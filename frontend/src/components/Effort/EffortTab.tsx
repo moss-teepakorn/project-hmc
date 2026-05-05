@@ -11,14 +11,17 @@ interface Props { projectId: string; }
 const PHASE_OPTIONS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
 
 export default function EffortTab({ projectId }: Props) {
-  const { efforts, fetchEfforts, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
+  const { efforts, tasks, fetchEfforts, fetchTasks, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
   const [modal, setModal]       = useState<Partial<Effort> | null>(null);
   const [phaseSummaryOpen, setPhaseSummaryOpen] = useState(false);
   const [deleting, setDeleting] = useState<Effort | null>(null);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
 
-  useEffect(() => { fetchEfforts(projectId); }, [projectId]);
+  useEffect(() => {
+    fetchEfforts(projectId);
+    fetchTasks(projectId);
+  }, [projectId]);
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -53,34 +56,39 @@ export default function EffortTab({ projectId }: Props) {
 
   const phaseOptions = PHASE_OPTIONS.map((phase) => ({ value: phase, label: phase }));
 
-  const phaseSortIndex = phaseOptions.reduce<Record<string, number>>((acc, option, index) => {
-    acc[option.value] = index;
+  const phaseKey = (phase?: string) => (phase && PHASE_OPTIONS.includes(phase) ? phase : 'Phase 1');
+
+  const tasksInProject = tasks.filter((t) => t.projectId === projectId);
+  const parentIds = new Set(tasksInProject.filter((t) => t.parentId).map((t) => t.parentId));
+  const leafSubtasks = tasksInProject.filter((t) => !!t.parentId && !parentIds.has(t.id));
+
+  const taskPlannedByPhase = leafSubtasks.reduce<Record<string, number>>((acc, t) => {
+    const phase = phaseKey(t.phase);
+    acc[phase] = (acc[phase] || 0) + Number(t.effortManday || 0);
     return acc;
   }, {});
 
-  const phaseKey = (phase?: string) => (phase && PHASE_OPTIONS.includes(phase) ? phase : 'Phase 1');
-
-  const phases = useMemo(
-    () => PHASE_OPTIONS.filter((phase) => efforts.some((e) => phaseKey(e.phase) === phase)),
-    [efforts.length, efforts.map((e) => phaseKey(e.phase)).join('|')]
-  );
+  const phases = useMemo(() => {
+    const phasesFromTasks = PHASE_OPTIONS.filter((phase) => (taskPlannedByPhase[phase] || 0) > 0);
+    if (phasesFromTasks.length > 0) return phasesFromTasks;
+    return PHASE_OPTIONS.filter((phase) => efforts.some((e) => phaseKey(e.phase) === phase));
+  }, [JSON.stringify(taskPlannedByPhase), efforts.length, efforts.map((e) => phaseKey(e.phase)).join('|')]);
 
   const phaseTotals = phases.reduce((acc, phase) => {
     const list = efforts.filter((e) => phaseKey(e.phase) === phase);
     const usedManday = list.reduce((s, e) => s + Object.values(e.monthly || {}).reduce((a, v) => a + v, 0), 0);
-    const budgetManday = list.reduce((s, e) => s + e.budgetManday, 0);
     acc[phase] = {
       budgetAmount: list.reduce((s, e) => s + e.budgetAmount, 0),
-      budgetManday,
+      budgetManday: Number(taskPlannedByPhase[phase] || 0),
       usedManday,
-      remaining: budgetManday - usedManday,
+      remaining: Number(taskPlannedByPhase[phase] || 0) - usedManday,
     };
     return acc;
   }, {} as Record<string, { budgetAmount: number; budgetManday: number; usedManday: number; remaining: number }>);
 
   // Totals
   const tBudAmt  = efforts.reduce((s, e) => s + e.budgetAmount, 0);
-  const tBudMD   = efforts.reduce((s, e) => s + e.budgetManday, 0);
+  const tBudMD   = phases.reduce((s, phase) => s + Number(taskPlannedByPhase[phase] || 0), 0);
   const tUsedMD  = efforts.reduce((s, e) => s + Object.values(e.monthly || {}).reduce((a, v) => a + v, 0), 0);
   const tRem     = tBudMD - tUsedMD;
   const pct      = tBudMD > 0 ? Math.round((tUsedMD / tBudMD) * 100) : 0;
@@ -334,10 +342,8 @@ export default function EffortTab({ projectId }: Props) {
       {modal !== null && <EffortModal data={modal} phaseOptions={phaseOptions} isMobile={isMobile} onClose={() => setModal(null)} onSave={handleSave} />}
       {phaseSummaryOpen && (
         <Modal title="Planned Manday by Phase" onClose={() => setPhaseSummaryOpen(false)} width={420}>
-          {PHASE_OPTIONS.map((phase) => {
-            const planned = efforts
-              .filter((e) => phaseKey(e.phase) === phase)
-              .reduce((sum, e) => sum + Number(e.budgetManday || 0), 0);
+          {phases.map((phase) => {
+            const planned = Number(taskPlannedByPhase[phase] || 0);
             return (
               <div key={phase} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
                 <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{phase}</span>
@@ -347,7 +353,7 @@ export default function EffortTab({ projectId }: Props) {
           })}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 8, borderTop: `2px solid ${C.border2}` }}>
             <span style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>TOTAL</span>
-            <span style={{ fontSize: 14, color: C.primary, fontWeight: 800 }}>{efforts.reduce((sum, e) => sum + Number(e.budgetManday || 0), 0)} MD</span>
+            <span style={{ fontSize: 14, color: C.primary, fontWeight: 800 }}>{phases.reduce((sum, phase) => sum + Number(taskPlannedByPhase[phase] || 0), 0)} MD</span>
           </div>
         </Modal>
       )}
