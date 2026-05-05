@@ -21,7 +21,7 @@ function pct(used: number, total: number) {
 // โ”€โ”€ Thin progress bar โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function Bar({ value, color, height = 6 }: { value: number; color: string; height?: number }) {
   return (
-    <div style={{ background: '#E2E8F0', borderRadius: 99, height, overflow: 'hidden', width: '100%' }}>
+    <div style={{ background: '#E2E8F0', borderRadius: 99, height, overflow: 'hidden', width: '100%', marginTop: 6 }}>
       <div style={{ width: `${Math.min(value, 100)}%`, height: '100%', background: color, borderRadius: 99, transition: 'width 0.4s' }} />
     </div>
   );
@@ -45,7 +45,26 @@ function Donut({ value, color, size = 64 }: { value: number; color: string; size
 
 // โ”€โ”€ Badge pill โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function Pill({ label, bg, color }: { label: string; bg: string; color: string }) {
-  return <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: bg, color }}>{label}</span>;
+  return (
+    <span
+      style={{
+        fontSize: 8,
+        fontWeight: 700,
+        padding: '3px 8px',
+        borderRadius: 99,
+        background: bg,
+        color,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        lineHeight: 1,
+        whiteSpace: 'nowrap',
+        minHeight: 18,
+      }}
+    >
+      {label}
+    </span>
+  );
 }
 
 export default function ProjectReport({ project }: Props) {
@@ -116,6 +135,10 @@ export default function ProjectReport({ project }: Props) {
     const el = document.querySelector('.exec-report') as HTMLElement | null;
     if (!el) return;
     try {
+      // Wait for webfonts so text metrics are stable in the capture.
+      if ('fonts' in document) {
+        await (document as Document & { fonts: FontFaceSet }).fonts.ready;
+      }
       const W = el.offsetWidth;
 
       // Clone into an off-screen container at the exact same width
@@ -329,13 +352,13 @@ export default function ProjectReport({ project }: Props) {
               {ms.map(m => {
                 const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
                 return (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid #F8FAFC' }}>
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', minHeight: 44, borderBottom: '1px solid #F8FAFC' }}>
                     <Pill label={m.phase || 'Phase'} bg={C.primaryBg} color={C.primary} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 8, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
-                      <div style={{ fontSize: 8, color: '#94A3B8' }}>Due: {fmtDate(m.dueDate) || 'TBD'}</div>
+                      <div style={{ fontSize: 8, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.25 }}>{m.name}</div>
+                      <div style={{ fontSize: 8, color: '#94A3B8', lineHeight: 1.25, marginTop: 2 }}>Due: {fmtDate(m.dueDate) || 'TBD'}</div>
                     </div>
-                    <div style={{ textAlign: 'right', minWidth: 60 }}>
+                    <div style={{ textAlign: 'right', minWidth: 96, paddingLeft: 6 }}>
                       <div style={{ fontSize: 9, fontWeight: 700, color: '#0F172A' }}>{money(m.amount)}</div>
                       <Pill label={ss.label} bg={ss.bg} color={ss.color} />
                     </div>
