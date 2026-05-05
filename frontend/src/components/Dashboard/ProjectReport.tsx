@@ -144,11 +144,12 @@ export default function ProjectReport({ project }: Props) {
       // Clone into an off-screen container at the exact same width
       // so CSS Grid columns compute identically to the visible layout
       const offscreen = document.createElement('div');
-      offscreen.style.cssText = `position:absolute;top:-99999px;left:0;width:${W}px;background:#fff;z-index:-1;`;
+      offscreen.style.cssText = 'position:fixed;inset:0;pointer-events:none;opacity:0;z-index:-1;background:#fff;';
       const clone = el.cloneNode(true) as HTMLElement;
       clone.style.width = `${W}px`;
       clone.style.borderRadius = '0';
       clone.style.boxShadow = 'none';
+      clone.style.margin = '0';
       offscreen.appendChild(clone);
       document.body.appendChild(offscreen);
 
@@ -161,6 +162,7 @@ export default function ProjectReport({ project }: Props) {
         useCORS: true,
         logging: false,
         allowTaint: false,
+        foreignObjectRendering: true,
         width: W,
         height: clone.scrollHeight,
       });
@@ -348,18 +350,20 @@ export default function ProjectReport({ project }: Props) {
           {/* Milestones */}
           <div style={{ padding: '12px 16px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>PAYMENT MILESTONES ({ms.length})</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {ms.map(m => {
                 const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
                 return (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', minHeight: 44, borderBottom: '1px solid #F8FAFC' }}>
-                    <Pill label={m.phase || 'Phase'} bg={C.primaryBg} color={C.primary} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 8, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.25 }}>{m.name}</div>
-                      <div style={{ fontSize: 8, color: '#94A3B8', lineHeight: 1.25, marginTop: 2 }}>Due: {fmtDate(m.dueDate) || 'TBD'}</div>
+                  <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '84px minmax(0,1fr) 124px', alignItems: 'center', columnGap: 8, padding: '7px 0', minHeight: 46, borderBottom: '1px solid #F8FAFC' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+                      <Pill label={m.phase || 'Phase'} bg={C.primaryBg} color={C.primary} />
                     </div>
-                    <div style={{ textAlign: 'right', minWidth: 96, paddingLeft: 6 }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: '#0F172A' }}>{money(m.amount)}</div>
+                    <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ fontSize: 8, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '12px' }}>{m.name}</div>
+                      <div style={{ fontSize: 8, color: '#94A3B8', lineHeight: '12px', marginTop: 2 }}>Due: {fmtDate(m.dueDate) || 'TBD'}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', gap: 3 }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: '#0F172A', lineHeight: '12px' }}>{money(m.amount)}</div>
                       <Pill label={ss.label} bg={ss.bg} color={ss.color} />
                     </div>
                   </div>
