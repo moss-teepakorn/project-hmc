@@ -116,34 +116,33 @@ export default function ProjectReport({ project }: Props) {
     const el = document.querySelector('.exec-report') as HTMLElement | null;
     if (!el) return;
     try {
-      window.scrollTo(0, 0);
-      await new Promise(r => setTimeout(r, 80));
+      const W = el.offsetWidth;
 
-      const canvas = await html2canvas(el, {
+      // Clone into an off-screen container at the exact same width
+      // so CSS Grid columns compute identically to the visible layout
+      const offscreen = document.createElement('div');
+      offscreen.style.cssText = `position:absolute;top:-99999px;left:0;width:${W}px;background:#fff;z-index:-1;`;
+      const clone = el.cloneNode(true) as HTMLElement;
+      clone.style.width = `${W}px`;
+      clone.style.borderRadius = '0';
+      clone.style.boxShadow = 'none';
+      offscreen.appendChild(clone);
+      document.body.appendChild(offscreen);
+
+      // Two rAF cycles to let the browser compute grid layout fully
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      const canvas = await html2canvas(clone, {
         scale: 2,
         backgroundColor: '#fff',
         useCORS: true,
         logging: false,
         allowTaint: false,
-        onclone: (_doc, clonedEl) => {
-          // Fix every element in the clone: remove clipping so nothing overlaps
-          const all: HTMLElement[] = [clonedEl, ...Array.from(clonedEl.querySelectorAll<HTMLElement>('*'))];
-          all.forEach(node => {
-            node.style.overflow = 'visible';
-            node.style.overflowX = 'visible';
-            node.style.overflowY = 'visible';
-            node.style.textOverflow = 'clip';
-            node.style.whiteSpace = 'normal';
-            // Remove transform that causes position offset
-            if (node.style.transform && node.style.transform.includes('translateX')) {
-              node.style.transform = 'none';
-            }
-          });
-          // Ensure root is visible and no clipping at top level
-          clonedEl.style.borderRadius = '0';
-          clonedEl.style.boxShadow = 'none';
-        },
+        width: W,
+        height: clone.scrollHeight,
       });
+
+      document.body.removeChild(offscreen);
 
       const link = document.createElement('a');
       link.href = canvas.toDataURL('image/png');
