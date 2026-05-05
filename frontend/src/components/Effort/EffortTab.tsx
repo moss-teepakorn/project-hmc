@@ -58,36 +58,38 @@ export default function EffortTab({ projectId }: Props) {
 
   const phaseKey = (phase?: string) => (phase && PHASE_OPTIONS.includes(phase) ? phase : 'Phase 1');
 
-  const tasksInProject = tasks.filter((t) => t.projectId === projectId);
-  const mainTasks = tasksInProject.filter((t) => Number(t.level || 0) === 0);
+  // Phase Summary Modal: group level-0 tasks by raw phase name, sum effortManday
+  const taskPhaseGroups = useMemo(() => {
+    const map: Record<string, number> = {};
+    tasks.filter((t) => t.projectId === projectId && Number(t.level || 0) === 0).forEach((t) => {
+      const phase = (t.phase || '').trim();
+      if (!phase) return;
+      map[phase] = (map[phase] || 0) + Number(t.effortManday || 0);
+    });
+    return map;
+  }, [tasks, projectId]);
 
-  const taskPlannedByPhase = mainTasks.reduce<Record<string, number>>((acc, t) => {
-    const phase = phaseKey(t.phase);
-    acc[phase] = (acc[phase] || 0) + Number(t.effortManday || 0);
-    return acc;
-  }, {});
-
+  // Phases and totals from Efforts table only
   const phases = useMemo(() => {
-    const phasesFromTasks = PHASE_OPTIONS.filter((phase) => (taskPlannedByPhase[phase] || 0) > 0);
-    if (phasesFromTasks.length > 0) return phasesFromTasks;
     return PHASE_OPTIONS.filter((phase) => efforts.some((e) => phaseKey(e.phase) === phase));
-  }, [JSON.stringify(taskPlannedByPhase), efforts.length, efforts.map((e) => phaseKey(e.phase)).join('|')]);
+  }, [efforts.length, efforts.map((e) => phaseKey(e.phase)).join('|')]);
 
   const phaseTotals = phases.reduce((acc, phase) => {
     const list = efforts.filter((e) => phaseKey(e.phase) === phase);
+    const budgetManday = list.reduce((s, e) => s + (e.budgetManday || 0), 0);
     const usedManday = list.reduce((s, e) => s + Object.values(e.monthly || {}).reduce((a, v) => a + v, 0), 0);
     acc[phase] = {
       budgetAmount: list.reduce((s, e) => s + e.budgetAmount, 0),
-      budgetManday: Number(taskPlannedByPhase[phase] || 0),
+      budgetManday,
       usedManday,
-      remaining: Number(taskPlannedByPhase[phase] || 0) - usedManday,
+      remaining: budgetManday - usedManday,
     };
     return acc;
   }, {} as Record<string, { budgetAmount: number; budgetManday: number; usedManday: number; remaining: number }>);
 
-  // Totals
+  // Totals — all from Efforts table
   const tBudAmt  = efforts.reduce((s, e) => s + e.budgetAmount, 0);
-  const tBudMD   = phases.reduce((s, phase) => s + Number(taskPlannedByPhase[phase] || 0), 0);
+  const tBudMD   = efforts.reduce((s, e) => s + (e.budgetManday || 0), 0);
   const tUsedMD  = efforts.reduce((s, e) => s + Object.values(e.monthly || {}).reduce((a, v) => a + v, 0), 0);
   const tRem     = tBudMD - tUsedMD;
   const pct      = tBudMD > 0 ? Math.round((tUsedMD / tBudMD) * 100) : 0;
@@ -341,18 +343,21 @@ export default function EffortTab({ projectId }: Props) {
       {modal !== null && <EffortModal data={modal} phaseOptions={phaseOptions} isMobile={isMobile} onClose={() => setModal(null)} onSave={handleSave} />}
       {phaseSummaryOpen && (
         <Modal title="Planned Manday by Phase" onClose={() => setPhaseSummaryOpen(false)} width={420}>
-          {phases.map((phase) => {
-            const planned = Number(taskPlannedByPhase[phase] || 0);
-            return (
+          {Object.entries(taskPhaseGroups)
+            .filter(([, md]) => md > 0)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([phase, md]) => (
               <div key={phase} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
                 <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{phase}</span>
-                <span style={{ fontSize: 13, color: C.primary, fontWeight: 700 }}>{planned} MD</span>
+                <span style={{ fontSize: 13, color: C.primary, fontWeight: 700 }}>{md} MD</span>
               </div>
-            );
-          })}
+            ))}
+          {Object.values(taskPhaseGroups).every((v) => v === 0) && (
+            <div style={{ padding: '16px 0', textAlign: 'center', color: C.text3, fontSize: 13 }}>No effort manday data in tasks</div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 8, borderTop: `2px solid ${C.border2}` }}>
             <span style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>TOTAL</span>
-            <span style={{ fontSize: 14, color: C.primary, fontWeight: 800 }}>{phases.reduce((sum, phase) => sum + Number(taskPlannedByPhase[phase] || 0), 0)} MD</span>
+            <span style={{ fontSize: 14, color: C.primary, fontWeight: 800 }}>{Object.values(taskPhaseGroups).reduce((s, v) => s + v, 0)} MD</span>
           </div>
         </Modal>
       )}
