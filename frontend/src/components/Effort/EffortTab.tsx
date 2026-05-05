@@ -160,25 +160,6 @@ export default function EffortTab({ projectId }: Props) {
         ))}
       </div>
 
-      {phases.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit,minmax(220px,1fr))', gap: 12, marginBottom: 18 }}>
-          {phases.map((phase) => {
-            const totals = phaseTotals[phase];
-            return (
-              <Card key={phase} style={{ padding: '14px 18px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{phase}</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: C.primary, margin: '8px 0' }}>{totals.budgetManday} MD</div>
-                <div style={{ fontSize: 11, color: C.text2, lineHeight: 1.6 }}>
-                  Budget ฿{fmtMoney(totals.budgetAmount)}
-                  <br />Used {totals.usedManday} MD
-                  <br />Remaining {totals.remaining} MD
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
       {/* Utilization bar */}
       <Card style={{ padding: 16, marginBottom: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
