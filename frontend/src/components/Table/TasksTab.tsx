@@ -47,6 +47,24 @@ const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Block/Delay', 'Done'] as co
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
 export type PhaseOption = { value: string; label: string };
 type TaskRow = Task | NewTaskInsert;
+type TaskImportRow = {
+  wbs: string;
+  taskName: string;
+  parentWbs: string;
+  startDate: string;
+  endDate: string;
+  actualFinish: string;
+  percentComplete: number;
+  status: string;
+  phase: string;
+  predecessorWbs: string;
+  resource: string;
+  effortManday: number;
+};
+type TaskImportPreview = {
+  fileName: string;
+  rows: TaskImportRow[];
+};
 
 const TASK_IMPORT_HEADERS = [
   'WBS',
@@ -152,6 +170,7 @@ export default function TasksTab({ projectId }: Props) {
   const [loading, setLoading]   = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<TaskImportPreview | null>(null);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
   const [buttonFocus, setButtonFocus] = useState<'expand' | 'collapse' | null>(null);
@@ -472,6 +491,69 @@ export default function TasksTab({ projectId }: Props) {
     return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
   };
 
+  const parseImportRows = (sheet: XLSX.WorkSheet): TaskImportRow[] => {
+    const matrix = XLSX.utils.sheet_to_json<(string | number | Date)[]>(sheet, { header: 1, defval: '' });
+    const headers = (matrix[0] || []).map((value) => String(value || '').trim());
+    const missingHeaders = TASK_IMPORT_HEADERS.filter((header) => !headers.includes(header));
+    if (missingHeaders.length) {
+      throw new Error(`Missing columns: ${missingHeaders.join(', ')}`);
+    }
+
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: true });
+    const importedRows = rows
+      .map((row, index) => {
+        const rawActualFinish = row['Actual Finish'];
+        const actualFinish = normalizeExcelDate(rawActualFinish);
+        if (String(rawActualFinish ?? '').trim() && !actualFinish) {
+          throw new Error(`Row ${index + 2}: Actual Finish must be YYYY-MM-DD`);
+        }
+
+        const rawStartDate = row['Start Date'];
+        const startDate = normalizeExcelDate(rawStartDate);
+        if (String(rawStartDate ?? '').trim() && !startDate) {
+          throw new Error(`Row ${index + 2}: Start Date must be YYYY-MM-DD`);
+        }
+
+        const rawEndDate = row['End Date'];
+        const endDate = normalizeExcelDate(rawEndDate);
+        if (String(rawEndDate ?? '').trim() && !endDate) {
+          throw new Error(`Row ${index + 2}: End Date must be YYYY-MM-DD`);
+        }
+
+        const percent = Number(row['% Complete'] ?? 0);
+        if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+          throw new Error(`Row ${index + 2}: % Complete must be between 0 and 100`);
+        }
+
+        const effort = Number(row['Effort Manday'] ?? 0);
+        if (!Number.isFinite(effort) || effort < 0) {
+          throw new Error(`Row ${index + 2}: Effort Manday must be a non-negative number`);
+        }
+
+        return {
+          wbs: String(row['WBS'] || '').trim(),
+          taskName: String(row['Task Name'] || '').trim(),
+          parentWbs: String(row['Parent WBS'] || '').trim(),
+          startDate,
+          endDate,
+          actualFinish,
+          percentComplete: percent,
+          status: String(row['Status'] || '').trim(),
+          phase: String(row['Phase'] || '').trim(),
+          predecessorWbs: String(row['Predecessor WBS'] || '').trim(),
+          resource: String(row['Owner'] || '').trim(),
+          effortManday: effort,
+        };
+      })
+      .filter((row) => row.wbs || row.taskName || row.parentWbs || row.startDate || row.endDate || row.phase || row.resource);
+
+    if (!importedRows.length) {
+      throw new Error('No task rows found in the file');
+    }
+
+    return importedRows;
+  };
+
   const openAddTaskDefault = () => {
     const anchor = projectTasks.find(t => t.id === selected) || null;
     setAddPreset({
@@ -621,77 +703,25 @@ export default function TasksTab({ projectId }: Props) {
     e.target.value = '';
     if (!file) return;
 
-    const confirmed = window.confirm('Import นี้จะลบ Task เดิมทั้งหมดของ project แล้วสร้างใหม่จากไฟล์ Excel ทันที ต้องการดำเนินการต่อหรือไม่?');
-    if (!confirmed) return;
-
     try {
-      setImporting(true);
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
       const sheet = workbook.Sheets.Tasks || workbook.Sheets[workbook.SheetNames[0]];
       if (!sheet) throw new Error('Tasks sheet not found');
+      const importedRows = parseImportRows(sheet);
+      setImportPreview({ fileName: file.name, rows: importedRows });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Import failed');
+    }
+  };
 
-      const matrix = XLSX.utils.sheet_to_json<(string | number | Date)[]>(sheet, { header: 1, defval: '' });
-      const headers = (matrix[0] || []).map((value) => String(value || '').trim());
-      const missingHeaders = TASK_IMPORT_HEADERS.filter((header) => !headers.includes(header));
-      if (missingHeaders.length) {
-        throw new Error(`Missing columns: ${missingHeaders.join(', ')}`);
-      }
-
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: true });
-        const importedRows = rows
-          .map((row, index) => {
-            const rawActualFinish = row['Actual Finish'];
-            const actualFinish = normalizeExcelDate(rawActualFinish);
-            if (String(rawActualFinish ?? '').trim() && !actualFinish) {
-              throw new Error(`Row ${index + 2}: Actual Finish must be YYYY-MM-DD`);
-            }
-
-            const rawStartDate = row['Start Date'];
-            const startDate = normalizeExcelDate(rawStartDate);
-            if (String(rawStartDate ?? '').trim() && !startDate) {
-              throw new Error(`Row ${index + 2}: Start Date must be YYYY-MM-DD`);
-            }
-
-            const rawEndDate = row['End Date'];
-            const endDate = normalizeExcelDate(rawEndDate);
-            if (String(rawEndDate ?? '').trim() && !endDate) {
-              throw new Error(`Row ${index + 2}: End Date must be YYYY-MM-DD`);
-            }
-
-            const percent = Number(row['% Complete'] ?? 0);
-            if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
-              throw new Error(`Row ${index + 2}: % Complete must be between 0 and 100`);
-            }
-
-            const effort = Number(row['Effort Manday'] ?? 0);
-            if (!Number.isFinite(effort) || effort < 0) {
-              throw new Error(`Row ${index + 2}: Effort Manday must be a non-negative number`);
-            }
-
-            return {
-              wbs: String(row['WBS'] || '').trim(),
-              taskName: String(row['Task Name'] || '').trim(),
-              parentWbs: String(row['Parent WBS'] || '').trim(),
-              startDate,
-              endDate,
-              actualFinish,
-              percentComplete: percent,
-              status: String(row['Status'] || '').trim(),
-              phase: String(row['Phase'] || '').trim(),
-              predecessorWbs: String(row['Predecessor WBS'] || '').trim(),
-              resource: String(row['Owner'] || '').trim(),
-              effortManday: effort,
-            };
-          })
-          .filter((row) => row.wbs || row.taskName || row.parentWbs || row.startDate || row.endDate || row.phase || row.resource);
-
-      if (!importedRows.length) {
-        throw new Error('No task rows found in the file');
-      }
-
-      const result = await taskApi.replaceByImport(projectId, importedRows);
+  const confirmImportOverwrite = async () => {
+    if (!importPreview) return;
+    try {
+      setImporting(true);
+      const result = await taskApi.replaceByImport(projectId, importPreview.rows);
       useStore.setState({ tasks: result.data });
+      setImportPreview(null);
       toast.success(`Imported ${result.data.length} tasks`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Import failed');
@@ -1424,6 +1454,63 @@ export default function TasksTab({ projectId }: Props) {
           onInsertBefore={() => openInsertAround(editModal, 'before')}
           onInsertAfter={() => openInsertAround(editModal, 'after')}
         />
+      )}
+      {importPreview && (
+        <Modal title="Preview Task Import" onClose={() => !importing && setImportPreview(null)} width={920}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 18 }}>
+            <Card style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>FILE</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, wordBreak: 'break-word' }}>{importPreview.fileName}</div>
+            </Card>
+            <Card style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>ROWS</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.primary }}>{importPreview.rows.length}</div>
+            </Card>
+            <Card style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>ROOT TASKS</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{importPreview.rows.filter((row) => !row.parentWbs).length}</div>
+            </Card>
+            <Card style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>WITH PREDECESSOR</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{importPreview.rows.filter((row) => !!row.predecessorWbs).length}</div>
+            </Card>
+          </div>
+
+          <div style={{ padding: '12px 14px', borderRadius: 12, background: C.redBg, color: C.red, fontSize: 12, fontWeight: 600, marginBottom: 16 }}>
+            การ import นี้จะลบ Task เดิมทั้งหมดของ project ปัจจุบัน แล้วสร้างใหม่จากไฟล์นี้ 100%
+          </div>
+
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '90px 1.4fr 110px 110px 110px 120px', gap: 0, background: C.bg2, borderBottom: `1px solid ${C.border}` }}>
+              {['WBS', 'Task Name', 'Parent', 'Status', '%', 'Owner'].map((label) => (
+                <div key={label} style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700, color: C.text2 }}>{label}</div>
+              ))}
+            </div>
+            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+              {importPreview.rows.slice(0, 15).map((row, index) => (
+                <div key={`${row.wbs}-${index}`} style={{ display: 'grid', gridTemplateColumns: '90px 1.4fr 110px 110px 110px 120px', gap: 0, borderBottom: `1px solid ${C.border}` }}>
+                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text }}>{row.wbs}</div>
+                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text }}>{row.taskName}</div>
+                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text2 }}>{row.parentWbs || '-'}</div>
+                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text2 }}>{row.status || '-'}</div>
+                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text2 }}>{row.percentComplete}%</div>
+                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text2 }}>{row.resource || '-'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {importPreview.rows.length > 15 && (
+            <div style={{ fontSize: 12, color: C.text2, marginBottom: 18 }}>
+              Showing first 15 rows from {importPreview.rows.length} rows in the file.
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Btn variant="ghost" onClick={() => setImportPreview(null)} disabled={importing}>Cancel</Btn>
+            <Btn variant="danger" onClick={confirmImportOverwrite} disabled={importing}>{importing ? 'Importing…' : 'Confirm Overwrite Import'}</Btn>
+          </div>
+        </Modal>
       )}
     </div>
   );
