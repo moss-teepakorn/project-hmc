@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, Download, ChevronDown, ZoomIn, ZoomOut } from 'lucide-react';
+import { Plus, Download, Upload, ChevronDown, ZoomIn, ZoomOut } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -47,6 +47,21 @@ const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Block/Delay', 'Done'] as co
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
 export type PhaseOption = { value: string; label: string };
 type TaskRow = Task | NewTaskInsert;
+
+const TASK_IMPORT_HEADERS = [
+  'WBS',
+  'Task Name',
+  'Parent WBS',
+  'Start Date',
+  'End Date',
+  'Actual Finish',
+  '% Complete',
+  'Status',
+  'Phase',
+  'Predecessor WBS',
+  'Owner',
+  'Effort Manday',
+] as const;
 
 type InsertAction =
   | 'main-before'
@@ -136,6 +151,7 @@ export default function TasksTab({ projectId }: Props) {
   const [editModal, setEditModal] = useState<Task | null>(null);
   const [loading, setLoading]   = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
   const [buttonFocus, setButtonFocus] = useState<'expand' | 'collapse' | null>(null);
@@ -160,6 +176,7 @@ export default function TasksTab({ projectId }: Props) {
   const tableHeaderRef = useRef<HTMLDivElement>(null);
   const ganttBodyRef = useRef<HTMLDivElement>(null);
   const syncing      = useRef(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // Column resize
   const resizingColumn = useRef<number | null>(null);
@@ -434,6 +451,27 @@ export default function TasksTab({ projectId }: Props) {
     catch { toast.error('Failed to save'); }
   };
 
+  const normalizeExcelDate = (value: unknown): string => {
+    if (value == null || value === '') return '';
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value.toISOString().slice(0, 10);
+    }
+    if (typeof value === 'number') {
+      const parsed = XLSX.SSF.parse_date_code(value);
+      if (!parsed) return '';
+      const yyyy = String(parsed.y).padStart(4, '0');
+      const mm = String(parsed.m).padStart(2, '0');
+      const dd = String(parsed.d).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    const text = String(value).trim();
+    if (!text) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(text)) return dmyToIso(text) || '';
+    const date = new Date(text);
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+  };
+
   const openAddTaskDefault = () => {
     const anchor = projectTasks.find(t => t.id === selected) || null;
     setAddPreset({
@@ -531,15 +569,135 @@ export default function TasksTab({ projectId }: Props) {
 
   // ── XLSX export ──────────────────────────────────────────────────────────
   const exportXLSX = () => {
+    const taskById = new Map(projectTasks.map((task) => [task.id, task]));
+    const sortedTasks = [...projectTasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
     const ws = XLSX.utils.aoa_to_sheet([
-      ['WBS','Task Name','Start','Finish','Actual Finish','Days','% Done','Effort (MD)','Resource'],
-      ...projectTasks.map(t => [t.wbs, t.taskName, t.startDate, t.endDate, t.actualFinish || '', t.duration, t.percentComplete, Number(t.effortManday || 0), t.resource]),
+      [...TASK_IMPORT_HEADERS],
+      ...sortedTasks.map((task) => [
+        task.wbs,
+        task.taskName,
+        task.parentId ? (taskById.get(task.parentId)?.wbs || '') : '',
+        task.startDate,
+        task.endDate,
+        task.actualFinish || '',
+        task.percentComplete,
+        getTaskStatus(task),
+        task.phase || '',
+        task.relatedTask ? (taskById.get(task.relatedTask)?.wbs || '') : '',
+        task.resource || '',
+        Number(task.effortManday || 0),
+      ]),
     ]);
-    ws['!cols'] = [{wch:8},{wch:35},{wch:14},{wch:14},{wch:14},{wch:8},{wch:10},{wch:12},{wch:20}];
+    ws['!cols'] = [{wch:10},{wch:38},{wch:14},{wch:14},{wch:14},{wch:14},{wch:12},{wch:16},{wch:26},{wch:18},{wch:24},{wch:14}];
+
+    const referenceSheet = XLSX.utils.aoa_to_sheet([
+      ['Field', 'Rule'],
+      ['WBS', 'Required, unique per project. Example: 1, 1.1, 1.1.1'],
+      ['Parent WBS', 'Leave blank for root task. Must point to another WBS in this file'],
+      ['Start Date / End Date / Actual Finish', 'Use YYYY-MM-DD'],
+      ['% Complete', '0-100'],
+      ['Status', TASK_STATUS_OPTIONS.join(', ')],
+      ['Phase', effectivePhaseOptions.map((option) => option.value).join(', ') || 'Use existing project phase values'],
+      ['Predecessor WBS', 'Leave blank or reference another WBS in this file'],
+      ['Owner', 'Mapped to Resource field in current system'],
+      ['Overwrite Import', 'Import will delete all current tasks in this project and recreate from sheet'],
+    ]);
+    referenceSheet['!cols'] = [{ wch: 24 }, { wch: 90 }];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
+    XLSX.utils.book_append_sheet(wb, referenceSheet, 'Reference');
     XLSX.writeFile(wb, `tasks-${projectId}.xlsx`);
     toast.success('Exported XLSX'); setShowExport(false);
+  };
+
+  const openImportDialog = () => {
+    setShowExport(false);
+    importInputRef.current?.click();
+  };
+
+  const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const confirmed = window.confirm('Import นี้จะลบ Task เดิมทั้งหมดของ project แล้วสร้างใหม่จากไฟล์ Excel ทันที ต้องการดำเนินการต่อหรือไม่?');
+    if (!confirmed) return;
+
+    try {
+      setImporting(true);
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+      const sheet = workbook.Sheets.Tasks || workbook.Sheets[workbook.SheetNames[0]];
+      if (!sheet) throw new Error('Tasks sheet not found');
+
+      const matrix = XLSX.utils.sheet_to_json<(string | number | Date)[]>(sheet, { header: 1, defval: '' });
+      const headers = (matrix[0] || []).map((value) => String(value || '').trim());
+      const missingHeaders = TASK_IMPORT_HEADERS.filter((header) => !headers.includes(header));
+      if (missingHeaders.length) {
+        throw new Error(`Missing columns: ${missingHeaders.join(', ')}`);
+      }
+
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: true });
+        const importedRows = rows
+          .map((row, index) => {
+            const rawActualFinish = row['Actual Finish'];
+            const actualFinish = normalizeExcelDate(rawActualFinish);
+            if (String(rawActualFinish ?? '').trim() && !actualFinish) {
+              throw new Error(`Row ${index + 2}: Actual Finish must be YYYY-MM-DD`);
+            }
+
+            const rawStartDate = row['Start Date'];
+            const startDate = normalizeExcelDate(rawStartDate);
+            if (String(rawStartDate ?? '').trim() && !startDate) {
+              throw new Error(`Row ${index + 2}: Start Date must be YYYY-MM-DD`);
+            }
+
+            const rawEndDate = row['End Date'];
+            const endDate = normalizeExcelDate(rawEndDate);
+            if (String(rawEndDate ?? '').trim() && !endDate) {
+              throw new Error(`Row ${index + 2}: End Date must be YYYY-MM-DD`);
+            }
+
+            const percent = Number(row['% Complete'] ?? 0);
+            if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+              throw new Error(`Row ${index + 2}: % Complete must be between 0 and 100`);
+            }
+
+            const effort = Number(row['Effort Manday'] ?? 0);
+            if (!Number.isFinite(effort) || effort < 0) {
+              throw new Error(`Row ${index + 2}: Effort Manday must be a non-negative number`);
+            }
+
+            return {
+              wbs: String(row['WBS'] || '').trim(),
+              taskName: String(row['Task Name'] || '').trim(),
+              parentWbs: String(row['Parent WBS'] || '').trim(),
+              startDate,
+              endDate,
+              actualFinish,
+              percentComplete: percent,
+              status: String(row['Status'] || '').trim(),
+              phase: String(row['Phase'] || '').trim(),
+              predecessorWbs: String(row['Predecessor WBS'] || '').trim(),
+              resource: String(row['Owner'] || '').trim(),
+              effortManday: effort,
+            };
+          })
+          .filter((row) => row.wbs || row.taskName || row.parentWbs || row.startDate || row.endDate || row.phase || row.resource);
+
+      if (!importedRows.length) {
+        throw new Error('No task rows found in the file');
+      }
+
+      const result = await taskApi.replaceByImport(projectId, importedRows);
+      useStore.setState({ tasks: result.data });
+      toast.success(`Imported ${result.data.length} tasks`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Import failed');
+    } finally {
+      setImporting(false);
+    }
   };
 
   // ── PDF export: left=table, right=Gantt, 1 task per line ─────────────────
@@ -1145,13 +1303,14 @@ export default function TasksTab({ projectId }: Props) {
           )}
         </div>
         <div style={{ display:'flex', gap:8, position:'relative' }}>
+          <input ref={importInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImportFileChange} />
           <div style={{ position:'relative' }}>
             <Btn variant="ghost" small onClick={()=>setShowExport(v=>!v)}>
               <Download size={13} /> Export <ChevronDown size={11} />
             </Btn>
             {showExport && (
               <div style={{ position:'absolute', right:0, top:'110%', background:C.white, border:`1px solid ${C.border}`, borderRadius:10, boxShadow:C.shadow2, zIndex:50, minWidth:160, overflow:'hidden' }}>
-                {[['📊 Excel (.xlsx)', exportXLSX],['📄 PDF + Gantt', exportPDF]].map(([label, fn]) => (
+                {[['📊 Excel Template (.xlsx)', exportXLSX],['📄 PDF + Gantt', exportPDF],['📥 Import Overwrite (.xlsx)', openImportDialog]].map(([label, fn]) => (
                   <button key={label as string} onClick={fn as ()=>void}
                     style={{ display:'block', width:'100%', padding:'10px 16px', textAlign:'left', border:'none', background:'none', cursor:'pointer', fontSize:13, color:C.text, fontFamily:'Poppins, sans-serif' }}
                     onMouseEnter={e=>e.currentTarget.style.background=C.bg}
@@ -1162,6 +1321,7 @@ export default function TasksTab({ projectId }: Props) {
               </div>
             )}
           </div>
+          <Btn small onClick={openImportDialog} style={{ opacity: importing ? 0.7 : 1 }}><Upload size={13} /> {importing ? 'Importing…' : 'Import Excel'}</Btn>
           <Btn small onClick={openAddTaskDefault}><Plus size={13} /> Add Task</Btn>
         </div>
       </div>

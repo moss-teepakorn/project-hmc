@@ -654,6 +654,130 @@ export const taskApi = {
 
     return { data: allTasks };
   },
+
+  replaceByImport: async (projectId: string, importedTasks: Array<Partial<Task> & { parentWbs?: string; predecessorWbs?: string }>): Promise<{ data: Task[] }> => {
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const okWrite = await checkProjectPermission(projectId, 'write');
+    if (!okWrite) throw new Error('FORBIDDEN');
+
+    const clean = (value: unknown) => String(value ?? '').trim();
+    const toDate = (value: unknown) => {
+      const text = clean(value);
+      if (!text) return '';
+      return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+    };
+    const toPercent = (value: unknown) => {
+      const num = Number(value ?? 0);
+      return Number.isFinite(num) ? Math.min(100, Math.max(0, Math.round(num))) : 0;
+    };
+    const toEffort = (value: unknown) => normalizeEffortManday(Number(value ?? 0));
+    const allowedStatuses = new Set(['Todo', 'In Progress', 'Block/Delay', 'Done']);
+
+    const rows = importedTasks.map((item, index) => ({
+      sourceRow: index + 2,
+      wbs: clean(item.wbs),
+      taskName: clean(item.taskName),
+      startDate: toDate(item.startDate),
+      endDate: toDate(item.endDate),
+      actualFinish: toDate(item.actualFinish),
+      percentComplete: toPercent(item.percentComplete),
+      status: clean(item.status) || 'Todo',
+      phase: clean(item.phase),
+      resource: clean(item.resource),
+      relatedTask: '',
+      parentWbs: clean(item.parentWbs),
+      predecessorWbs: clean(item.predecessorWbs),
+      orderHint: clean((item as any).order),
+      levelHint: clean((item as any).level),
+      effortManday: toEffort(item.effortManday),
+    }));
+
+    if (!rows.length) throw new Error('IMPORT_FILE_EMPTY');
+
+    const wbsSet = new Set<string>();
+    const phaseOptions = (await masterCodeApi.getByType('task_phase')).data
+      .filter((code) => code.active)
+      .map((code) => String(code.codeValue || '').trim());
+    const allowAnyPhase = phaseOptions.length === 0;
+
+    for (const row of rows) {
+      if (!row.wbs) throw new Error(`Row ${row.sourceRow}: WBS is required`);
+      if (wbsSet.has(row.wbs)) throw new Error(`Row ${row.sourceRow}: duplicate WBS '${row.wbs}'`);
+      wbsSet.add(row.wbs);
+      if (!row.taskName) throw new Error(`Row ${row.sourceRow}: Task Name is required`);
+      if (!row.startDate) throw new Error(`Row ${row.sourceRow}: Start Date must be YYYY-MM-DD`);
+      if (!row.endDate) throw new Error(`Row ${row.sourceRow}: End Date must be YYYY-MM-DD`);
+      if (row.actualFinish && !row.actualFinish) throw new Error(`Row ${row.sourceRow}: Actual Finish must be YYYY-MM-DD`);
+      if (!allowedStatuses.has(row.status)) throw new Error(`Row ${row.sourceRow}: invalid Status '${row.status}'`);
+      if (!allowAnyPhase && row.phase && !phaseOptions.includes(row.phase)) throw new Error(`Row ${row.sourceRow}: invalid Phase '${row.phase}'`);
+    }
+
+    for (const row of rows) {
+      if (row.parentWbs && !wbsSet.has(row.parentWbs)) {
+        throw new Error(`Row ${row.sourceRow}: Parent WBS '${row.parentWbs}' not found`);
+      }
+      if (row.predecessorWbs && !wbsSet.has(row.predecessorWbs)) {
+        throw new Error(`Row ${row.sourceRow}: Predecessor WBS '${row.predecessorWbs}' not found`);
+      }
+    }
+
+    const sorted = [...rows].sort((a, b) => compareWbs(a.wbs, b.wbs));
+    const existing = await taskApi.getByProject(projectId);
+    const existingIds = existing.data.map((task) => task.id);
+    if (existingIds.length) {
+      const { error: deleteErr } = await supabase.from('tasks').delete().eq('project_id', projectId);
+      if (deleteErr) throw new Error(deleteErr.message);
+    }
+
+    const createdByWbs = new Map<string, Task>();
+    let runningOrder = 1;
+    for (const row of sorted) {
+      const parentTask = row.parentWbs ? createdByWbs.get(row.parentWbs) : null;
+      const level = parentTask ? (Number(parentTask.level || 0) + 1) : 0;
+      const payload = objToRow({
+        projectId,
+        wbs: row.wbs,
+        taskName: row.taskName,
+        effortManday: row.effortManday,
+        startDate: row.startDate,
+        endDate: row.endDate,
+        actualFinish: row.actualFinish,
+        phase: row.phase,
+        duration: calcDurationFromDates({ startDate: row.startDate, endDate: row.endDate } as Task),
+        percentComplete: row.percentComplete,
+        status: row.status,
+        resource: row.resource,
+        relatedTask: '',
+        parentId: parentTask?.id || '',
+        level,
+        order: runningOrder++,
+      } as Record<string, unknown>);
+      delete payload.id;
+      delete payload.created_at;
+
+      const { data, error } = await supabase.from('tasks').insert(payload).select().single();
+      if (error) throw new Error(`Row ${row.sourceRow}: ${error.message}`);
+      createdByWbs.set(row.wbs, rowToObj<Task>(data));
+    }
+
+    for (const row of sorted) {
+      if (!row.predecessorWbs) continue;
+      const task = createdByWbs.get(row.wbs);
+      const predecessor = createdByWbs.get(row.predecessorWbs);
+      if (!task || !predecessor) continue;
+      const { error: relationErr } = await supabase
+        .from('tasks')
+        .update({ related_task: predecessor.id })
+        .eq('id', task.id);
+      if (relationErr) throw new Error(`Row ${row.sourceRow}: ${relationErr.message}`);
+    }
+
+    const all = await taskApi.getByProject(projectId);
+    const structured = recalcStructure(all.data);
+    const allTasks = recalcParents(structured);
+    await persistTaskChanges(all.data, allTasks);
+    return { data: allTasks };
+  },
 };
 
 async function deleteTaskAndChildren(taskId: string): Promise<void> {
