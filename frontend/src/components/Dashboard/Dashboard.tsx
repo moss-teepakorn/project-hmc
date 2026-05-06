@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useRolePermissions } from '../../hooks/useRolePermissions';
 import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, MILESTONE_STATUS, TH, TD } from '../Common';
 import { fmtDate, fmtMoney, compareWbs, computeBaselineProgress, getHalfMonthSnapshotDates } from '../../utils';
 import type { Project } from '../../types';
@@ -16,14 +17,13 @@ const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live',
 export default function Dashboard() {
   const { projects, tasks, milestones, issues, risks, changeRequests, activeProject, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts, masterCodes } = useStore();
   const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
-  const isClient = profile?.role === 'client';
+  const permissions = useRolePermissions();
   const [selected,   setSelected]   = useState<Project | null>(null);
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [showAdd,    setShowAdd]    = useState(false);
   const [showHypercare, setShowHypercare] = useState(false);
-  const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>(isClient ? 'report' : 'overview');
+  const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>(permissions.canViewPortfolioOverview ? 'overview' : 'report');
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [notificationsShown, setNotificationsShown] = useState(false);
   const [sendingAll, setSendingAll] = useState(false);
@@ -233,7 +233,7 @@ export default function Dashboard() {
           <div style={{ width: '100%', minHeight: 0 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '16px 14px 0' : '24px 32px 0' }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                {!isClient && (
+                {permissions.canViewPortfolioOverview && (
                   <button
                     onClick={() => setDashboardTab('overview')}
                     style={{
@@ -322,7 +322,7 @@ export default function Dashboard() {
                     {sendingAll ? 'Sending…' : 'Send Email'}
                   </Btn>
                 )}
-                {isAdmin && dashboardTab === 'overview' && (
+                {profile?.role === 'admin' && dashboardTab === 'overview' && (
                   <Btn variant="outline" onClick={() => setShowEmailLogs(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Mail size={13} /> Email Logs
                   </Btn>

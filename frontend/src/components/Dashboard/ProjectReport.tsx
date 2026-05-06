@@ -3,6 +3,7 @@ import html2canvas from 'html2canvas';
 import { Printer } from 'lucide-react';
 import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
+import { useRolePermissions } from '../../hooks/useRolePermissions';
 import { C, MILESTONE_STATUS } from '../Common';
 import { fmtDate, fmtMoney, compareWbs, RISK_LEVEL_COLOR } from '../../utils';
 import type { Project } from '../../types';
@@ -70,7 +71,7 @@ function Pill({ label, bg, color }: { label: string; bg: string; color: string }
 export default function ProjectReport({ project }: Props) {
   const { tasks, milestones, efforts, members, changeRequests, issues, risks, masterCodes } = useStore();
   const { profile } = useAuth();
-  const isMemberRole = profile?.role === 'member';
+  const permissions = useRolePermissions();
   const [commitId] = useState(() => (import.meta as any).env?.VITE_COMMIT_ID ?? 'local');
 
   const pt  = tasks.filter(t => t.projectId === project.id);
@@ -90,8 +91,8 @@ export default function ProjectReport({ project }: Props) {
   // Payment - mask for Member role
   const totalContract = ms.reduce((s, m) => s + m.amount, 0);
   const collected     = ms.filter(m => m.status === 'paid').reduce((s, m) => s + m.amount, 0);
-  const displayCollected = isMemberRole ? 0 : collected;
-  const payPct        = pct(displayCollected, isMemberRole ? 1 : totalContract);
+  const displayCollected = permissions.getMaskedAmount(collected);
+  const payPct        = pct(displayCollected, permissions.maskFinancialAmounts ? 1 : totalContract);
 
   // Effort / manday
   const tBudMD  = ef.reduce((s, e) => s + e.budgetManday, 0);
@@ -365,7 +366,7 @@ export default function ProjectReport({ project }: Props) {
                       <div style={{ fontSize: 8, color: '#94A3B8', lineHeight: '12px', marginTop: 2 }}>Due: {fmtDate(m.dueDate) || 'TBD'}</div>
                     </div>
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', gap: 3 }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: '#0F172A', lineHeight: '12px' }}>{money(isMemberRole ? 0 : m.amount)}</div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: '#0F172A', lineHeight: '12px' }}>{money(permissions.getMaskedAmount(m.amount))}</div>
                       <Pill label={ss.label} bg={ss.bg} color={ss.color} />
                     </div>
                   </div>
@@ -480,7 +481,7 @@ export default function ProjectReport({ project }: Props) {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <div>
                   <div style={{ fontSize: 8, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase' }}>Contract Value</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: C.primary }}>{money(isMemberRole ? 0 : totalContract)} <span style={{ fontSize: 9, fontWeight: 500 }}>THB</span></div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: C.primary }}>{money(permissions.getMaskedAmount(totalContract))} <span style={{ fontSize: 9, fontWeight: 500 }}>THB</span></div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 8, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase' }}>Collected</div>

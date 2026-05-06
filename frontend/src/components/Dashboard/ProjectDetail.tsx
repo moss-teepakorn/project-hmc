@@ -14,14 +14,14 @@ import RiskRegisterTab   from '../RiskRegister/RiskRegisterTab';
 import ProjectEnvironmentTab from './ProjectEnvironmentTab';
 import ProjectReport     from './ProjectReport';
 import { useStore }      from '../../store';
-import { useAuth }       from '../../contexts/AuthContext';
+import { useRolePermissions } from '../../hooks/useRolePermissions';
 
 interface Props { project: Project; }
 
 export default function ProjectDetail({ project }: Props) {
   const [activeTab, setActiveTab]   = useState('tasks');
   const [isMobile, setIsMobile] = useState(false);
-  const { profile } = useAuth();
+  const permissions = useRolePermissions();
   const {
     tasks,
     members,
@@ -87,20 +87,8 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'report',   label: 'Report',     icon: '📊' },
   ];
 
-  // Role-based tab filtering
-  const userRole = profile?.role || 'admin';
-  const TABS = allTabs.filter(tab => {
-    if (userRole === 'admin') return true; // Admin sees all tabs
-    if (userRole === 'member') {
-      // Member cannot see Milestone tab
-      return tab.id !== 'ms';
-    }
-    if (userRole === 'client') {
-      // Client cannot see Milestone, Effort, or Report tabs
-      return tab.id !== 'ms' && tab.id !== 'effort' && tab.id !== 'report';
-    }
-    return true;
-  });
+  // Filter tabs based on role permissions
+  const TABS = allTabs.filter(tab => permissions.isTabVisible(tab.id));
 
   React.useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
