@@ -14,12 +14,14 @@ import RiskRegisterTab   from '../RiskRegister/RiskRegisterTab';
 import ProjectEnvironmentTab from './ProjectEnvironmentTab';
 import ProjectReport     from './ProjectReport';
 import { useStore }      from '../../store';
+import { useAuth }       from '../../contexts/AuthContext';
 
 interface Props { project: Project; }
 
 export default function ProjectDetail({ project }: Props) {
   const [activeTab, setActiveTab]   = useState('tasks');
   const [isMobile, setIsMobile] = useState(false);
+  const { profile } = useAuth();
   const {
     tasks,
     members,
@@ -72,7 +74,7 @@ export default function ProjectDetail({ project }: Props) {
         : C.greenBg;
   const scheduleLabel = scheduleStatus === 'Plan N/A' ? 'Plan N/A' : `Project Health : ${scheduleStatus}`;
 
-  const TABS = [
+  const allTabs = [
     { id: 'tasks',    label: 'Tasks',      icon: '📋', count: tasks.filter(t => t.projectId === project.id).length },
     { id: 'summary',  label: 'Summary',    icon: '📈' },
     { id: 'members',  label: 'Members',    icon: '👥', count: members.length },
@@ -84,6 +86,21 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'env',      label: 'Program URL', icon: '🌐', count: projectEnvironments.filter((e) => e.projectId === project.id).length },
     { id: 'report',   label: 'Report',     icon: '📊' },
   ];
+
+  // Role-based tab filtering
+  const userRole = profile?.role || 'admin';
+  const TABS = allTabs.filter(tab => {
+    if (userRole === 'admin') return true; // Admin sees all tabs
+    if (userRole === 'member') {
+      // Member cannot see Milestone tab
+      return tab.id !== 'ms';
+    }
+    if (userRole === 'client') {
+      // Client cannot see Milestone, Effort, or Report tabs
+      return tab.id !== 'ms' && tab.id !== 'effort' && tab.id !== 'report';
+    }
+    return true;
+  });
 
   React.useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);

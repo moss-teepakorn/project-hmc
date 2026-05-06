@@ -17,12 +17,13 @@ export default function Dashboard() {
   const { projects, tasks, milestones, issues, risks, changeRequests, activeProject, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts, masterCodes } = useStore();
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
+  const isClient = profile?.role === 'client';
   const [selected,   setSelected]   = useState<Project | null>(null);
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [showAdd,    setShowAdd]    = useState(false);
   const [showHypercare, setShowHypercare] = useState(false);
-  const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>('overview');
+  const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>(isClient ? 'report' : 'overview');
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [notificationsShown, setNotificationsShown] = useState(false);
   const [sendingAll, setSendingAll] = useState(false);
@@ -232,26 +233,40 @@ export default function Dashboard() {
           <div style={{ width: '100%', minHeight: 0 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '16px 14px 0' : '24px 32px 0' }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                {['overview', 'report'].map((tab) => (
+                {!isClient && (
                   <button
-                    key={tab}
-                    onClick={() => setDashboardTab(tab as 'overview' | 'report')}
+                    onClick={() => setDashboardTab('overview')}
                     style={{
                       padding: '6px 12px',
                       borderRadius: 10,
-                      border: dashboardTab === tab ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
-                      background: dashboardTab === tab ? C.primaryBg : C.white,
-                      color: dashboardTab === tab ? C.primary : C.text,
+                      border: dashboardTab === 'overview' ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
+                      background: dashboardTab === 'overview' ? C.primaryBg : C.white,
+                      color: dashboardTab === 'overview' ? C.primary : C.text,
                       cursor: 'pointer',
                       fontWeight: 600,
                       fontSize: 12,
                       fontFamily: 'Poppins, sans-serif',
                     }}
                   >
-                    {tab === 'overview' ? 'Portfolio Overview' : 'Project Summary Report'}
+                    Portfolio Overview
                   </button>
-                ))}
-                {selected && (
+                )}
+                <button
+                  onClick={() => setDashboardTab('report')}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 10,
+                    border: dashboardTab === 'report' ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
+                    background: dashboardTab === 'report' ? C.primaryBg : C.white,
+                    color: dashboardTab === 'report' ? C.primary : C.text,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: 12,
+                    fontFamily: 'Poppins, sans-serif',
+                  }}
+                >
+                  Project Summary Report
+                </button>
                   <button
                     type="button"
                     onClick={() => {

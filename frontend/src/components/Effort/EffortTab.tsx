@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
+import { useAuth } from '../../contexts/AuthContext';
 import { Card, Btn, Modal, FormRow, Input, Select, ConfirmModal, ProgressBar, C, TH, TD } from '../Common';
 import { fmtMoney, fmtMonth } from '../../utils';
 import type { Effort } from '../../types';
@@ -12,6 +13,8 @@ const PHASE_OPTIONS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
 
 export default function EffortTab({ projectId }: Props) {
   const { efforts, tasks, masterCodes, fetchEfforts, fetchTasks, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
+  const { profile } = useAuth();
+  const isMemberRole = profile?.role === 'member';
   const [modal, setModal]       = useState<Partial<Effort> | null>(null);
   const [phaseSummaryOpen, setPhaseSummaryOpen] = useState(false);
   const [deleting, setDeleting] = useState<Effort | null>(null);
@@ -121,6 +124,9 @@ export default function EffortTab({ projectId }: Props) {
   const tRem     = tBudMD - tUsedMD;
   const pct      = tBudMD > 0 ? Math.round((tUsedMD / tBudMD) * 100) : 0;
 
+  // Mask amounts for Member role
+  const displayBudgetAmt = isMemberRole ? 0 : tBudAmt;
+
   const handleSave = async (form: Partial<Effort>) => {
     try {
       if (form.id) { await updateEffort(form.id, form); toast.success('Task updated'); }
@@ -147,7 +153,7 @@ export default function EffortTab({ projectId }: Props) {
       {/* Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4,1fr)', gap: 12, marginBottom: 18 }}>
         {[
-          { label: 'Budget Amount', value: `฿${fmtMoney(tBudAmt)}`, color: C.primary, bg: C.primaryBg,                 icon: '💼' },
+          { label: 'Budget Amount', value: `฿${fmtMoney(displayBudgetAmt)}`, color: C.primary, bg: C.primaryBg,                 icon: '💼' },
           { label: 'Budget Manday', value: `${tBudMD} MD`,            color: C.blue,    bg: C.blueBg,                    icon: '📅' },
           { label: 'Used Manday',   value: `${tUsedMD} MD`,           color: C.amber,   bg: C.amberBg,                   icon: '⚡' },
           { label: 'Remaining',     value: `${tRem} MD`,              color: tRem < 0 ? C.red : C.green, bg: tRem < 0 ? C.redBg : C.greenBg, icon: tRem < 0 ? '⚠️' : '✅' },
@@ -187,6 +193,7 @@ export default function EffortTab({ projectId }: Props) {
         phases.map((phase) => {
           const phaseEfforts = efforts.filter((e) => phaseKey(e.phase) === phase);
           const totals = phaseTotals[phase];
+          const displayPhaseBudgetAmount = isMemberRole ? 0 : totals.budgetAmount;
           return (
             <div key={phase} style={{ marginBottom: isMobile ? 18 : 24 }}>
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: 10, marginBottom: 12 }}>
@@ -197,7 +204,7 @@ export default function EffortTab({ projectId }: Props) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 12, color: C.text2 }}>฿{fmtMoney(totals.budgetAmount)}</div>
+                  <div style={{ fontSize: 12, color: C.text2 }}>฿{fmtMoney(displayPhaseBudgetAmount)}</div>
                   <div style={{ fontSize: 12, color: C.text2 }}>{phaseEfforts.length} tasks</div>
                 </div>
               </div>
@@ -211,7 +218,7 @@ export default function EffortTab({ projectId }: Props) {
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>{e.module}</div>
-                            <div style={{ fontSize: 12, color: C.text2 }}>{e.budgetManday} MD • ฿{fmtMoney(e.budgetAmount)}</div>
+                            <div style={{ fontSize: 12, color: C.text2 }}>{e.budgetManday} MD • ฿{fmtMoney(isMemberRole ? 0 : e.budgetAmount)}</div>
                           </div>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button onClick={() => setModal(e)} style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.primaryBg, border: 'none', borderRadius: 8, color: C.primary, cursor: 'pointer' }}>
@@ -286,7 +293,7 @@ export default function EffortTab({ projectId }: Props) {
                         return (
                           <tr key={e.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
                             <td style={{ ...TD, fontWeight: 600 }}>{e.module}</td>
-                            <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', color: C.primary, fontWeight: 600 }}>฿{fmtMoney(e.budgetAmount)}</td>
+                            <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', color: C.primary, fontWeight: 600 }}>฿{fmtMoney(isMemberRole ? 0 : e.budgetAmount)}</td>
                             <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.blue }}>{e.budgetManday}</td>
                             {months.map(mo => (
                               <td key={mo} style={{ ...TD, textAlign: 'center', padding: '6px 6px' }}>
@@ -324,7 +331,7 @@ export default function EffortTab({ projectId }: Props) {
                       {phaseEfforts.length > 0 && (
                         <tr style={{ background: C.bg2, borderTop: `2px solid ${C.border2}` }}>
                           <td style={{ ...TD, fontWeight: 800 }}>TOTAL</td>
-                          <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontWeight: 700, color: C.primary }}>฿{fmtMoney(totals.budgetAmount)}</td>
+                          <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontWeight: 700, color: C.primary }}>฿{fmtMoney(isMemberRole ? 0 : totals.budgetAmount)}</td>
                           <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.blue }}>{totals.budgetManday}</td>
                           {months.map(mo => {
                             const sum = phaseEfforts.reduce((s, e) => s + ((e.monthly || {})[mo] || 0), 0);
