@@ -267,29 +267,27 @@ export default function Dashboard() {
                 >
                   Project Summary Report
                 </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveProject(null);
-                  window.dispatchEvent(new CustomEvent('app-home'));
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 12px',
-                  borderRadius: 10,
-                  border: `1px solid ${C.border}`,
-                  background: C.white,
-                  color: C.text,
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: 12,
-                  fontFamily: 'Poppins, sans-serif',
-                }}
-              ><Home size={14} /> Home</button>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveProject(null);
+                    window.dispatchEvent(new CustomEvent('app-home'));
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 12px',
+                    borderRadius: 10,
+                    border: `1px solid ${C.border}`,
+                    background: C.white,
+                    color: C.text,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: 12,
+                    fontFamily: 'Poppins, sans-serif',
+                  }}
+                ><Home size={14} /> Home</button>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {dashboardTab === 'overview' && (
@@ -556,6 +554,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
 // ── Per-project summary panel ─────────────────────────────────────────────────
 function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { project: Project; onOpen: () => void; onViewMilestones: () => void; isMobile: boolean }) {
   const { tasks, milestones, members, efforts, changeRequests, issues, risks, masterCodes } = useStore();
+  const permissions = useRolePermissions();
   const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
   const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: project.status || 'Unknown' };
 
@@ -577,6 +576,11 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
   const paidAmt = ms.filter((m) => String(m.status).toLowerCase() === 'paid').reduce((sum, m) => sum + (m.amount || 0), 0);
   const outstandingAmt = Math.max(totalContract - paidAmt, 0);
   const payPct = totalContract > 0 ? Math.round((paidAmt / totalContract) * 100) : 0;
+  const visibleTotalContract = permissions.getMaskedAmount(totalContract);
+  const visibleBilledAmt = permissions.getMaskedAmount(billedAmt);
+  const visiblePaidAmt = permissions.getMaskedAmount(paidAmt);
+  const visibleOutstandingAmt = permissions.maskFinancialAmounts ? 0 : outstandingAmt;
+  const visiblePayPct = permissions.maskFinancialAmounts ? 0 : payPct;
 
   const tBudMD = ef.reduce((sum, e) => sum + (e.budgetManday || 0), 0);
   const tUsedMD = ef.reduce((sum, e) => sum + Object.values(e.monthly || {}).reduce((acc, v) => acc + Number(v || 0), 0), 0);
@@ -785,7 +789,7 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
           { title: 'Overall Progress', value: `${prog}%`, detail: `${doneTasks}/${totalTasks} completed`, color: C.primary, bg: C.primaryBg },
           { title: 'Schedule Status', value: `${plannedPercent}%`, detail: scheduleDetail, color: scheduleColor, bg: scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg },
           { title: 'Project Health', value: healthValue, detail: healthSubtitle, color: scheduleColor, bg: scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg },
-          { title: 'Payment Collected', value: `฿${fmtMoney(paidAmt)}`, detail: `Outstanding ฿${fmtMoney(outstandingAmt)}`, color: C.green, bg: C.greenBg },
+          { title: 'Payment Collected', value: `฿${fmtMoney(visiblePaidAmt)}`, detail: `Outstanding ฿${fmtMoney(visibleOutstandingAmt)}`, color: C.green, bg: C.greenBg },
           { title: 'Resource Usage', value: `${tUsedMD}/${tBudMD}`, detail: 'Mandays used / budget', color: C.amber, bg: C.amberBg },
           { title: 'Risks / Issues', value: `${openRisks}/${openIssues}`, detail: `${openRisks} open risks`, color: openRisks ? C.red : C.green, bg: openRisks ? C.redBg : C.greenBg },
         ].map((item) => (
@@ -826,7 +830,7 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
               <div style={{ fontSize: 11, color: C.text2 }}>NEXT MILESTONE</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginTop: 6 }}>{upcomingMilestones[0]?.name || 'No milestone due soon'}</div>
-              {upcomingMilestones[0] && <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>{upcomingMilestones[0].dueDate ? fmtDate(upcomingMilestones[0].dueDate) : 'TBD'} · Amount ฿{fmtMoney(upcomingMilestones[0].amount)}</div>}
+              {upcomingMilestones[0] && <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>{upcomingMilestones[0].dueDate ? fmtDate(upcomingMilestones[0].dueDate) : 'TBD'} · Amount ฿{fmtMoney(permissions.getMaskedAmount(upcomingMilestones[0].amount || 0))}</div>}
             </div>
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
               <div style={{ fontSize: 11, color: C.text2 }}>NEXT ACTION</div>
@@ -869,7 +873,7 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
                   <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{m.phase || 'No phase'}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>฿{fmtMoney(m.amount)}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>฿{fmtMoney(permissions.getMaskedAmount(m.amount || 0))}</div>
                   <div style={{ fontSize: 11, color: m.isDelayed ? C.red : C.text2, marginTop: 4 }}>{m.dueDate ? fmtDate(m.dueDate) : 'TBD'}</div>
                   {(() => {
                     const ss = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
@@ -889,19 +893,19 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 16 }}>
             <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: C.text2 }}>CONTRACT</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(totalContract)}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(visibleTotalContract)}</div>
             </div>
             <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: C.text2 }}>BILLED</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(billedAmt)}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(visibleBilledAmt)}</div>
             </div>
             <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: C.text2 }}>COLLECTED</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(paidAmt)}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(visiblePaidAmt)}</div>
             </div>
             <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: C.text2 }}>NEXT BILLING</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(upcomingMilestones[0]?.amount || 0)}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(permissions.getMaskedAmount(upcomingMilestones[0]?.amount || 0))}</div>
             </div>
           </div>
         </Card>
