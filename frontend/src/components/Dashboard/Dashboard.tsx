@@ -267,28 +267,29 @@ export default function Dashboard() {
                 >
                   Project Summary Report
                 </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveProject(null);
-                      window.dispatchEvent(new CustomEvent('app-home'));
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '6px 12px',
-                      borderRadius: 10,
-                      border: `1px solid ${C.border}`,
-                      background: C.white,
-                      color: C.text,
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                      fontSize: 12,
-                      fontFamily: 'Poppins, sans-serif',
-                    }}
-                  ><Home size={14} /> Home</button>
-                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveProject(null);
+                  window.dispatchEvent(new CustomEvent('app-home'));
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  borderRadius: 10,
+                  border: `1px solid ${C.border}`,
+                  background: C.white,
+                  color: C.text,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  fontFamily: 'Poppins, sans-serif',
+                }}
+              ><Home size={14} /> Home</button>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {dashboardTab === 'overview' && (
