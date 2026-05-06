@@ -653,22 +653,32 @@ export default function TasksTab({ projectId }: Props) {
   const exportXLSX = () => {
     const taskById = new Map(projectTasks.map((task) => [task.id, task]));
     const sortedTasks = [...projectTasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
+    const exampleRows = [
+      ['1', 'Project Preparation', '', '2026-05-01', '2026-05-05', '', 100, 'Done', effectivePhaseOptions[0]?.value || 'Project Initiation', '', 'PM Team', 0],
+      ['1.1', 'Kickoff Meeting', '1', '2026-05-01', '2026-05-01', '2026-05-01', 100, 'Done', effectivePhaseOptions[0]?.value || 'Project Initiation', '', 'PM Team', 0.5],
+      ['1.2', 'Requirement Workshop', '1', '2026-05-02', '2026-05-05', '', 60, 'In Progress', effectivePhaseOptions[1]?.value || 'Requirement & Gap Analysis', '1.1', 'Business Analyst', 2],
+      ['2', 'Blueprint Phase', '', '2026-05-06', '2026-05-12', '', 0, 'Todo', effectivePhaseOptions[2]?.value || 'Business Blueprint', '1.2', 'Consulting Team', 0],
+      ['2.1', 'Design Approval', '2', '2026-05-10', '2026-05-12', '', 0, 'Todo', effectivePhaseOptions[2]?.value || 'Business Blueprint', '', 'Project Sponsor', 1],
+    ];
+    const exportRows = sortedTasks.length > 0
+      ? sortedTasks.map((task) => [
+          task.wbs,
+          task.taskName,
+          task.parentId ? (taskById.get(task.parentId)?.wbs || '') : '',
+          task.startDate,
+          task.endDate,
+          task.actualFinish || '',
+          task.percentComplete,
+          getTaskStatus(task),
+          task.phase || '',
+          task.relatedTask ? (taskById.get(task.relatedTask)?.wbs || '') : '',
+          task.resource || '',
+          Number(task.effortManday || 0),
+        ])
+      : exampleRows;
     const ws = XLSX.utils.aoa_to_sheet([
       [...TASK_IMPORT_HEADERS],
-      ...sortedTasks.map((task) => [
-        task.wbs,
-        task.taskName,
-        task.parentId ? (taskById.get(task.parentId)?.wbs || '') : '',
-        task.startDate,
-        task.endDate,
-        task.actualFinish || '',
-        task.percentComplete,
-        getTaskStatus(task),
-        task.phase || '',
-        task.relatedTask ? (taskById.get(task.relatedTask)?.wbs || '') : '',
-        task.resource || '',
-        Number(task.effortManday || 0),
-      ]),
+      ...exportRows,
     ]);
     ws['!cols'] = [{wch:10},{wch:38},{wch:14},{wch:14},{wch:14},{wch:14},{wch:12},{wch:16},{wch:26},{wch:18},{wch:24},{wch:14}];
 
@@ -690,7 +700,7 @@ export default function TasksTab({ projectId }: Props) {
     XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
     XLSX.utils.book_append_sheet(wb, referenceSheet, 'Reference');
     XLSX.writeFile(wb, `tasks-${projectId}.xlsx`);
-    toast.success('Exported XLSX'); setShowExport(false);
+    toast.success(sortedTasks.length > 0 ? 'Exported XLSX' : 'Exported XLSX with example rows'); setShowExport(false);
   };
 
   const openImportDialog = () => {
