@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
+import { useRolePermissions } from '../../hooks/useRolePermissions';
 import { Card, Btn, Modal, FormRow, Input, Select, ConfirmModal, ProgressBar, C, TH, TD } from '../Common';
 import { fmtMoney, fmtMonth } from '../../utils';
 import type { Effort } from '../../types';
