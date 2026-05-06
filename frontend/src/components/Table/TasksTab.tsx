@@ -55,7 +55,7 @@ type TaskImportRow = {
   endDate: string;
   actualFinish: string;
   percentComplete: number;
-  status: string;
+  status: TaskStatus;
   phase: string;
   predecessorWbs: string;
   resource: string;
@@ -525,6 +525,11 @@ export default function TasksTab({ projectId }: Props) {
           throw new Error(`Row ${index + 2}: % Complete must be between 0 and 100`);
         }
 
+        const status = String(row['Status'] || '').trim() as TaskStatus;
+        if (!TASK_STATUS_OPTIONS.includes(status)) {
+          throw new Error(`Row ${index + 2}: Status must be one of ${TASK_STATUS_OPTIONS.join(', ')}`);
+        }
+
         const effort = Number(row['Effort Manday'] ?? 0);
         if (!Number.isFinite(effort) || effort < 0) {
           throw new Error(`Row ${index + 2}: Effort Manday must be a non-negative number`);
@@ -538,7 +543,7 @@ export default function TasksTab({ projectId }: Props) {
           endDate,
           actualFinish,
           percentComplete: percent,
-          status: String(row['Status'] || '').trim(),
+          status,
           phase: String(row['Phase'] || '').trim(),
           predecessorWbs: String(row['Predecessor WBS'] || '').trim(),
           resource: String(row['Owner'] || '').trim(),

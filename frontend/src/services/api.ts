@@ -116,6 +116,8 @@ export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId:
 
   return _authFetchPromise;
 }
+import { compareWbs } from '../utils';
+
 // ===== SUPABASE API SERVICE =====
 // All data operations go through Supabase PostgreSQL directly.
 // No custom backend needed.
@@ -695,9 +697,9 @@ export const taskApi = {
     if (!rows.length) throw new Error('IMPORT_FILE_EMPTY');
 
     const wbsSet = new Set<string>();
-    const phaseOptions = (await masterCodeApi.getByType('task_phase')).data
-      .filter((code) => code.active)
-      .map((code) => String(code.codeValue || '').trim());
+    const phaseOptions = (await masterCodeApi.getAll('task_phase')).data
+      .filter((code: MasterCode) => code.active)
+      .map((code: MasterCode) => String(code.codeValue || '').trim());
     const allowAnyPhase = phaseOptions.length === 0;
 
     for (const row of rows) {
