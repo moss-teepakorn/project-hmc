@@ -245,6 +245,8 @@ export default function TasksTab({ projectId }: Props) {
     mode: 'main',
     position: 'append',
   });
+  const [dragTaskId, setDragTaskId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null);
 
   // Scroll sync
   const tableBodyRef = useRef<HTMLDivElement>(null);
@@ -675,6 +677,84 @@ export default function TasksTab({ projectId }: Props) {
       toast.error('Failed to reorder task');
     } finally {
       setContextMenu((prev) => ({ ...prev, visible: false }));
+    }
+  };
+
+  const handleTableRowDragStart = (task: Task) => (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.setData('text/plain', task.id);
+    e.dataTransfer.effectAllowed = 'move';
+    setDragTaskId(task.id);
+  };
+
+  const handleTableRowDragEnd = () => {
+    setDragTaskId(null);
+    setDropTarget(null);
+  };
+
+  const handleTableRowDragOver = (targetTask: Task) => (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const draggedId = dragTaskId || e.dataTransfer.getData('text/plain');
+    if (!draggedId || draggedId === targetTask.id) {
+      setDropTarget(null);
+      return;
+    }
+
+    const draggedTask = projectTasks.find((t) => t.id === draggedId);
+    if (!draggedTask) return;
+    if ((draggedTask.parentId || '') !== (targetTask.parentId || '')) {
+      setDropTarget(null);
+      return;
+    }
+
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const position: 'before' | 'after' = (e.clientY - rect.top) < (rect.height / 2) ? 'before' : 'after';
+    setDropTarget({ id: targetTask.id, position });
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleTableRowDrop = (targetTask: Task) => async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const draggedId = dragTaskId || e.dataTransfer.getData('text/plain');
+    const activeDropTarget = dropTarget;
+    setDropTarget(null);
+    setDragTaskId(null);
+
+    if (!draggedId || !activeDropTarget || draggedId === targetTask.id) return;
+    const draggedTask = projectTasks.find((t) => t.id === draggedId);
+    if (!draggedTask) return;
+    if ((draggedTask.parentId || '') !== (targetTask.parentId || '')) {
+      toast.error('Drag & drop is allowed only within the same group');
+      return;
+    }
+
+    const siblings = projectTasks
+      .filter((t) => (t.parentId || '') === (targetTask.parentId || '') && t.id !== draggedTask.id)
+      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+
+    if (!siblings.length) return;
+
+    let insertIndex = siblings.findIndex((t) => t.id === targetTask.id);
+    if (insertIndex < 0) return;
+    if (activeDropTarget.position === 'after') insertIndex += 1;
+
+    let nextSortOrder = 1;
+    if (insertIndex <= 0) {
+      nextSortOrder = Number(siblings[0].sortOrder || 0) - 0.5;
+    } else if (insertIndex >= siblings.length) {
+      nextSortOrder = Number(siblings[siblings.length - 1].sortOrder || 0) + 1;
+    } else {
+      const prev = Number(siblings[insertIndex - 1].sortOrder || 0);
+      const next = Number(siblings[insertIndex].sortOrder || 0);
+      nextSortOrder = (prev + next) / 2;
+    }
+
+    try {
+      await updateTask(draggedTask.id, { sortOrder: nextSortOrder });
+      toast.success('Task moved');
+    } catch {
+      toast.error('Failed to move task');
     }
   };
 
@@ -1456,11 +1536,26 @@ export default function TasksTab({ projectId }: Props) {
                 const canEditEffort = isNew ? !!newRow.parentId : (!isPar && !!rowTask.parentId);
                 const level = isNew ? newRow.level : rowTask.level ?? 0;
                 const durationDays = isNew ? calcDuration(newRow.startDate, newRow.endDate) : rowTask.duration;
+                const isDropBefore = !isNew && dropTarget?.id === rowTask.id && dropTarget.position === 'before';
+                const isDropAfter = !isNew && dropTarget?.id === rowTask.id && dropTarget.position === 'after';
                 return (
                   <div key={task.id}
+                    draggable={!isNew}
+                    onDragStart={!isNew ? handleTableRowDragStart(rowTask) : undefined}
+                    onDragEnd={!isNew ? handleTableRowDragEnd : undefined}
+                    onDragOver={!isNew ? handleTableRowDragOver(rowTask) : undefined}
+                    onDrop={!isNew ? handleTableRowDrop(rowTask) : undefined}
                     onClick={() => setSelected(task.id)}
                     onContextMenu={!isNew ? openTaskContextMenu(rowTask) : undefined}
-                    style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isNew ? C.primaryBg : isSel ? C.primaryBg : i % 2 === 0 ? C.white : C.bg, borderLeft: isSel ? `3px solid ${C.primary}` : '3px solid transparent', cursor:'pointer', flexShrink:0 }}>
+                    style={{
+                      display:'flex', alignItems:'center', height:ROW_H,
+                      borderTop: isDropBefore ? `2px solid ${C.primary}` : '1px solid transparent',
+                      borderBottom: isDropAfter ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                      background: isNew ? C.primaryBg : isSel ? C.primaryBg : i % 2 === 0 ? C.white : C.bg,
+                      borderLeft: isSel ? `3px solid ${C.primary}` : '3px solid transparent',
+                      cursor: !isNew ? (dragTaskId === rowTask.id ? 'grabbing' : 'grab') : 'pointer',
+                      flexShrink:0,
+                    }}>
                     <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{isNew ? '—' : rowTask!.wbs}</div>
                     <div style={{
                       width: colWidths[1],
