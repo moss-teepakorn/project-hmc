@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Plus, Download, Upload, ChevronDown, ZoomIn, ZoomOut, Lock, Unlock, Sparkles } from 'lucide-react';
+import { Plus, Download, Upload, ChevronDown, ZoomIn, ZoomOut, Lock, Unlock, Sparkles, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Pencil, Trash2, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -566,6 +566,64 @@ export default function TasksTab({ projectId }: Props) {
       toast.error('Failed to move task');
     } finally {
       setMoveToSubModal(null);
+    }
+  };
+
+  const handleReorderTask = async (mode: 'up' | 'down' | 'top' | 'bottom') => {
+    const anchor = contextMenu.task;
+    if (!anchor) return;
+
+    const siblings = projectTasks
+      .filter((t) => (t.parentId || '') === (anchor.parentId || ''))
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+    const index = siblings.findIndex((t) => t.id === anchor.id);
+
+    if (index < 0 || siblings.length <= 1) {
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+      return;
+    }
+
+    let order = Number(anchor.order || 0);
+    if (mode === 'up') {
+      if (index === 0) {
+        toast('Task is already at top');
+        setContextMenu((prev) => ({ ...prev, visible: false }));
+        return;
+      }
+      order = Number(siblings[index - 1].order || 0) - 0.5;
+    }
+    if (mode === 'down') {
+      if (index === siblings.length - 1) {
+        toast('Task is already at bottom');
+        setContextMenu((prev) => ({ ...prev, visible: false }));
+        return;
+      }
+      order = Number(siblings[index + 1].order || 0) + 0.5;
+    }
+    if (mode === 'top') {
+      if (index === 0) {
+        toast('Task is already at top');
+        setContextMenu((prev) => ({ ...prev, visible: false }));
+        return;
+      }
+      order = Number(siblings[0].order || 0) - 0.5;
+    }
+    if (mode === 'bottom') {
+      if (index === siblings.length - 1) {
+        toast('Task is already at bottom');
+        setContextMenu((prev) => ({ ...prev, visible: false }));
+        return;
+      }
+      order = Number(siblings[siblings.length - 1].order || 0) + 0.5;
+    }
+
+    try {
+      await updateTask(anchor.id, { parentId: anchor.parentId || '', order });
+      toast.success('Task order updated');
+    } catch {
+      toast.error('Failed to reorder task');
+    } finally {
+      setContextMenu((prev) => ({ ...prev, visible: false }));
     }
   };
 
@@ -1465,23 +1523,27 @@ export default function TasksTab({ projectId }: Props) {
                       {isNew ? (
                         <>
                           <button onClick={e => { e.stopPropagation(); saveNewTask(); }}
-                            style={{ height:22, padding:'0 8px', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary, fontSize:11, fontWeight:600 }}>
-                            Save
+                            title="Save"
+                            style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary }}>
+                            <Check size={12} />
                           </button>
                           <button onClick={e => { e.stopPropagation(); cancelNewTask(); }}
-                            style={{ height:22, padding:'0 8px', background:C.border2, border:'none', borderRadius:5, cursor:'pointer', color:C.text2, fontSize:11 }}>
-                            Cancel
+                            title="Cancel"
+                            style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.border2, border:'none', borderRadius:5, cursor:'pointer', color:C.text2 }}>
+                            <X size={12} />
                           </button>
                         </>
                       ) : (
                         <>
                           <button onClick={e => { e.stopPropagation(); setEditModal(rowTask); }}
-                            style={{ height:22, padding:'0 7px', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary, fontSize:11, fontWeight:600 }}>
-                            Edit
+                            title="Edit"
+                            style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary }}>
+                            <Pencil size={12} />
                           </button>
                           <button onClick={e => { e.stopPropagation(); handleDelete(rowTask.id); }}
-                            style={{ width:22, height:22, background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red, fontSize:11 }}>
-                            ✕
+                            title="Delete"
+                            style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red }}>
+                            <Trash2 size={12} />
                           </button>
                         </>
                       )}
@@ -1567,8 +1629,9 @@ export default function TasksTab({ projectId }: Props) {
                     </div>
                     <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
                       <button onClick={(e) => { e.stopPropagation(); setEditModal(task); }}
-                        style={{ padding:'6px 10px', borderRadius:8, border:'none', background:C.primaryBg, color:C.primary, fontSize:11, fontWeight:600, cursor:'pointer' }}>
-                        Edit
+                        title="Edit"
+                        style={{ width:28, height:28, display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:8, border:'none', background:C.primaryBg, color:C.primary, cursor:'pointer' }}>
+                        <Pencil size={14} />
                       </button>
                     </div>
                   </div>
@@ -1603,13 +1666,13 @@ export default function TasksTab({ projectId }: Props) {
             ))}
           </div>
           <div style={{ display:'flex', gap:8, marginLeft:8, alignItems:'center' }}>
-            <button onClick={expandAll} onFocus={() => setButtonFocus('expand')} onBlur={() => setButtonFocus(null)}
-              style={{ padding:'5px 10px', borderRadius:6, border:'1px solid transparent', background: buttonFocus === 'expand' ? C.primary : C.primaryBg, color: buttonFocus === 'expand' ? C.white : C.primary, cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif', outline:'none' }}>
-              Expand All
+            <button onClick={expandAll} title="Expand All" onFocus={() => setButtonFocus('expand')} onBlur={() => setButtonFocus(null)}
+              style={{ width:30, height:30, display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:6, border:'1px solid transparent', background: buttonFocus === 'expand' ? C.primary : C.primaryBg, color: buttonFocus === 'expand' ? C.white : C.primary, cursor:'pointer', outline:'none' }}>
+              <ChevronsDown size={15} />
             </button>
-            <button onClick={collapseAll} onFocus={() => setButtonFocus('collapse')} onBlur={() => setButtonFocus(null)}
-              style={{ padding:'5px 10px', borderRadius:6, border:'1px solid transparent', background: buttonFocus === 'collapse' ? C.text : C.bg, color: buttonFocus === 'collapse' ? C.white : C.text2, cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif', outline:'none' }}>
-              Collapse All
+            <button onClick={collapseAll} title="Collapse All" onFocus={() => setButtonFocus('collapse')} onBlur={() => setButtonFocus(null)}
+              style={{ width:30, height:30, display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:6, border:'1px solid transparent', background: buttonFocus === 'collapse' ? C.text : C.bg, color: buttonFocus === 'collapse' ? C.white : C.text2, cursor:'pointer', outline:'none' }}>
+              <ChevronsUp size={15} />
             </button>
           </div>
           {/* Zoom controls (visible when Gantt is showing) */}
@@ -1636,8 +1699,8 @@ export default function TasksTab({ projectId }: Props) {
         <div style={{ display:'flex', gap:8, position:'relative' }}>
           <input ref={importInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImportFileChange} />
           <div style={{ position:'relative' }}>
-            <Btn variant="ghost" small onClick={()=>setShowExport(v=>!v)}>
-              <Download size={13} /> Export <ChevronDown size={11} />
+            <Btn variant="ghost" small onClick={()=>setShowExport(v=>!v)} title="Export">
+              <Download size={13} /> <ChevronDown size={11} />
             </Btn>
             {showExport && (
               <div style={{ position:'absolute', right:0, top:'110%', background:C.white, border:`1px solid ${C.border}`, borderRadius:10, boxShadow:C.shadow2, zIndex:50, minWidth:160, overflow:'hidden' }}>
@@ -1652,12 +1715,12 @@ export default function TasksTab({ projectId }: Props) {
               </div>
             )}
           </div>
-          <Btn small onClick={openImportDialog} style={{ opacity: importing ? 0.7 : 1 }}><Upload size={13} /> {importing ? 'Importing…' : 'Import Excel'}</Btn>
-          <Btn small variant="ghost" onClick={toggleSuggestionLock}>
-            {isSuggestionLocked ? <Lock size={13} /> : <Unlock size={13} />} {isSuggestionLocked ? 'Lock On' : 'Lock Off'}
+          <Btn small onClick={openImportDialog} title={importing ? 'Importing' : 'Import Excel'} style={{ opacity: importing ? 0.7 : 1 }}><Upload size={13} /></Btn>
+          <Btn small variant="ghost" onClick={toggleSuggestionLock} title={isSuggestionLocked ? 'Unlock Suggestion' : 'Lock Suggestion'}>
+            {isSuggestionLocked ? <Lock size={13} /> : <Unlock size={13} />}
           </Btn>
-          <Btn small onClick={openSuggestionModal} disabled={isSuggestionLocked}><Sparkles size={13} /> Suggest Dates</Btn>
-          <Btn small onClick={openAddTaskDefault}><Plus size={13} /> Add Task</Btn>
+          <Btn small onClick={openSuggestionModal} disabled={isSuggestionLocked} title="Suggest Dates"><Sparkles size={13} /></Btn>
+          <Btn small onClick={openAddTaskDefault} title="Add Task"><Plus size={13} /></Btn>
         </div>
       </div>
 
@@ -1694,6 +1757,23 @@ export default function TasksTab({ projectId }: Props) {
 
       {contextMenu.visible && contextMenu.task && (
         <div style={{ position:'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 999, background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow2, minWidth: 220, overflow: 'hidden' }}>
+          <button type="button" onClick={() => handleReorderTask('top')}
+            style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+            <ChevronsUp size={13} style={{ marginRight: 8, verticalAlign: 'text-bottom' }} /> Move Top
+          </button>
+          <button type="button" onClick={() => handleReorderTask('up')}
+            style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+            <ArrowUp size={13} style={{ marginRight: 8, verticalAlign: 'text-bottom' }} /> Move Up
+          </button>
+          <button type="button" onClick={() => handleReorderTask('down')}
+            style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+            <ArrowDown size={13} style={{ marginRight: 8, verticalAlign: 'text-bottom' }} /> Move Down
+          </button>
+          <button type="button" onClick={() => handleReorderTask('bottom')}
+            style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+            <ChevronsDown size={13} style={{ marginRight: 8, verticalAlign: 'text-bottom' }} /> Move Bottom
+          </button>
+          <div style={{ borderTop: `1px solid ${C.border}` }} />
           {contextMenu.taskLevel === 0 ? (
             <>
               <button type="button" onClick={() => handleContextMenuSelect('main-before')}
