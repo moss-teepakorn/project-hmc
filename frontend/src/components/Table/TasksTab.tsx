@@ -766,15 +766,21 @@ export default function TasksTab({ projectId }: Props) {
       return;
     }
 
-    const siblings = projectTasks
+    // IMPORTANT: compute insertion index from the exact order user sees on screen.
+    // This keeps drop behavior deterministic in Collapse all and mixed ordering states.
+    const siblingIdsInViewOrder = visible
       .filter((t) => (t.parentId || '') === (targetTask.parentId || '') && t.id !== draggedTask.id)
-      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+      .map((t) => t.id);
+
+    const siblings = siblingIdsInViewOrder
+      .map((id) => projectTasks.find((t) => t.id === id))
+      .filter((t): t is Task => Boolean(t));
 
     if (!siblings.length) return;
 
-    let insertIndex = siblings.findIndex((t) => t.id === targetTask.id);
+    let insertIndex = siblingIdsInViewOrder.findIndex((id) => id === targetTask.id);
     if (insertIndex < 0) return;
-  if (dropPosition === 'after') insertIndex += 1;
+    if (dropPosition === 'after') insertIndex += 1;
 
     let nextSortOrder = 1;
     if (insertIndex <= 0) {
