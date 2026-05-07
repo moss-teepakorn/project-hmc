@@ -108,6 +108,28 @@ export interface Effort {
   monthly: Record<string, number>;
 }
 
+export interface TaskTemplate {
+  id: string;
+  templateNo: number;
+  name: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskTemplateItem {
+  id: string;
+  templateId: string;
+  wbs: string;
+  parentWbs: string;
+  level: number;
+  sortOrder: number;
+  taskName: string;
+  duration: number;
+  effortManday: number;
+  createdAt: string;
+}
+
 // ── Change Request ────────────────────────────────────────────────────────────
 export interface ChangeRequest {
   id: string;

@@ -124,7 +124,7 @@ import { compareWbs } from '../utils';
 
 import { supabase } from './supabase';
 import { parseISO, isValid } from 'date-fns';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode } from '../types';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem } from '../types';
 
 // ── Snake ↔ Camel conversion helpers ────────────────────────────────────────
 
@@ -595,6 +595,8 @@ export const taskApi = {
   },
 
   copyFromProject: async (sourceProjectId: string, targetProjectId: string, scope: 'all' | 'main' = 'all'): Promise<{ data: Task[] }> => {
+    const canWriteTarget = await checkProjectPermission(targetProjectId, 'write');
+    if (!canWriteTarget) throw new Error('FORBIDDEN');
     const src = await taskApi.getByProject(sourceProjectId);
     const selectedSource = scope === 'main'
       ? src.data.filter((t) => !t.parentId)
@@ -655,6 +657,20 @@ export const taskApi = {
     await persistTaskChanges(all.data, allTasks);
 
     return { data: allTasks };
+  },
+
+  replaceFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Task[] }> => {
+    const canWriteTarget = await checkProjectPermission(targetProjectId, 'write');
+    if (!canWriteTarget) throw new Error('FORBIDDEN');
+
+    const existing = await taskApi.getByProject(targetProjectId);
+    if (existing.data.length) {
+      const { error: deleteErr } = await supabase.from('tasks').delete().eq('project_id', targetProjectId);
+      if (deleteErr) throw new Error(deleteErr.message);
+    }
+
+    const copied = await taskApi.copyFromProject(sourceProjectId, targetProjectId, 'all');
+    return { data: copied.data };
   },
 
   replaceByImport: async (projectId: string, importedTasks: Array<Partial<Task> & { parentWbs?: string; predecessorWbs?: string }>): Promise<{ data: Task[] }> => {
@@ -778,6 +794,188 @@ export const taskApi = {
     const structured = recalcStructure(all.data);
     const allTasks = recalcParents(structured);
     await persistTaskChanges(all.data, allTasks);
+    return { data: allTasks };
+  },
+};
+
+// ── Task Templates (System-wide) ───────────────────────────────────────────
+
+type UpsertTemplateItem = {
+  wbs: string;
+  parentWbs: string;
+  level: number;
+  sortOrder: number;
+  taskName: string;
+  duration: number;
+  effortManday: number;
+};
+
+async function ensureAdminRole(): Promise<string> {
+  const { role, userId } = await getCurrentUserRoleAndId();
+  if (role !== 'admin') throw new Error('FORBIDDEN');
+  return userId;
+}
+
+export const taskTemplateApi = {
+  getAll: async (): Promise<{ data: TaskTemplate[] }> => {
+    const { data, error } = await supabase
+      .from('task_templates')
+      .select('*')
+      .order('template_no', { ascending: true });
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<TaskTemplate>(data || []) };
+  },
+
+  getItems: async (templateId: string): Promise<{ data: TaskTemplateItem[] }> => {
+    const { data, error } = await supabase
+      .from('task_template_items')
+      .select('*')
+      .eq('template_id', templateId)
+      .order('sort_order', { ascending: true });
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<TaskTemplateItem>(data || []) };
+  },
+
+  createFromProject: async (name: string, sourceProjectId: string): Promise<{ data: TaskTemplate }> => {
+    const createdBy = await ensureAdminRole();
+    const source = await taskApi.getByProject(sourceProjectId);
+    const sourceTasks = [...source.data].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+    if (!sourceTasks.length) throw new Error('SOURCE_PROJECT_HAS_NO_TASKS');
+
+    const { data: tplRow, error: tplErr } = await supabase
+      .from('task_templates')
+      .insert({ name: String(name || '').trim(), created_by: createdBy })
+      .select()
+      .single();
+    if (tplErr) throw new Error(tplErr.message);
+
+    const parentById = new Map<string, Task>(sourceTasks.map((t) => [t.id, t]));
+    const items = sourceTasks.map((t) => ({
+      template_id: (tplRow as any).id,
+      wbs: t.wbs || '',
+      parent_wbs: t.parentId ? (parentById.get(t.parentId)?.wbs || '') : '',
+      level: Number(t.level || 0),
+      sort_order: Number(t.sortOrder || 0),
+      task_name: t.taskName || '',
+      duration: Number(t.duration || 0),
+      effort_manday: normalizeEffortManday(t.effortManday),
+    }));
+
+    const { error: itemErr } = await supabase.from('task_template_items').insert(items);
+    if (itemErr) throw new Error(itemErr.message);
+
+    return { data: rowToObj<TaskTemplate>(tplRow as Record<string, unknown>) };
+  },
+
+  updateTemplate: async (templateId: string, updates: Partial<Pick<TaskTemplate, 'name'>>): Promise<{ data: TaskTemplate }> => {
+    await ensureAdminRole();
+    const row = objToRow(updates as Record<string, unknown>);
+    const { data, error } = await supabase
+      .from('task_templates')
+      .update(row)
+      .eq('id', templateId)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<TaskTemplate>(data as Record<string, unknown>) };
+  },
+
+  replaceItems: async (templateId: string, items: UpsertTemplateItem[]): Promise<{ data: TaskTemplateItem[] }> => {
+    await ensureAdminRole();
+    const normalized = items
+      .filter((item) => String(item.taskName || '').trim())
+      .map((item) => ({
+        template_id: templateId,
+        wbs: String(item.wbs || '').trim(),
+        parent_wbs: String(item.parentWbs || '').trim(),
+        level: Math.max(0, Number(item.level || 0)),
+        sort_order: Number(item.sortOrder || 0),
+        task_name: String(item.taskName || '').trim(),
+        duration: Math.max(0, Number(item.duration || 0)),
+        effort_manday: normalizeEffortManday(item.effortManday),
+      }));
+
+    const { error: deleteErr } = await supabase
+      .from('task_template_items')
+      .delete()
+      .eq('template_id', templateId);
+    if (deleteErr) throw new Error(deleteErr.message);
+
+    if (!normalized.length) return { data: [] };
+
+    const { data, error } = await supabase
+      .from('task_template_items')
+      .insert(normalized)
+      .select()
+      .order('sort_order', { ascending: true });
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<TaskTemplateItem>(data || []) };
+  },
+
+  removeTemplate: async (templateId: string): Promise<void> => {
+    await ensureAdminRole();
+    const { error } = await supabase.from('task_templates').delete().eq('id', templateId);
+    if (error) throw new Error(error.message);
+  },
+
+  applyToProject: async (templateId: string, targetProjectId: string): Promise<{ data: Task[] }> => {
+    const canWriteTarget = await checkProjectPermission(targetProjectId, 'write');
+    if (!canWriteTarget) throw new Error('FORBIDDEN');
+
+    const { data: itemRows, error: itemErr } = await supabase
+      .from('task_template_items')
+      .select('*')
+      .eq('template_id', templateId)
+      .order('sort_order', { ascending: true });
+    if (itemErr) throw new Error(itemErr.message);
+
+    const items = rowsToObjs<TaskTemplateItem>(itemRows || []);
+    if (!items.length) throw new Error('TEMPLATE_HAS_NO_ITEMS');
+
+    const { error: deleteErr } = await supabase.from('tasks').delete().eq('project_id', targetProjectId);
+    if (deleteErr) throw new Error(deleteErr.message);
+
+    const createdByWbs = new Map<string, Task>();
+    const sorted = [...items].sort((a, b) => {
+      const levelDiff = Number(a.level || 0) - Number(b.level || 0);
+      if (levelDiff !== 0) return levelDiff;
+      return Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+    });
+
+    for (const item of sorted) {
+      const parentTask = item.parentWbs ? createdByWbs.get(item.parentWbs) : null;
+      const payload = objToRow({
+        projectId: targetProjectId,
+        wbs: item.wbs,
+        taskName: item.taskName,
+        effortManday: normalizeEffortManday(item.effortManday),
+        startDate: '',
+        endDate: '',
+        actualFinish: '',
+        phase: '',
+        duration: Math.max(0, Number(item.duration || 0)),
+        percentComplete: 0,
+        status: 'Todo',
+        resource: '',
+        relatedTask: '',
+        parentId: parentTask?.id || '',
+        level: Number(item.level || 0),
+        sortOrder: Number(item.sortOrder || 0),
+      } as Record<string, unknown>);
+      delete payload.id;
+      delete payload.created_at;
+
+      const { data, error } = await supabase.from('tasks').insert(payload).select().single();
+      if (error) throw new Error(error.message);
+      const createdTask = rowToObj<Task>(data as Record<string, unknown>);
+      createdByWbs.set(item.wbs, createdTask);
+    }
+
+    const all = await taskApi.getByProject(targetProjectId);
+    const structured = recalcStructure(all.data);
+    const allTasks = recalcParents(structured);
+    await persistTaskChanges(all.data, allTasks);
+
     return { data: allTasks };
   },
 };

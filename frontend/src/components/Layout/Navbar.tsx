@@ -5,7 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { C } from '../Common';
 import SetupModal from '../Setup/SetupModal';
-import { Bell, Home, LogOut, Moon, Sun } from 'lucide-react';
+import TaskTemplateModal from '../Setup/TaskTemplateModal';
+import { Bell, Home, LogOut, Moon, Sun, Copy } from 'lucide-react';
 
 const F = 'Poppins, sans-serif';
 
@@ -16,6 +17,7 @@ export default function Navbar() {
   const [isMobile, setIsMobile] = React.useState(false);
   const [notifyOpen, setNotifyOpen] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
+  const [taskTemplateOpen, setTaskTemplateOpen] = React.useState(false);
   const [setupLoading, setSetupLoading] = React.useState(false);
   const bellRef = React.useRef<HTMLDivElement | null>(null);
   const isDark = theme === 'dark';
@@ -194,6 +196,27 @@ export default function Navbar() {
           </button>
         )}
 
+        <button
+          onClick={() => setTaskTemplateOpen(true)}
+          title={activeProject ? 'Task Copy & WBS Template' : 'Open a project first'}
+          disabled={!activeProject}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 9,
+            border: `1px solid ${isDark ? C.border2 : C.border}`,
+            background: isDark ? '#1E293B' : C.white,
+            color: activeProject ? textColor : textMuted,
+            cursor: activeProject ? 'pointer' : 'not-allowed',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: activeProject ? 1 : 0.55,
+          }}
+        >
+          <Copy size={14} />
+        </button>
+
         <div ref={bellRef} style={{ position: 'relative' }}>
           <button
             onClick={() => setNotifyOpen((open) => !open)}
@@ -310,6 +333,7 @@ export default function Navbar() {
         )}
       </div>
       {setupOpen && <SetupModal onClose={() => setSetupOpen(false)} />}
+      {taskTemplateOpen && <TaskTemplateModal onClose={() => setTaskTemplateOpen(false)} />}
     </nav>
   );
 }
