@@ -10,10 +10,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger reminder send endpoint
+        env:
+          VERCEL_DOMAIN: ${{ secrets.VERCEL_DOMAIN }}
+          REMINDER_API_SECRET: ${{ secrets.REMINDER_API_SECRET }}
         run: |
           echo "Triggering task reminder send at $(date)"
-          curl -X POST "https://${{ secrets.VERCEL_DOMAIN }}/api/send-task-reminders" \
+
+          if [ -z "$VERCEL_DOMAIN" ]; then
+            echo "ERROR: Missing GitHub secret VERCEL_DOMAIN"
+            exit 1
+          fi
+
+          if [ -z "$REMINDER_API_SECRET" ]; then
+            echo "ERROR: Missing GitHub secret REMINDER_API_SECRET"
+            exit 1
+          fi
+
+          url="https://${VERCEL_DOMAIN}/api/send-task-reminders"
+          echo "Calling ${url}"
+
+          http_code=$(curl -sS -o response_body.txt -w "%{http_code}" \
+            -X POST "$url" \
             -H "Content-Type: application/json" \
-            -H "x-reminder-secret: ${{ secrets.REMINDER_API_SECRET }}" \
-            -d '{}' \
-            --fail --show-error
+            -H "x-reminder-secret: ${REMINDER_API_SECRET}" \
+            -d '{}')
+
+          echo "HTTP status: ${http_code}"
+          echo "Response body:"
+          cat response_body.txt
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "ERROR: Reminder endpoint call failed"
+            exit 1
+          fi
