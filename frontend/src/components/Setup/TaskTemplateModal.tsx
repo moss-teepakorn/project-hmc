@@ -372,8 +372,8 @@ export default function TaskTemplateModal({ onClose }: Props) {
               </FormRow>
             )}
 
-            <FormRow label="Password (ddmmyyyy)" required>
-              <Input value={password} onChange={setPassword} placeholder="ddmmyyyy" />
+            <FormRow label="Password" required>
+              <Input value={password} onChange={setPassword} placeholder="*********" />
             </FormRow>
 
             <div style={{ padding: '10px 12px', borderRadius: 10, background: C.amberBg, fontSize: 12, color: C.text2 }}>

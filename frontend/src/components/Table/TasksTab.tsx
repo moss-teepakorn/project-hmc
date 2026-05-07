@@ -927,7 +927,7 @@ export default function TasksTab({ projectId }: Props) {
 
   const confirmUnlockSuggestion = () => {
     if (unlockPassword.trim() !== getTodayPassword()) {
-      toast.error('Invalid password. Use today in ddmmyyyy format.');
+      toast.error('Invalid password.');
       return;
     }
     setIsSuggestionLocked(false);
@@ -2221,7 +2221,7 @@ export default function TasksTab({ projectId }: Props) {
         <Modal title="Unlock Suggestion" onClose={() => setUnlockModalOpen(false)} width={520}>
           <div style={{ display: 'grid', gap: 12 }}>
             <FormRow label="Password">
-              <Input value={unlockPassword} onChange={setUnlockPassword} placeholder="ddmmyyyy" />
+              <Input value={unlockPassword} onChange={setUnlockPassword} placeholder="*********" />
             </FormRow>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <Btn variant="ghost" onClick={() => setUnlockModalOpen(false)}>Cancel</Btn>
