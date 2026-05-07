@@ -995,8 +995,12 @@ async function deleteTaskAndChildren(taskId: string): Promise<void> {
 }
 
 async function persistTaskChanges(origTasks: Task[], newTasks: Task[]): Promise<void> {
+  // Build a Map for O(1) lookup instead of O(n²) find in loop
+  const origById = new Map(origTasks.map((o) => [o.id, o]));
+  const writes: Promise<void>[] = [];
+
   for (const t of newTasks) {
-    const orig = origTasks.find((o) => o.id === t.id);
+    const orig = origById.get(t.id);
     if (!orig) continue;
     const updates: Record<string, unknown> = {};
     if (orig.wbs !== t.wbs) updates.wbs = t.wbs;
@@ -1011,9 +1015,15 @@ async function persistTaskChanges(origTasks: Task[], newTasks: Task[]): Promise<
     if (t.startDate && t.endDate && orig.duration !== calculatedDuration) updates.duration = calculatedDuration;
     if ((orig.actualFinish || '') !== (t.actualFinish || '')) updates.actual_finish = t.actualFinish || '';
     if (Object.keys(updates).length > 0) {
-      await supabase.from('tasks').update(updates).eq('id', t.id);
+      writes.push(
+        supabase.from('tasks').update(updates).eq('id', t.id).then(({ error }) => {
+          if (error) console.error('persistTaskChanges error for task', t.id, error.message);
+        })
+      );
     }
   }
+  // Fire all writes in parallel instead of sequential round-trips
+  await Promise.all(writes);
 }
 
 function recalcStructure(tasks: Task[]): Task[] {
@@ -1039,14 +1049,15 @@ function recalcStructure(tasks: Task[]): Task[] {
       return String(a.id).localeCompare(String(b.id));
     });
 
-  let runningOrder = 1;
   const walk = (parentId: string, level: number, prefix: string) => {
     const siblings = sortSiblings(byParent.get(parentId) || []);
     siblings.forEach((task, idx) => {
       const wbs = prefix ? `${prefix}.${idx + 1}` : `${idx + 1}`;
       task.wbs = wbs;
       task.level = level;
-      task.sortOrder = runningOrder++;
+      // sortOrder is NOT renumbered here — preserving existing values prevents
+      // marking every task as changed and triggering unnecessary DB writes.
+      // sortOrder is updated only when explicitly set by move/reorder operations.
       walk(task.id, level + 1, wbs);
     });
   };
@@ -1057,6 +1068,16 @@ function recalcStructure(tasks: Task[]): Task[] {
 
 function recalcParents(tasks: Task[]): Task[] {
   const result = tasks.map((t) => ({ ...t }));
+  // Build Maps for O(1) lookups instead of O(n) find/filter in loops
+  const taskById = new Map(result.map((t) => [t.id, t]));
+  const childrenByParent = new Map<string, Task[]>();
+  for (const t of result) {
+    const pid = t.parentId || '';
+    const list = childrenByParent.get(pid) || [];
+    list.push(t);
+    childrenByParent.set(pid, list);
+  }
+
   // Process bottom-up: find all parent IDs, then recalc each
   const parentIds = [...new Set(result.filter((t) => t.parentId).map((t) => t.parentId))];
 
@@ -1067,9 +1088,9 @@ function recalcParents(tasks: Task[]): Task[] {
     changed = false;
     iterations++;
     for (const pid of parentIds) {
-      const parent = result.find((t) => t.id === pid);
+      const parent = taskById.get(pid as string);
       if (!parent) continue;
-      const children = result.filter((t) => t.parentId === pid);
+      const children = childrenByParent.get(pid as string) || [];
       if (children.length === 0) {
         if (!parent.parentId && Number(parent.effortManday || 0) !== 0) {
           parent.effortManday = 0;
