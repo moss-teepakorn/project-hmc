@@ -81,145 +81,13 @@ const TASK_IMPORT_HEADERS = [
   'Effort Manday',
 ] as const;
 
-type SuggestionInput = {
-  deliverableCompleteness: number;
-  acceptanceCompleteness: number;
-  ownershipCoverage: number;
-  effortCoverage: number;
-  estimationOutlierPenalty: number;
-  unitConsistency: number;
-  predecessorCoverage: number;
-  cycleSafety: number;
-  criticalPathCoverage: number;
-  overAllocationRate: number;
-  availabilityMatch: number;
-  roleCoverage: number;
-  workingDayFit: number;
-  milestoneHitRate: number;
-  criticalPathSlack: number;
-  bufferAdequacy: number;
-  highRiskCoverage: number;
-  similarDurationFit: number;
-  similarEffortFit: number;
-  teamSimilarityFit: number;
+type SuggestedDateAssignment = {
+  id: string;
+  taskName: string;
+  level: number;
+  startDate: string;
+  endDate: string;
 };
-
-const SUGGESTION_WEIGHTS = {
-  scopeClarity: 15,
-  estimationAccuracy: 20,
-  dependencyQuality: 15,
-  resourceCapacityFit: 20,
-  scheduleFeasibility: 15,
-  riskBufferAdequacy: 10,
-  historicalSimilarityFit: 5,
-} as const;
-
-const SUGGESTION_DEFAULT_INPUT: SuggestionInput = {
-  deliverableCompleteness: 85,
-  acceptanceCompleteness: 80,
-  ownershipCoverage: 90,
-  effortCoverage: 85,
-  estimationOutlierPenalty: 15,
-  unitConsistency: 90,
-  predecessorCoverage: 80,
-  cycleSafety: 100,
-  criticalPathCoverage: 75,
-  overAllocationRate: 10,
-  availabilityMatch: 85,
-  roleCoverage: 80,
-  workingDayFit: 90,
-  milestoneHitRate: 80,
-  criticalPathSlack: 70,
-  bufferAdequacy: 75,
-  highRiskCoverage: 80,
-  similarDurationFit: 70,
-  similarEffortFit: 70,
-  teamSimilarityFit: 65,
-};
-
-const SUGGESTION_FIELDS: Array<{ key: keyof SuggestionInput; label: string; hint?: string }> = [
-  { key: 'deliverableCompleteness', label: 'Deliverable Completeness (%)' },
-  { key: 'acceptanceCompleteness', label: 'Acceptance Criteria Completeness (%)' },
-  { key: 'ownershipCoverage', label: 'Ownership Coverage (%)' },
-  { key: 'effortCoverage', label: 'Effort Coverage (%)' },
-  { key: 'estimationOutlierPenalty', label: 'Estimation Outlier Penalty (%)', hint: 'Penalty: lower is better' },
-  { key: 'unitConsistency', label: 'Unit Consistency (%)' },
-  { key: 'predecessorCoverage', label: 'Predecessor Coverage (%)' },
-  { key: 'cycleSafety', label: 'Cycle Safety (%)' },
-  { key: 'criticalPathCoverage', label: 'Critical Path Coverage (%)' },
-  { key: 'overAllocationRate', label: 'Over-allocation Rate (%)', hint: 'Penalty: lower is better' },
-  { key: 'availabilityMatch', label: 'Availability Match (%)' },
-  { key: 'roleCoverage', label: 'Role Coverage (%)' },
-  { key: 'workingDayFit', label: 'Working Day Fit (%)' },
-  { key: 'milestoneHitRate', label: 'Milestone Hit Rate (%)' },
-  { key: 'criticalPathSlack', label: 'Critical Path Slack (%)' },
-  { key: 'bufferAdequacy', label: 'Buffer Adequacy (%)' },
-  { key: 'highRiskCoverage', label: 'High-risk Coverage (%)' },
-  { key: 'similarDurationFit', label: 'Similar Duration Fit (%)' },
-  { key: 'similarEffortFit', label: 'Similar Effort Fit (%)' },
-  { key: 'teamSimilarityFit', label: 'Team Similarity Fit (%)' },
-];
-
-const DASHBOARD_SUGGESTION_JSON_SCHEMA = {
-  schemaVersion: '1.0.0',
-  type: 'object',
-  required: ['generatedAt', 'projectId', 'lockStatus', 'score', 'dimensions', 'inputs', 'dashboard'],
-  properties: {
-    generatedAt: { type: 'string', format: 'date-time' },
-    projectId: { type: 'string' },
-    lockStatus: { type: 'string', enum: ['locked', 'unlocked'] },
-    score: {
-      type: 'object',
-      required: ['total', 'grade'],
-      properties: {
-        total: { type: 'number', minimum: 0, maximum: 100 },
-        grade: { type: 'string' },
-      },
-    },
-    dimensions: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['key', 'weight', 'score', 'weightedScore'],
-        properties: {
-          key: { type: 'string' },
-          weight: { type: 'number' },
-          score: { type: 'number', minimum: 0, maximum: 100 },
-          weightedScore: { type: 'number', minimum: 0, maximum: 100 },
-        },
-      },
-    },
-    inputs: { type: 'object' },
-    dashboard: {
-      type: 'object',
-      required: ['projectDurationDays', 'taskCount', 'recommendedAction'],
-      properties: {
-        projectDurationDays: { type: 'number' },
-        taskCount: { type: 'number' },
-        recommendedAction: { type: 'string' },
-      },
-    },
-  },
-} as const;
-
-function clampPct(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(100, Number(value)));
-}
-
-function getPlanGrade(total: number): string {
-  if (total >= 85) return 'High Confidence';
-  if (total >= 70) return 'Review Recommended';
-  if (total >= 50) return 'Risky Plan';
-  return 'Re-plan Required';
-}
-
-function getRecommendedAction(total: number): string {
-  if (total >= 85) return 'Auto-suggest ready';
-  if (total >= 70) return 'Use with PM review';
-  if (total >= 50) return 'Rework critical factors before baseline';
-  return 'Do not apply schedule yet';
-}
 
 function getProjectDurationDays(startDate?: string, endDate?: string): number {
   if (!startDate || !endDate) return 0;
@@ -227,6 +95,29 @@ function getProjectDurationDays(startDate?: string, endDate?: string): number {
   const end = new Date(endDate);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
   return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+}
+
+function isWeekend(date: Date): boolean {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function toIsoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function getWorkingDatesBetween(startDate?: string, endDate?: string): string[] {
+  if (!startDate || !endDate) return [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return [];
+  const dates: string[] = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    if (!isWeekend(cursor)) dates.push(toIsoDate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
 }
 
 function getTodayPassword(): string {
@@ -334,7 +225,6 @@ export default function TasksTab({ projectId }: Props) {
   const [newTaskInsert, setNewTaskInsert] = useState<NewTaskInsert | null>(null);
   const [moveToSubModal, setMoveToSubModal] = useState<{ task: Task; targetParentId: string } | null>(null);
   const [suggestModalOpen, setSuggestModalOpen] = useState(false);
-  const [suggestionInput, setSuggestionInput] = useState<SuggestionInput>(SUGGESTION_DEFAULT_INPUT);
   const [isSuggestionLocked, setIsSuggestionLocked] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem('task-suggestion-locked') === 'true';
@@ -486,107 +376,86 @@ export default function TasksTab({ projectId }: Props) {
       .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
     : [];
 
-  const suggestionResult = useMemo(() => {
-    const scopeClarity = clampPct((
-      suggestionInput.deliverableCompleteness +
-      suggestionInput.acceptanceCompleteness +
-      suggestionInput.ownershipCoverage
-    ) / 3);
+  const suggestionPreview = useMemo(() => {
+    const projectStart = activeProject?.startDate || '';
+    const projectEnd = activeProject?.endDate || '';
+    const workingDates = getWorkingDatesBetween(projectStart, projectEnd);
+    const childrenByParent = new Map<string, Task[]>();
 
-    const estimationAccuracy = clampPct(
-      suggestionInput.effortCoverage * 0.5 +
-      (100 - suggestionInput.estimationOutlierPenalty) * 0.35 +
-      suggestionInput.unitConsistency * 0.15
-    );
+    const sortTasks = (items: Task[]) => [...items].sort((a, b) => {
+      const orderDiff = Number(a.order || 0) - Number(b.order || 0);
+      if (orderDiff !== 0) return orderDiff;
+      return compareWbs(a.wbs, b.wbs);
+    });
 
-    const dependencyQuality = clampPct(
-      suggestionInput.predecessorCoverage * 0.4 +
-      suggestionInput.cycleSafety * 0.4 +
-      suggestionInput.criticalPathCoverage * 0.2
-    );
+    for (const task of projectTasks) {
+      const parentId = task.parentId || '';
+      const list = childrenByParent.get(parentId) || [];
+      list.push(task);
+      childrenByParent.set(parentId, list);
+    }
+    for (const [key, items] of childrenByParent.entries()) {
+      childrenByParent.set(key, sortTasks(items));
+    }
 
-    const resourceCapacityFit = clampPct(
-      (100 - suggestionInput.overAllocationRate) * 0.5 +
-      suggestionInput.availabilityMatch * 0.3 +
-      suggestionInput.roleCoverage * 0.2
-    );
-
-    const scheduleFeasibility = clampPct(
-      suggestionInput.workingDayFit * 0.4 +
-      suggestionInput.milestoneHitRate * 0.3 +
-      suggestionInput.criticalPathSlack * 0.3
-    );
-
-    const riskBufferAdequacy = clampPct(
-      suggestionInput.bufferAdequacy * 0.6 +
-      suggestionInput.highRiskCoverage * 0.4
-    );
-
-    const historicalSimilarityFit = clampPct(
-      suggestionInput.similarDurationFit * 0.5 +
-      suggestionInput.similarEffortFit * 0.3 +
-      suggestionInput.teamSimilarityFit * 0.2
-    );
-
-    const dimensions = [
-      { key: 'scopeClarity', weight: SUGGESTION_WEIGHTS.scopeClarity, score: scopeClarity },
-      { key: 'estimationAccuracy', weight: SUGGESTION_WEIGHTS.estimationAccuracy, score: estimationAccuracy },
-      { key: 'dependencyQuality', weight: SUGGESTION_WEIGHTS.dependencyQuality, score: dependencyQuality },
-      { key: 'resourceCapacityFit', weight: SUGGESTION_WEIGHTS.resourceCapacityFit, score: resourceCapacityFit },
-      { key: 'scheduleFeasibility', weight: SUGGESTION_WEIGHTS.scheduleFeasibility, score: scheduleFeasibility },
-      { key: 'riskBufferAdequacy', weight: SUGGESTION_WEIGHTS.riskBufferAdequacy, score: riskBufferAdequacy },
-      { key: 'historicalSimilarityFit', weight: SUGGESTION_WEIGHTS.historicalSimilarityFit, score: historicalSimilarityFit },
-    ].map((item) => ({ ...item, weightedScore: Number(((item.score * item.weight) / 100).toFixed(2)) }));
-
-    const total = Number(dimensions.reduce((sum, item) => sum + item.weightedScore, 0).toFixed(2));
-    const grade = getPlanGrade(total);
-    const projectDurationDays = getProjectDurationDays(activeProject?.startDate, activeProject?.endDate);
-    const recommendedAction = getRecommendedAction(total);
-
-    const dashboardPayload = {
-      generatedAt: new Date().toISOString(),
-      projectId,
-      lockStatus: isSuggestionLocked ? 'locked' : 'unlocked',
-      score: {
-        total,
-        grade,
-      },
-      dimensions,
-      inputs: suggestionInput,
-      formulas: {
-        scopeClarity: '(deliverableCompleteness + acceptanceCompleteness + ownershipCoverage) / 3',
-        estimationAccuracy: 'effortCoverage*0.5 + (100-estimationOutlierPenalty)*0.35 + unitConsistency*0.15',
-        dependencyQuality: 'predecessorCoverage*0.4 + cycleSafety*0.4 + criticalPathCoverage*0.2',
-        resourceCapacityFit: '(100-overAllocationRate)*0.5 + availabilityMatch*0.3 + roleCoverage*0.2',
-        scheduleFeasibility: 'workingDayFit*0.4 + milestoneHitRate*0.3 + criticalPathSlack*0.3',
-        riskBufferAdequacy: 'bufferAdequacy*0.6 + highRiskCoverage*0.4',
-        historicalSimilarityFit: 'similarDurationFit*0.5 + similarEffortFit*0.3 + teamSimilarityFit*0.2',
-        weightedTotal: 'sum(dimensionScore * weight / 100)',
-      },
-      dashboard: {
-        projectDurationDays,
-        taskCount: projectTasks.length,
-        recommendedAction,
-      },
+    const leafCountCache = new Map<string, number>();
+    const getLeafCount = (taskId: string): number => {
+      const cached = leafCountCache.get(taskId);
+      if (cached != null) return cached;
+      const children = childrenByParent.get(taskId) || [];
+      if (!children.length) {
+        leafCountCache.set(taskId, 1);
+        return 1;
+      }
+      const count = children.reduce((sum, child) => sum + getLeafCount(child.id), 0);
+      leafCountCache.set(taskId, count);
+      return Math.max(1, count);
     };
+
+    const assignments: SuggestedDateAssignment[] = [];
+    const assignDates = (tasksToAssign: Task[], dates: string[]) => {
+      if (!tasksToAssign.length || !dates.length) return;
+      const weights = tasksToAssign.map((task) => getLeafCount(task.id));
+      const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || 1;
+      let consumedWeight = 0;
+
+      tasksToAssign.forEach((task, index) => {
+        const startIndex = Math.min(
+          dates.length - 1,
+          Math.floor((dates.length * consumedWeight) / totalWeight),
+        );
+        consumedWeight += weights[index];
+        const computedEndIndex = index === tasksToAssign.length - 1
+          ? dates.length - 1
+          : Math.floor((dates.length * consumedWeight) / totalWeight) - 1;
+        const endIndex = Math.max(startIndex, Math.min(dates.length - 1, computedEndIndex));
+        const assignedDates = dates.slice(startIndex, endIndex + 1);
+        const children = childrenByParent.get(task.id) || [];
+        if (!children.length) {
+          assignments.push({
+            id: task.id,
+            taskName: task.taskName,
+            level: task.level ?? 0,
+            startDate: assignedDates[0],
+            endDate: assignedDates[assignedDates.length - 1],
+          });
+          return;
+        }
+        assignDates(children, assignedDates.length ? assignedDates : [dates[startIndex]]);
+      });
+    };
+
+    const rootTasks = sortTasks(projectTasks.filter((task) => !task.parentId));
+    assignDates(rootTasks, workingDates);
 
     return {
-      total,
-      grade,
-      dimensions,
-      dashboardPayload,
-      dashboardSchema: DASHBOARD_SUGGESTION_JSON_SCHEMA,
+      projectStart,
+      projectEnd,
+      projectDurationDays: getProjectDurationDays(projectStart, projectEnd),
+      workingDayCount: workingDates.length,
+      assignments,
     };
-  }, [activeProject?.endDate, activeProject?.startDate, isSuggestionLocked, projectId, projectTasks.length, suggestionInput]);
-
-  const suggestionPayloadText = useMemo(
-    () => JSON.stringify(suggestionResult.dashboardPayload, null, 2),
-    [suggestionResult.dashboardPayload],
-  );
-  const suggestionSchemaText = useMemo(
-    () => JSON.stringify(suggestionResult.dashboardSchema, null, 2),
-    [suggestionResult.dashboardSchema],
-  );
+  }, [activeProject?.endDate, activeProject?.startDate, projectTasks]);
 
   const openTaskContextMenu = (task: Task) => (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -834,6 +703,38 @@ export default function TasksTab({ projectId }: Props) {
     setUnlockModalOpen(false);
     setUnlockPassword('');
     toast.success('Suggestion unlocked');
+  };
+
+  const applySuggestedDates = async () => {
+    if (!activeProject?.startDate || !activeProject?.endDate) {
+      toast.error('Project start/end date is required');
+      return;
+    }
+    if (suggestionPreview.workingDayCount <= 0) {
+      toast.error('Project duration has no working days to suggest');
+      return;
+    }
+    if (!suggestionPreview.assignments.length) {
+      toast.error('No leaf tasks found to update');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      for (const assignment of suggestionPreview.assignments) {
+        await updateTask(assignment.id, {
+          startDate: assignment.startDate,
+          endDate: assignment.endDate,
+        });
+      }
+      await fetchTasks(projectId);
+      toast.success(`Suggested dates applied to ${suggestionPreview.assignments.length} task(s)`);
+      setSuggestModalOpen(false);
+    } catch {
+      toast.error('Failed to apply suggested dates');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -1755,7 +1656,7 @@ export default function TasksTab({ projectId }: Props) {
           <Btn small variant="ghost" onClick={toggleSuggestionLock}>
             {isSuggestionLocked ? <Lock size={13} /> : <Unlock size={13} />} {isSuggestionLocked ? 'Lock On' : 'Lock Off'}
           </Btn>
-          <Btn small onClick={openSuggestionModal} disabled={isSuggestionLocked}><Sparkles size={13} /> Suggest Plan</Btn>
+          <Btn small onClick={openSuggestionModal} disabled={isSuggestionLocked}><Sparkles size={13} /> Suggest Dates</Btn>
           <Btn small onClick={openAddTaskDefault}><Plus size={13} /> Add Task</Btn>
         </div>
       </div>
@@ -1951,73 +1852,65 @@ export default function TasksTab({ projectId }: Props) {
       )}
 
       {suggestModalOpen && (
-        <Modal title="Plan Suggestion Scoring Model" onClose={() => setSuggestModalOpen(false)} width={1080}>
+        <Modal title="Suggest Task Dates" onClose={() => setSuggestModalOpen(false)} width={980}>
           <div style={{ display: 'grid', gap: 16 }}>
             <Card style={{ padding: '14px 16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
                 <div>
-                  <div style={{ fontSize: 11, color: C.text2 }}>TOTAL SCORE</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: C.primary }}>{suggestionResult.total}</div>
+                  <div style={{ fontSize: 11, color: C.text2 }}>PROJECT RANGE</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{fmtDate(suggestionPreview.projectStart)} - {fmtDate(suggestionPreview.projectEnd)}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: C.text2 }}>GRADE</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{suggestionResult.grade}</div>
+                  <div style={{ fontSize: 11, color: C.text2 }}>DURATION</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: C.primary }}>{suggestionPreview.projectDurationDays} days</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: C.text2 }}>LOCK STATUS</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: isSuggestionLocked ? C.red : C.green }}>{isSuggestionLocked ? 'LOCKED' : 'UNLOCKED'}</div>
+                  <div style={{ fontSize: 11, color: C.text2 }}>WORKING DAYS</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{suggestionPreview.workingDayCount}</div>
                 </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.text2 }}>LEAF TASKS TO UPDATE</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{suggestionPreview.assignments.length}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: C.text2, marginTop: 12 }}>
+                ระบบจะกระจายวันตามลำดับ task ภายในช่วงวันของโครงการ และข้ามวันเสาร์-อาทิตย์อัตโนมัติ โดยจะอัปเดตเฉพาะ leaf task แล้วให้ parent คำนวณวันตามลูกอีกที
               </div>
             </Card>
 
             <Card style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>Input Fields (0-100)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
-                {SUGGESTION_FIELDS.map((field) => (
-                  <FormRow key={field.key} label={field.label}>
-                    <div style={{ display: 'grid', gap: 6 }}>
-                      <Input
-                        value={String((suggestionInput[field.key] ?? 0))}
-                        onChange={(v) => {
-                          const parsed = Number(v);
-                          setSuggestionInput((prev) => ({ ...prev, [field.key]: clampPct(Number.isFinite(parsed) ? parsed : 0) }));
-                        }}
-                        placeholder="0-100"
-                      />
-                      {field.hint && <div style={{ fontSize: 11, color: C.text3 }}>{field.hint}</div>}
-                    </div>
-                  </FormRow>
-                ))}
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>Suggested Leaf Task Dates</div>
+              <div style={{ maxHeight: 320, overflow: 'auto', border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: C.bg }}>
+                      {['Task', 'Level', 'Start Date', 'End Date'].map((label) => (
+                        <th key={label} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 11, color: C.text2, borderBottom: `1px solid ${C.border}` }}>{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {suggestionPreview.assignments.map((item) => (
+                      <tr key={item.id}>
+                        <td style={{ padding: '10px 12px', fontSize: 12, color: C.text, borderBottom: `1px solid ${C.border}` }}>{item.taskName}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 12, color: C.text2, borderBottom: `1px solid ${C.border}` }}>{item.level}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 12, color: C.text2, borderBottom: `1px solid ${C.border}` }}>{fmtDate(item.startDate)}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 12, color: C.text2, borderBottom: `1px solid ${C.border}` }}>{fmtDate(item.endDate)}</td>
+                      </tr>
+                    ))}
+                    {!suggestionPreview.assignments.length && (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '18px 12px', fontSize: 12, color: C.text3, textAlign: 'center' }}>No suggested dates available. Check project start/end date and task list.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </Card>
-
-            <Card style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>Dimension Formula & Weights</div>
-              <div style={{ display: 'grid', gap: 8, fontSize: 12, color: C.text2 }}>
-                <div>scopeClarity (15): (deliverableCompleteness + acceptanceCompleteness + ownershipCoverage) / 3</div>
-                <div>estimationAccuracy (20): effortCoverage*0.5 + (100-estimationOutlierPenalty)*0.35 + unitConsistency*0.15</div>
-                <div>dependencyQuality (15): predecessorCoverage*0.4 + cycleSafety*0.4 + criticalPathCoverage*0.2</div>
-                <div>resourceCapacityFit (20): (100-overAllocationRate)*0.5 + availabilityMatch*0.3 + roleCoverage*0.2</div>
-                <div>scheduleFeasibility (15): workingDayFit*0.4 + milestoneHitRate*0.3 + criticalPathSlack*0.3</div>
-                <div>riskBufferAdequacy (10): bufferAdequacy*0.6 + highRiskCoverage*0.4</div>
-                <div>historicalSimilarityFit (5): similarDurationFit*0.5 + similarEffortFit*0.3 + teamSimilarityFit*0.2</div>
-                <div>totalScore: sum(dimensionScore * weight / 100)</div>
-              </div>
-            </Card>
-
-            <Card style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>Dashboard Output JSON (Payload)</div>
-              <pre style={{ margin: 0, padding: 12, background: C.bg, borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 11, maxHeight: 220, overflow: 'auto' }}>{suggestionPayloadText}</pre>
-            </Card>
-
-            <Card style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>Dashboard JSON Schema</div>
-              <pre style={{ margin: 0, padding: 12, background: C.bg, borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 11, maxHeight: 220, overflow: 'auto' }}>{suggestionSchemaText}</pre>
             </Card>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <Btn variant="ghost" onClick={() => setSuggestionInput(SUGGESTION_DEFAULT_INPUT)}>Reset Default</Btn>
-              <Btn onClick={() => setSuggestModalOpen(false)}>Done</Btn>
+              <Btn variant="ghost" onClick={() => setSuggestModalOpen(false)}>Cancel</Btn>
+              <Btn onClick={applySuggestedDates} disabled={!suggestionPreview.assignments.length || loading}>{loading ? 'Applying…' : 'Apply Suggested Dates'}</Btn>
             </div>
           </div>
         </Modal>
