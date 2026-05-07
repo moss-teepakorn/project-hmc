@@ -749,11 +749,12 @@ export default function TasksTab({ projectId }: Props) {
     e.preventDefault();
     e.stopPropagation();
     const draggedId = dragTaskId || e.dataTransfer.getData('text/plain');
-    const activeDropTarget = dropTarget;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const dropPosition: 'before' | 'after' = (e.clientY - rect.top) < (rect.height / 2) ? 'before' : 'after';
     setDropTarget(null);
     setDragTaskId(null);
 
-    if (!draggedId || !activeDropTarget || draggedId === targetTask.id) return;
+    if (!draggedId || draggedId === targetTask.id) return;
     const draggedTask = projectTasks.find((t) => t.id === draggedId);
     if (!draggedTask) return;
     if ((draggedTask.parentId || '') !== (targetTask.parentId || '')) {
@@ -769,7 +770,7 @@ export default function TasksTab({ projectId }: Props) {
 
     let insertIndex = siblings.findIndex((t) => t.id === targetTask.id);
     if (insertIndex < 0) return;
-    if (activeDropTarget.position === 'after') insertIndex += 1;
+  if (dropPosition === 'after') insertIndex += 1;
 
     let nextSortOrder = 1;
     if (insertIndex <= 0) {
