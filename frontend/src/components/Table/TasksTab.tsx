@@ -320,7 +320,7 @@ export default function TasksTab({ projectId }: Props) {
     e.stopPropagation();
     const taskLevel = task.level ?? 0;
     const menuWidth = 220;
-    const menuHeight = 180;
+    const menuHeight = 260;
     const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12);
     const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12);
     setSelected(task.id);
@@ -348,6 +348,73 @@ export default function TasksTab({ projectId }: Props) {
       level,
     });
     setContextMenu((prev) => ({ ...prev, visible: false }));
+  };
+
+  const handleMoveToMainTask = async () => {
+    const anchor = contextMenu.task;
+    if (!anchor) return;
+    if (!anchor.parentId) {
+      toast.error('This task is already a Main Task');
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+      return;
+    }
+
+    try {
+      const maxRootOrder = projectTasks
+        .filter((t) => !t.parentId && t.id !== anchor.id)
+        .reduce((max, t) => Math.max(max, Number(t.order || 0)), 0);
+
+      await updateTask(anchor.id, {
+        parentId: '',
+        order: maxRootOrder + 1,
+      });
+      toast.success('Moved to Main Task');
+    } catch {
+      toast.error('Failed to move task');
+    } finally {
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+    }
+  };
+
+  const handleMoveToSubTask = async () => {
+    const anchor = contextMenu.task;
+    if (!anchor) return;
+    if (anchor.parentId) {
+      toast.error('This task is already a Sub Task');
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+      return;
+    }
+
+    const rootSiblings = projectTasks
+      .filter((t) => !t.parentId && t.id !== anchor.id)
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+
+    const previousMainTask = rootSiblings
+      .filter((t) => Number(t.order || 0) < Number(anchor.order || 0))
+      .slice(-1)[0];
+
+    if (!previousMainTask) {
+      toast.error('Cannot move to Sub Task: no previous Main Task found');
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+      return;
+    }
+
+    try {
+      const children = projectTasks
+        .filter((t) => t.parentId === previousMainTask.id)
+        .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+      const nextOrder = children.length ? Number(children[children.length - 1].order || 0) + 1 : 1;
+
+      await updateTask(anchor.id, {
+        parentId: previousMainTask.id,
+        order: nextOrder,
+      });
+      toast.success(`Moved to Sub Task under ${previousMainTask.taskName}`);
+    } catch {
+      toast.error('Failed to move task');
+    } finally {
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+    }
   };
 
   const cancelNewTask = () => setNewTaskInsert(null);
@@ -1418,6 +1485,10 @@ export default function TasksTab({ projectId }: Props) {
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
                 Add Subtask After
               </button>
+              <button type="button" onClick={handleMoveToSubTask}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Move to Sub Task
+              </button>
             </>
           ) : contextMenu.taskLevel === 1 ? (
             <>
@@ -1433,6 +1504,10 @@ export default function TasksTab({ projectId }: Props) {
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
                 Add Childtask
               </button>
+              <button type="button" onClick={handleMoveToMainTask}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Move to Main Task
+              </button>
             </>
           ) : (
             <>
@@ -1443,6 +1518,10 @@ export default function TasksTab({ projectId }: Props) {
               <button type="button" onClick={() => handleContextMenuSelect('child-after')}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
                 Add Childtask After
+              </button>
+              <button type="button" onClick={handleMoveToMainTask}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Move to Main Task
               </button>
             </>
           )}
