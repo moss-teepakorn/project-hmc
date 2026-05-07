@@ -272,7 +272,18 @@ export default function TaskTemplateModal({ onClose }: Props) {
     const maxSort = itemsDraft.reduce((m, it) => Math.max(m, it.sortOrder || 0), 0);
     setItemsDraft((prev) => [
       ...prev,
-      { id: '', templateId: selectedTemplateId, wbs: '', parentWbs: '', level: 0, sortOrder: maxSort + 10, taskName: '', duration: 0, effortManday: 0 },
+      {
+        id: '',
+        templateId: selectedTemplateId,
+        wbs: '',
+        parentWbs: '',
+        level: 0,
+        sortOrder: maxSort + 10,
+        taskName: '',
+        duration: 0,
+        effortManday: 0,
+        createdAt: new Date().toISOString(),
+      },
     ]);
   };
 
