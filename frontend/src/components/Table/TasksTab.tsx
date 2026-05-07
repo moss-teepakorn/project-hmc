@@ -373,16 +373,30 @@ export default function TasksTab({ projectId }: Props) {
       .sort((a, b) => compareWbs(a.wbs, b.wbs)),
   }));
 
+  const getDescendantIds = (taskId: string): Set<string> => {
+    const ids = new Set<string>();
+    const queue = [taskId];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      projectTasks
+        .filter((t) => t.parentId === cur)
+        .forEach((t) => { ids.add(t.id); queue.push(t.id); });
+    }
+    return ids;
+  };
+
   const availableMoveToSubParents = moveToSubModal
-    ? projectTasks
-      .filter((t) => {
-        if (t.id === moveToSubModal.task.id) return false;
-        if (moveToSubModal.targetLevel === 1) {
-          return !t.parentId;
-        }
-        return (t.level ?? 0) === 1;
-      })
-      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+    ? (() => {
+      const descendantIds = getDescendantIds(moveToSubModal.task.id);
+      return projectTasks
+        .filter((t) => {
+          if (t.id === moveToSubModal.task.id) return false;
+          if (descendantIds.has(t.id)) return false;
+          if (moveToSubModal.targetLevel === 1) return !t.parentId;
+          return (t.level ?? 0) === 1;
+        })
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+    })()
     : [];
 
   const availableMoveToMainPositions = moveToMainModal
