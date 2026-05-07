@@ -787,6 +787,21 @@ export default function TasksTab({ projectId }: Props) {
       nextSortOrder = (prev + next) / 2;
     }
 
+    // Adjacent drag/drop can mathematically produce the same sortOrder as current.
+    // Force a directional delta so the move is always applied.
+    const currentSortOrder = Number(draggedTask.sortOrder || 0);
+    if (Math.abs(nextSortOrder - currentSortOrder) < 0.000001) {
+      const targetSortOrder = Number(targetTask.sortOrder || 0);
+      nextSortOrder = dropPosition === 'before'
+        ? targetSortOrder - 0.25
+        : targetSortOrder + 0.25;
+      if (Math.abs(nextSortOrder - currentSortOrder) < 0.000001) {
+        nextSortOrder = dropPosition === 'before'
+          ? currentSortOrder - 0.5
+          : currentSortOrder + 0.5;
+      }
+    }
+
     try {
       await updateTask(draggedTask.id, { sortOrder: nextSortOrder });
       toast.success('Task moved');
