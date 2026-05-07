@@ -4,6 +4,7 @@ import { Copy, FolderOpen, Layers, Plus, Save, Trash2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { taskApi, taskTemplateApi } from '../../services/api';
+import { compareWbs } from '../../utils';
 import type { TaskTemplateItem, TaskTemplate } from '../../types';
 import { Btn, C, FormRow, Input, Modal, Select } from '../Common';
 
@@ -213,13 +214,14 @@ export default function TaskTemplateModal({ onClose }: Props) {
     }
     setLoading(true);
     try {
+      const sortedItems = [...itemsDraft].sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''));
       await taskTemplateApi.replaceItems(
         selectedTemplateId,
-        itemsDraft.map((item) => ({
+        sortedItems.map((item, index) => ({
           wbs: item.wbs,
           parentWbs: item.parentWbs,
           level: Number(item.level || 0),
-          sortOrder: Number(item.sortOrder || 0),
+          sortOrder: (index + 1) * 10,
           taskName: item.taskName,
           duration: Number(item.duration || 0),
           effortManday: Number(item.effortManday || 0),
