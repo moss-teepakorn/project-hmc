@@ -223,7 +223,7 @@ export default function TasksTab({ projectId }: Props) {
   const [buttonFocus, setButtonFocus] = useState<'expand' | 'collapse' | null>(null);
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; taskLevel: number }>({ visible: false, x: 0, y: 0, task: null, taskLevel: 0 });
   const [newTaskInsert, setNewTaskInsert] = useState<NewTaskInsert | null>(null);
-  const [moveToSubModal, setMoveToSubModal] = useState<{ task: Task; targetParentId: string } | null>(null);
+  const [moveToSubModal, setMoveToSubModal] = useState<{ task: Task; targetParentId: string; targetLevel: 1 | 2 } | null>(null);
   const [moveToMainModal, setMoveToMainModal] = useState<{ task: Task; targetIndex: number } | null>(null);
   const [suggestModalOpen, setSuggestModalOpen] = useState(false);
   const [isSuggestionLocked, setIsSuggestionLocked] = useState<boolean>(() => {
@@ -375,7 +375,13 @@ export default function TasksTab({ projectId }: Props) {
 
   const availableMoveToSubParents = moveToSubModal
     ? projectTasks
-      .filter((t) => !t.parentId && t.id !== moveToSubModal.task.id)
+      .filter((t) => {
+        if (t.id === moveToSubModal.task.id) return false;
+        if (moveToSubModal.targetLevel === 1) {
+          return !t.parentId;
+        }
+        return (t.level ?? 0) === 1;
+      })
       .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
     : [];
 
@@ -574,23 +580,26 @@ export default function TasksTab({ projectId }: Props) {
   const handleMoveToSubTask = async () => {
     const anchor = contextMenu.task;
     if (!anchor) return;
-    if (anchor.parentId) {
-      toast.error('This task is already a Sub Task');
-      setContextMenu((prev) => ({ ...prev, visible: false }));
-      return;
-    }
 
+    const taskLevel = anchor.level ?? 0;
+    const targetLevel: 1 | 2 = taskLevel === 1 ? 2 : 1;
     const candidates = projectTasks
-      .filter((t) => !t.parentId && t.id !== anchor.id)
+      .filter((t) => {
+        if (t.id === anchor.id) return false;
+        if (targetLevel === 1) return !t.parentId;
+        return (t.level ?? 0) === 1;
+      })
       .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 
     if (!candidates.length) {
-      toast.error('Cannot move to Sub Task: no target Main Task found');
+      toast.error(targetLevel === 1
+        ? 'Cannot move to Sub Task Level 1: no target Main Task found'
+        : 'Cannot move to Sub Task Level 2: no target Sub Task Level 1 found');
       setContextMenu((prev) => ({ ...prev, visible: false }));
       return;
     }
 
-    setMoveToSubModal({ task: anchor, targetParentId: candidates[0].id });
+    setMoveToSubModal({ task: anchor, targetParentId: candidates[0].id, targetLevel });
     setContextMenu((prev) => ({ ...prev, visible: false }));
   };
 
@@ -598,9 +607,19 @@ export default function TasksTab({ projectId }: Props) {
     if (!moveToSubModal) return;
     const anchor = moveToSubModal.task;
     const targetParentId = moveToSubModal.targetParentId;
+    const targetLevel = moveToSubModal.targetLevel;
     const targetParent = projectTasks.find((t) => t.id === targetParentId);
     if (!targetParent) {
-      toast.error('Target Main Task not found');
+      toast.error(targetLevel === 1 ? 'Target Main Task not found' : 'Target Sub Task Level 1 not found');
+      return;
+    }
+
+    if (targetLevel === 1 && targetParent.parentId) {
+      toast.error('Target for Sub Task Level 1 must be a Main Task');
+      return;
+    }
+    if (targetLevel === 2 && (targetParent.level ?? 0) !== 1) {
+      toast.error('Target for Sub Task Level 2 must be Sub Task Level 1');
       return;
     }
 
@@ -614,7 +633,7 @@ export default function TasksTab({ projectId }: Props) {
         parentId: targetParentId,
         sortOrder: nextSortOrder,
       });
-      toast.success(`Moved to Sub Task under ${targetParent.taskName}`);
+      toast.success(`Moved to Sub Task Level ${targetLevel} under ${targetParent.taskName}`);
     } catch {
       toast.error('Failed to move task');
     } finally {
@@ -1940,7 +1959,7 @@ export default function TasksTab({ projectId }: Props) {
               </button>
               <button type="button" onClick={handleMoveToSubTask}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-                Move to Sub Task
+                Move to Sub Task Level 1
               </button>
             </>
           ) : contextMenu.taskLevel === 1 ? (
@@ -1961,6 +1980,10 @@ export default function TasksTab({ projectId }: Props) {
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
                 Move to Main Task
               </button>
+              <button type="button" onClick={handleMoveToSubTask}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
+                Move to Sub Task Level 2
+              </button>
             </>
           ) : (
             <>
@@ -1972,9 +1995,9 @@ export default function TasksTab({ projectId }: Props) {
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
                 Add Childtask After
               </button>
-              <button type="button" onClick={handleMoveToMainTask}
+              <button type="button" onClick={handleMoveToSubTask}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-                Move to Main Task
+                Move to Sub Task Level 1
               </button>
             </>
           )}
@@ -1982,12 +2005,12 @@ export default function TasksTab({ projectId }: Props) {
       )}
 
       {moveToSubModal && (
-        <Modal title="Move to Sub Task" onClose={() => setMoveToSubModal(null)} width={560}>
+        <Modal title={`Move to Sub Task Level ${moveToSubModal.targetLevel}`} onClose={() => setMoveToSubModal(null)} width={560}>
           <div style={{ display: 'grid', gap: 14 }}>
             <div style={{ fontSize: 13, color: C.text2 }}>
-              Choose target Main Task for: <span style={{ color: C.text, fontWeight: 700 }}>{moveToSubModal.task.taskName}</span>
+              Choose target {moveToSubModal.targetLevel === 1 ? 'Main Task' : 'Sub Task Level 1'} for: <span style={{ color: C.text, fontWeight: 700 }}>{moveToSubModal.task.taskName}</span>
             </div>
-            <FormRow label="Target Main Task">
+            <FormRow label={moveToSubModal.targetLevel === 1 ? 'Target Main Task' : 'Target Sub Task Level 1'}>
               <Select
                 value={moveToSubModal.targetParentId}
                 onChange={(v) => setMoveToSubModal((prev) => prev ? ({ ...prev, targetParentId: v }) : prev)}
@@ -1996,7 +2019,7 @@ export default function TasksTab({ projectId }: Props) {
             </FormRow>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <Btn variant="ghost" onClick={() => setMoveToSubModal(null)}>Cancel</Btn>
-              <Btn onClick={confirmMoveToSubTask} disabled={!moveToSubModal.targetParentId}>Move to Sub Task</Btn>
+              <Btn onClick={confirmMoveToSubTask} disabled={!moveToSubModal.targetParentId}>Move to Sub Task Level {moveToSubModal.targetLevel}</Btn>
             </div>
           </div>
         </Modal>
