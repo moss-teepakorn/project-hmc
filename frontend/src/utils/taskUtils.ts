@@ -4,7 +4,7 @@ import type { Task } from '../types';
 export function flattenTree(tasks: Task[], expandedIds: Set<string>): Task[] {
   const rootTasks = tasks
     .filter((t) => !t.parentId)
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const result: Task[] = [];
 
@@ -13,7 +13,7 @@ export function flattenTree(tasks: Task[], expandedIds: Set<string>): Task[] {
     if (expandedIds.has(task.id)) {
       const children = tasks
         .filter((t) => t.parentId === task.id)
-        .sort((a, b) => a.order - b.order);
+        .sort((a, b) => a.sortOrder - b.sortOrder);
       children.forEach(walk);
     }
   }
