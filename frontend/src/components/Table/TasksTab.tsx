@@ -248,6 +248,7 @@ export default function TasksTab({ projectId }: Props) {
   });
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null);
+  const dragTaskIdRef = useRef<string | null>(null);
 
   // Scroll sync
   const tableBodyRef = useRef<HTMLDivElement>(null);
@@ -715,10 +716,12 @@ export default function TasksTab({ projectId }: Props) {
   const handleTableRowDragStart = (task: Task) => (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.setData('text/plain', task.id);
     e.dataTransfer.effectAllowed = 'move';
+    dragTaskIdRef.current = task.id;
     setDragTaskId(task.id);
   };
 
   const handleTableRowDragEnd = () => {
+    dragTaskIdRef.current = null;
     setDragTaskId(null);
     setDropTarget(null);
   };
@@ -726,7 +729,7 @@ export default function TasksTab({ projectId }: Props) {
   const handleTableRowDragOver = (targetTask: Task) => (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    const draggedId = dragTaskId || e.dataTransfer.getData('text/plain');
+    const draggedId = dragTaskIdRef.current || dragTaskId || e.dataTransfer.getData('text/plain');
     if (!draggedId || draggedId === targetTask.id) {
       setDropTarget(null);
       return;
@@ -748,10 +751,11 @@ export default function TasksTab({ projectId }: Props) {
   const handleTableRowDrop = (targetTask: Task) => async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    const draggedId = dragTaskId || e.dataTransfer.getData('text/plain');
+    const draggedId = dragTaskIdRef.current || dragTaskId || e.dataTransfer.getData('text/plain');
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     const dropPosition: 'before' | 'after' = (e.clientY - rect.top) < (rect.height / 2) ? 'before' : 'after';
     setDropTarget(null);
+    dragTaskIdRef.current = null;
     setDragTaskId(null);
 
     if (!draggedId || draggedId === targetTask.id) return;
