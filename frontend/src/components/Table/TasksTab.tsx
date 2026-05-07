@@ -142,7 +142,7 @@ interface NewTaskInsert {
   anchorId: string;
   parentId: string;
   action: InsertAction;
-  order: number;
+  sortOrder: number;
   taskName: string;
   effortManday: number;
   startDate: string;
@@ -301,41 +301,41 @@ export default function TasksTab({ projectId }: Props) {
 
   const getInsertMeta = (anchor: Task, action: InsertAction) => {
     if (action === 'main-before' || action === 'main-after') {
-      return { parentId: '', order: Number(anchor.order || 0) + (action === 'main-before' ? -0.5 : 0.5), level: 0 };
+      return { parentId: '', sortOrder: Number(anchor.sortOrder || 0) + (action === 'main-before' ? -0.5 : 0.5), level: 0 };
     }
 
     if (action === 'sub-before' || action === 'sub-after') {
       if ((anchor.level ?? 0) === 0) {
         const children = projectTasks
           .filter((t) => t.parentId === anchor.id)
-          .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
-        const order = action === 'sub-before'
-          ? (children.length ? Number(children[0].order || 0) - 0.5 : 1)
-          : (children.length ? Number(children[children.length - 1].order || 0) + 1 : 1);
-        return { parentId: anchor.id, order, level: 1 };
+          .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+        const sortOrder = action === 'sub-before'
+          ? (children.length ? Number(children[0].sortOrder || 0) - 0.5 : 1)
+          : (children.length ? Number(children[children.length - 1].sortOrder || 0) + 1 : 1);
+        return { parentId: anchor.id, sortOrder, level: 1 };
       }
       const parentId = anchor.parentId;
-      return { parentId, order: Number(anchor.order || 0) + (action === 'sub-before' ? -0.5 : 0.5), level: 1 };
+      return { parentId, sortOrder: Number(anchor.sortOrder || 0) + (action === 'sub-before' ? -0.5 : 0.5), level: 1 };
     }
 
     if (action === 'child-before' || action === 'child-after') {
       const parentId = anchor.parentId;
-      return { parentId, order: Number(anchor.order || 0) + (action === 'child-before' ? -0.5 : 0.5), level: 2 };
+      return { parentId, sortOrder: Number(anchor.sortOrder || 0) + (action === 'child-before' ? -0.5 : 0.5), level: 2 };
     }
 
     if (action === 'child-under') {
       const children = projectTasks
         .filter((t) => t.parentId === anchor.id)
-        .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
-      const nextOrder = children.length ? Number(children[children.length - 1].order || 0) + 1 : 1;
-      return { parentId: anchor.id, order: nextOrder, level: 2 };
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+      const nextSortOrder = children.length ? Number(children[children.length - 1].sortOrder || 0) + 1 : 1;
+      return { parentId: anchor.id, sortOrder: nextSortOrder, level: 2 };
     }
 
     const children = projectTasks
       .filter((t) => t.parentId === anchor.id)
-      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
-    const nextOrder = children.length ? Number(children[children.length - 1].order || 0) + 1 : 1;
-    return { parentId: anchor.id, order: nextOrder, level: 2 };
+      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+    const nextSortOrder = children.length ? Number(children[children.length - 1].sortOrder || 0) + 1 : 1;
+    return { parentId: anchor.id, sortOrder: nextSortOrder, level: 2 };
   };
 
   const getInsertIndex = (anchor: Task, action: InsertAction) => {
@@ -373,7 +373,7 @@ export default function TasksTab({ projectId }: Props) {
   const availableMoveToSubParents = moveToSubModal
     ? projectTasks
       .filter((t) => !t.parentId && t.id !== moveToSubModal.task.id)
-      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
     : [];
 
   const suggestionPreview = useMemo(() => {
@@ -383,8 +383,8 @@ export default function TasksTab({ projectId }: Props) {
     const childrenByParent = new Map<string, Task[]>();
 
     const sortTasks = (items: Task[]) => [...items].sort((a, b) => {
-      const orderDiff = Number(a.order || 0) - Number(b.order || 0);
-      if (orderDiff !== 0) return orderDiff;
+      const sortOrderDiff = Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+      if (sortOrderDiff !== 0) return sortOrderDiff;
       return compareWbs(a.wbs, b.wbs);
     });
 
@@ -502,13 +502,13 @@ export default function TasksTab({ projectId }: Props) {
     }
 
     try {
-      const maxRootOrder = projectTasks
+      const maxRootSortOrder = projectTasks
         .filter((t) => !t.parentId && t.id !== anchor.id)
-        .reduce((max, t) => Math.max(max, Number(t.order || 0)), 0);
+        .reduce((max, t) => Math.max(max, Number(t.sortOrder || 0)), 0);
 
       await updateTask(anchor.id, {
         parentId: '',
-        order: maxRootOrder + 1,
+        sortOrder: maxRootSortOrder + 1,
       });
       toast.success('Moved to Main Task');
     } catch {
@@ -529,7 +529,7 @@ export default function TasksTab({ projectId }: Props) {
 
     const candidates = projectTasks
       .filter((t) => !t.parentId && t.id !== anchor.id)
-      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 
     if (!candidates.length) {
       toast.error('Cannot move to Sub Task: no target Main Task found');
@@ -554,12 +554,12 @@ export default function TasksTab({ projectId }: Props) {
     try {
       const children = projectTasks
         .filter((t) => t.parentId === targetParentId)
-        .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
-      const nextOrder = children.length ? Number(children[children.length - 1].order || 0) + 1 : 1;
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+      const nextSortOrder = children.length ? Number(children[children.length - 1].sortOrder || 0) + 1 : 1;
 
       await updateTask(anchor.id, {
         parentId: targetParentId,
-        order: nextOrder,
+        sortOrder: nextSortOrder,
       });
       toast.success(`Moved to Sub Task under ${targetParent.taskName}`);
     } catch {
@@ -575,7 +575,7 @@ export default function TasksTab({ projectId }: Props) {
 
     const siblings = projectTasks
       .filter((t) => (t.parentId || '') === (anchor.parentId || ''))
-      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
     const index = siblings.findIndex((t) => t.id === anchor.id);
 
     if (index < 0 || siblings.length <= 1) {
@@ -583,14 +583,14 @@ export default function TasksTab({ projectId }: Props) {
       return;
     }
 
-    let order = Number(anchor.order || 0);
+    let sortOrder = Number(anchor.sortOrder || 0);
     if (mode === 'up') {
       if (index === 0) {
         toast('Task is already at top');
         setContextMenu((prev) => ({ ...prev, visible: false }));
         return;
       }
-      order = Number(siblings[index - 1].order || 0) - 0.5;
+      sortOrder = Number(siblings[index - 1].sortOrder || 0) - 0.5;
     }
     if (mode === 'down') {
       if (index === siblings.length - 1) {
@@ -598,7 +598,7 @@ export default function TasksTab({ projectId }: Props) {
         setContextMenu((prev) => ({ ...prev, visible: false }));
         return;
       }
-      order = Number(siblings[index + 1].order || 0) + 0.5;
+      sortOrder = Number(siblings[index + 1].sortOrder || 0) + 0.5;
     }
     if (mode === 'top') {
       if (index === 0) {
@@ -606,7 +606,7 @@ export default function TasksTab({ projectId }: Props) {
         setContextMenu((prev) => ({ ...prev, visible: false }));
         return;
       }
-      order = Number(siblings[0].order || 0) - 0.5;
+      sortOrder = Number(siblings[0].sortOrder || 0) - 0.5;
     }
     if (mode === 'bottom') {
       if (index === siblings.length - 1) {
@@ -614,11 +614,11 @@ export default function TasksTab({ projectId }: Props) {
         setContextMenu((prev) => ({ ...prev, visible: false }));
         return;
       }
-      order = Number(siblings[siblings.length - 1].order || 0) + 0.5;
+      sortOrder = Number(siblings[siblings.length - 1].sortOrder || 0) + 0.5;
     }
 
     try {
-      await updateTask(anchor.id, { parentId: anchor.parentId || '', order });
+      await updateTask(anchor.id, { sortOrder });
       toast.success('Task order updated');
     } catch {
       toast.error('Failed to reorder task');
@@ -639,7 +639,7 @@ export default function TasksTab({ projectId }: Props) {
       await createTask({
         projectId,
         parentId: newTaskInsert.parentId,
-        order: newTaskInsert.order,
+        sortOrder: newTaskInsert.sortOrder,
         taskName: newTaskInsert.taskName,
         effortManday: roundEffortManday(newTaskInsert.effortManday),
         startDate: newTaskInsert.startDate,
@@ -2166,17 +2166,17 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
           }
 
           let parentId = '';
-          let order: number | undefined;
+          let sortOrder: number | undefined;
 
           if (insertType === 'main') {
             parentId = '';
             if (selectedTask && !selectedTask.parentId && insertPosition !== 'append') {
-              order = Number(selectedTask.order || 0) + (insertPosition === 'before' ? -0.5 : 0.5);
+              sortOrder = Number(selectedTask.sortOrder || 0) + (insertPosition === 'before' ? -0.5 : 0.5);
             }
             else {
               const roots = tasks.filter(t => !t.parentId);
-              const maxOrder = roots.reduce((m, t) => Math.max(m, Number(t.order || 0)), 0);
-              order = maxOrder + 1;
+              const maxSortOrder = roots.reduce((m, t) => Math.max(m, Number(t.sortOrder || 0)), 0);
+              sortOrder = maxSortOrder + 1;
             }
           } else {
             parentId = (form.parentId as string) || selectedTask?.id || '';
@@ -2185,11 +2185,11 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
               return;
             }
             const siblings = tasks.filter(t => (t.parentId || '') === parentId);
-            const maxOrder = siblings.reduce((m, t) => Math.max(m, Number(t.order || 0)), 0);
+            const maxSortOrder = siblings.reduce((m, t) => Math.max(m, Number(t.sortOrder || 0)), 0);
             if (selectedTask && (selectedTask.parentId || '') === parentId && insertPosition !== 'append') {
-              order = Number(selectedTask.order || 0) + (insertPosition === 'before' ? -0.5 : 0.5);
+              sortOrder = Number(selectedTask.sortOrder || 0) + (insertPosition === 'before' ? -0.5 : 0.5);
             } else {
-              order = maxOrder + 1;
+              sortOrder = maxSortOrder + 1;
             }
           }
 
@@ -2197,7 +2197,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
           onSave({
             ...form,
             parentId,
-            order,
+            sortOrder,
             effortManday: insertType === 'main' ? 0 : roundEffortManday(Number(form.effortManday || 0)),
             startDate,
             endDate,

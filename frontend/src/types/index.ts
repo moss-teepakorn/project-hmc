@@ -67,7 +67,7 @@ export interface Task {
   relatedTask: string;
   parentId: string;
   level: number;
-  order: number;
+  sortOrder: number;
 }
 
 export interface Member {
