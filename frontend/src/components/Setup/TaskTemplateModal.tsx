@@ -51,6 +51,11 @@ export default function TaskTemplateModal({ onClose }: Props) {
       .map((p) => ({ value: p.id, label: `${p.code} - ${p.name}` }));
   }, [projects, activeProject?.id]);
 
+  const allProjectOptions = useMemo(
+    () => projects.map((p) => ({ value: p.id, label: `${p.code} - ${p.name}` })),
+    [projects],
+  );
+
   const templateOptions = useMemo(
     () => templates.map((t) => ({ value: t.id, label: `Template ${t.templateNo} - ${t.name}` })),
     [templates],
@@ -60,10 +65,10 @@ export default function TaskTemplateModal({ onClose }: Props) {
     if (!sourceProjectId && sourceProjectOptions.length > 0) {
       setSourceProjectId(sourceProjectOptions[0].value);
     }
-    if (!createSourceProjectId && sourceProjectOptions.length > 0) {
-      setCreateSourceProjectId(sourceProjectOptions[0].value);
+    if (!createSourceProjectId && allProjectOptions.length > 0) {
+      setCreateSourceProjectId(allProjectOptions[0].value);
     }
-  }, [sourceProjectId, createSourceProjectId, sourceProjectOptions]);
+  }, [sourceProjectId, createSourceProjectId, sourceProjectOptions, allProjectOptions]);
 
   const loadTemplates = async () => {
     setTemplatesLoading(true);
@@ -373,8 +378,8 @@ export default function TaskTemplateModal({ onClose }: Props) {
                 <Select
                   value={createSourceProjectId}
                   onChange={setCreateSourceProjectId}
-                  options={sourceProjectOptions.length ? sourceProjectOptions : [{ value: '', label: 'No source project available' }]}
-                  disabled={!sourceProjectOptions.length}
+                  options={allProjectOptions.length ? allProjectOptions : [{ value: '', label: 'No source project available' }]}
+                  disabled={!allProjectOptions.length}
                 />
               </FormRow>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
