@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Download, Upload, ChevronDown, ZoomIn, ZoomOut, Lock, Unlock, Sparkles, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Pencil, Trash2, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -254,6 +255,7 @@ export default function TasksTab({ projectId }: Props) {
   const ganttBodyRef = useRef<HTMLDivElement>(null);
   const syncing      = useRef(false);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   // Column resize
   const resizingColumn = useRef<number | null>(null);
@@ -502,14 +504,11 @@ export default function TasksTab({ projectId }: Props) {
     e.preventDefault();
     e.stopPropagation();
     const taskLevel = task.level ?? 0;
-    const menuWidth = 220;
-    const levelActionCount = taskLevel === 0 ? 4 : taskLevel === 1 ? 4 : 3;
-    const menuItemCount = 4 + levelActionCount;
-    const menuHeight = Math.min(window.innerHeight - 24, 16 + menuItemCount * 38);
-    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12);
-    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12);
+    const margin = 12;
+    const x = Math.max(margin, Math.min(e.clientX, window.innerWidth - margin));
+    const y = Math.max(margin, Math.min(e.clientY, window.innerHeight - margin));
     setSelected(task.id);
-    setContextMenu({ visible: true, x: Math.max(x, 12), y: Math.max(y, 12), task, taskLevel });
+    setContextMenu({ visible: true, x, y, task, taskLevel });
   };
 
   const handleContextMenuSelect = (action: InsertAction) => {
@@ -828,6 +827,30 @@ export default function TasksTab({ projectId }: Props) {
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, [contextMenu.visible]);
+
+  useEffect(() => {
+    if (!contextMenu.visible) return;
+    const menuEl = contextMenuRef.current;
+    if (!menuEl) return;
+
+    const margin = 12;
+    const rect = menuEl.getBoundingClientRect();
+    let nextX = contextMenu.x;
+    let nextY = contextMenu.y;
+
+    if (rect.right > window.innerWidth - margin) {
+      nextX -= rect.right - (window.innerWidth - margin);
+    }
+    if (rect.bottom > window.innerHeight - margin) {
+      nextY -= rect.bottom - (window.innerHeight - margin);
+    }
+    if (rect.left < margin) nextX = margin;
+    if (rect.top < margin) nextY = margin;
+
+    if (nextX !== contextMenu.x || nextY !== contextMenu.y) {
+      setContextMenu((prev) => ({ ...prev, x: Math.round(nextX), y: Math.round(nextY) }));
+    }
+  }, [contextMenu.visible, contextMenu.x, contextMenu.y, contextMenu.taskLevel]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1934,8 +1957,8 @@ export default function TasksTab({ projectId }: Props) {
         )}
       </div>
 
-      {contextMenu.visible && contextMenu.task && (
-        <div style={{ position:'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 999, background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow2, minWidth: 220, maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', overflowX: 'hidden' }}>
+      {contextMenu.visible && contextMenu.task && typeof document !== 'undefined' && createPortal(
+        <div ref={contextMenuRef} style={{ position:'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 3000, background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow2, minWidth: 220, maxWidth: 'calc(100vw - 24px)', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', overflowX: 'hidden' }}>
           <button type="button" onClick={() => handleReorderTask('top')}
             style={{ display:'flex', alignItems:'center', gap:8, width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13, whiteSpace:'nowrap' }}>
             <ChevronsUp size={13} />
@@ -2015,7 +2038,8 @@ export default function TasksTab({ projectId }: Props) {
               </button>
             </>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
 
       {moveToSubModal && (
