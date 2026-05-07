@@ -49,20 +49,23 @@ alter table public.task_templates enable row level security;
 alter table public.task_template_items enable row level security;
 
 -- Read access for authenticated users
-create policy if not exists task_templates_select_authenticated
+drop policy if exists task_templates_select_authenticated on public.task_templates;
+create policy task_templates_select_authenticated
 on public.task_templates
 for select
 to authenticated
 using (true);
 
-create policy if not exists task_template_items_select_authenticated
+drop policy if exists task_template_items_select_authenticated on public.task_template_items;
+create policy task_template_items_select_authenticated
 on public.task_template_items
 for select
 to authenticated
 using (true);
 
 -- Admin-only create/update/delete
-create policy if not exists task_templates_admin_insert
+drop policy if exists task_templates_admin_insert on public.task_templates;
+create policy task_templates_admin_insert
 on public.task_templates
 for insert
 to authenticated
@@ -73,7 +76,8 @@ with check (
   )
 );
 
-create policy if not exists task_templates_admin_update
+drop policy if exists task_templates_admin_update on public.task_templates;
+create policy task_templates_admin_update
 on public.task_templates
 for update
 to authenticated
@@ -90,7 +94,8 @@ with check (
   )
 );
 
-create policy if not exists task_templates_admin_delete
+drop policy if exists task_templates_admin_delete on public.task_templates;
+create policy task_templates_admin_delete
 on public.task_templates
 for delete
 to authenticated
@@ -101,7 +106,8 @@ using (
   )
 );
 
-create policy if not exists task_template_items_admin_insert
+drop policy if exists task_template_items_admin_insert on public.task_template_items;
+create policy task_template_items_admin_insert
 on public.task_template_items
 for insert
 to authenticated
@@ -112,7 +118,8 @@ with check (
   )
 );
 
-create policy if not exists task_template_items_admin_update
+drop policy if exists task_template_items_admin_update on public.task_template_items;
+create policy task_template_items_admin_update
 on public.task_template_items
 for update
 to authenticated
@@ -129,7 +136,8 @@ with check (
   )
 );
 
-create policy if not exists task_template_items_admin_delete
+drop policy if exists task_template_items_admin_delete on public.task_template_items;
+create policy task_template_items_admin_delete
 on public.task_template_items
 for delete
 to authenticated
