@@ -368,7 +368,8 @@ export const taskApi = {
   getByProject: async (pid?: string): Promise<{ data: Task[] }> => {
     let q = supabase.from('tasks').select('*');
     if (pid) q = q.eq('project_id', pid);
-    q = q.order('order', { ascending: true });
+    // Prefer new sort_order, fallback to legacy order for older rows.
+    q = q.order('sort_order', { ascending: true }).order('order', { ascending: true });
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     const tasks = rowsToObjs<Task>(data || []);
