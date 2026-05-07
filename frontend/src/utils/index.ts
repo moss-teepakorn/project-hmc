@@ -166,12 +166,12 @@ export const getDays = (minDate: Date, totalDays: number) =>
 
 // ── Task tree helpers ─────────────────────────────────────────────────────────
 export const flattenTree = (tasks: Task[], expandedIds: Set<string>): Task[] => {
-  const roots = tasks.filter(t => !t.parentId).sort((a, b) => a.order - b.order);
+  const roots = tasks.filter(t => !t.parentId).sort((a, b) => a.sortOrder - b.sortOrder);
   const out: Task[] = [];
   const walk = (t: Task) => {
     out.push(t);
     if (expandedIds.has(t.id))
-      tasks.filter(x => x.parentId === t.id).sort((a, b) => a.order - b.order).forEach(walk);
+      tasks.filter(x => x.parentId === t.id).sort((a, b) => a.sortOrder - b.sortOrder).forEach(walk);
   };
   roots.forEach(walk);
   return out;

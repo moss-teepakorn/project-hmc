@@ -609,7 +609,7 @@ export const taskApi = {
       const al = Number(a.level || 0);
       const bl = Number(b.level || 0);
       if (al !== bl) return al - bl;
-      return Number(a.order || 0) - Number(b.order || 0);
+      return Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
     });
 
     const idMap = new Map<string, string>();
@@ -803,7 +803,7 @@ async function persistTaskChanges(origTasks: Task[], newTasks: Task[]): Promise<
     const updates: Record<string, unknown> = {};
     if (orig.wbs !== t.wbs) updates.wbs = t.wbs;
     if (orig.level !== t.level) updates.level = t.level;
-    if (orig.order !== t.order) updates.order = t.order;
+    if (orig.sortOrder !== t.sortOrder) updates.sort_order = t.sortOrder;
     if ((orig.parentId || '') !== (t.parentId || '')) updates.parent_id = t.parentId || null;
     if (orig.percentComplete !== t.percentComplete) updates.percent_complete = t.percentComplete;
     if (orig.startDate !== t.startDate) updates.start_date = t.startDate;
@@ -835,8 +835,8 @@ function recalcStructure(tasks: Task[]): Task[] {
 
   const sortSiblings = (items: Task[]) =>
     [...items].sort((a, b) => {
-      const ao = Number(a.order || 0);
-      const bo = Number(b.order || 0);
+      const ao = Number(a.sortOrder || 0);
+      const bo = Number(b.sortOrder || 0);
       if (ao !== bo) return ao - bo;
       return String(a.id).localeCompare(String(b.id));
     });
@@ -848,7 +848,7 @@ function recalcStructure(tasks: Task[]): Task[] {
       const wbs = prefix ? `${prefix}.${idx + 1}` : `${idx + 1}`;
       task.wbs = wbs;
       task.level = level;
-      task.order = runningOrder++;
+      task.sortOrder = runningOrder++;
       walk(task.id, level + 1, wbs);
     });
   };

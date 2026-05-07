@@ -472,13 +472,13 @@ export default function TasksTab({ projectId }: Props) {
   const handleContextMenuSelect = (action: InsertAction) => {
     const anchor = contextMenu.task;
     if (!anchor) return;
-    const { parentId, order, level } = getInsertMeta(anchor, action);
+    const { parentId, sortOrder, level } = getInsertMeta(anchor, action);
     setNewTaskInsert({
       id: `new-${Date.now()}`,
       anchorId: anchor.id,
       parentId,
       action,
-      order,
+      sortOrder,
       taskName: '',
       effortManday: 0,
       startDate: todayIso,
