@@ -462,7 +462,9 @@ export default function TasksTab({ projectId }: Props) {
     e.stopPropagation();
     const taskLevel = task.level ?? 0;
     const menuWidth = 220;
-    const menuHeight = 260;
+    const levelActionCount = taskLevel === 0 ? 4 : taskLevel === 1 ? 4 : 3;
+    const menuItemCount = 4 + levelActionCount;
+    const menuHeight = Math.min(window.innerHeight - 24, 16 + menuItemCount * 38);
     const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12);
     const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12);
     setSelected(task.id);
@@ -1756,22 +1758,26 @@ export default function TasksTab({ projectId }: Props) {
       </div>
 
       {contextMenu.visible && contextMenu.task && (
-        <div style={{ position:'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 999, background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow2, minWidth: 220, overflow: 'hidden' }}>
+        <div style={{ position:'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 999, background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow2, minWidth: 220, maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', overflowX: 'hidden' }}>
           <button type="button" onClick={() => handleReorderTask('top')}
-            style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-            <ChevronsUp size={13} style={{ marginRight: 8, verticalAlign: 'text-bottom' }} /> Move Top
+            style={{ display:'flex', alignItems:'center', gap:8, width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13, whiteSpace:'nowrap' }}>
+            <ChevronsUp size={13} />
+            <span>Move Top</span>
           </button>
           <button type="button" onClick={() => handleReorderTask('up')}
-            style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-            <ArrowUp size={13} style={{ marginRight: 8, verticalAlign: 'text-bottom' }} /> Move Up
+            style={{ display:'flex', alignItems:'center', gap:8, width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13, whiteSpace:'nowrap' }}>
+            <ArrowUp size={13} />
+            <span>Move Up</span>
           </button>
           <button type="button" onClick={() => handleReorderTask('down')}
-            style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-            <ArrowDown size={13} style={{ marginRight: 8, verticalAlign: 'text-bottom' }} /> Move Down
+            style={{ display:'flex', alignItems:'center', gap:8, width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13, whiteSpace:'nowrap' }}>
+            <ArrowDown size={13} />
+            <span>Move Down</span>
           </button>
           <button type="button" onClick={() => handleReorderTask('bottom')}
-            style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13 }}>
-            <ChevronsDown size={13} style={{ marginRight: 8, verticalAlign: 'text-bottom' }} /> Move Bottom
+            style={{ display:'flex', alignItems:'center', gap:8, width:'100%', textAlign:'left', padding:'10px 14px', border:'none', background:'none', color:C.text, cursor:'pointer', fontSize:13, whiteSpace:'nowrap' }}>
+            <ChevronsDown size={13} />
+            <span>Move Bottom</span>
           </button>
           <div style={{ borderTop: `1px solid ${C.border}` }} />
           {contextMenu.taskLevel === 0 ? (
