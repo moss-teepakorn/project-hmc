@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, Home } from 'lucide-react';
-import { Badge, Tabs, C, PROJECT_STATUS, ProgressBar } from '../Common';
+import { ChevronLeft, Copy, Home } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Badge, Tabs, C, PROJECT_STATUS, ProgressBar, Btn, Modal, FormRow, Select, Input } from '../Common';
 import { fmtDate, computeBaselineProgress } from '../../utils';
 import type { Project } from '../../types';
 import TasksTab          from '../Table/TasksTab';
@@ -15,14 +16,29 @@ import ProjectEnvironmentTab from './ProjectEnvironmentTab';
 import ProjectReport     from './ProjectReport';
 import { useStore }      from '../../store';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
+import { effortApi, memberApi, milestoneApi, riskApi, taskApi } from '../../services/api';
 
 interface Props { project: Project; }
+type CopyScope = 'tasks' | 'members' | 'ms' | 'effort' | 'risks';
+
+function getTodayPassword(): string {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(now.getFullYear());
+  return `${dd}${mm}${yyyy}`;
+}
 
 export default function ProjectDetail({ project }: Props) {
   const [activeTab, setActiveTab]   = useState('tasks');
   const [isMobile, setIsMobile] = useState(false);
+  const [copyModalOpen, setCopyModalOpen] = useState(false);
+  const [copySourceProjectId, setCopySourceProjectId] = useState('');
+  const [copyPassword, setCopyPassword] = useState('');
+  const [copying, setCopying] = useState(false);
   const permissions = useRolePermissions();
   const {
+    projects,
     tasks,
     members,
     milestones,
@@ -31,6 +47,7 @@ export default function ProjectDetail({ project }: Props) {
     issues,
     risks,
     projectEnvironments,
+    fetchProjects,
     fetchTasks,
     fetchProjectProgressSnapshots,
     fetchMembers,
@@ -74,6 +91,65 @@ export default function ProjectDetail({ project }: Props) {
         : C.greenBg;
   const scheduleLabel = scheduleStatus === 'Plan N/A' ? 'Plan N/A' : `Project Health : ${scheduleStatus}`;
 
+  const copyTabLabel: Record<CopyScope, string> = {
+    tasks: 'Task',
+    members: 'Member',
+    ms: 'Milestone',
+    effort: 'Effort',
+    risks: 'Risk',
+  };
+  const copyScope = (['tasks', 'members', 'ms', 'effort', 'risks'].includes(activeTab)
+    ? activeTab
+    : null) as CopyScope | null;
+  const sourceProjectOptions = projects
+    .filter((p) => p.id !== project.id)
+    .map((p) => ({ value: p.id, label: `${p.code} - ${p.name}` }));
+
+  const openCopyModal = () => {
+    setCopySourceProjectId(sourceProjectOptions[0]?.value || '');
+    setCopyPassword('');
+    setCopyModalOpen(true);
+  };
+
+  const handleConfirmCopy = async () => {
+    if (!copyScope) return;
+    if (!copySourceProjectId) {
+      toast.error('Please select source project');
+      return;
+    }
+    if (copyPassword.trim() !== getTodayPassword()) {
+      toast.error('Invalid password');
+      return;
+    }
+
+    setCopying(true);
+    try {
+      if (copyScope === 'tasks') {
+        await taskApi.copyFromProject(copySourceProjectId, project.id, 'all');
+        await fetchTasks(project.id);
+      } else if (copyScope === 'members') {
+        await memberApi.copyFromProject(copySourceProjectId, project.id);
+        await fetchMembers(project.id);
+      } else if (copyScope === 'ms') {
+        await milestoneApi.copyFromProject(copySourceProjectId, project.id);
+        await fetchMilestones(project.id);
+      } else if (copyScope === 'effort') {
+        await effortApi.copyFromProject(copySourceProjectId, project.id);
+        await fetchEfforts(project.id);
+      } else if (copyScope === 'risks') {
+        await riskApi.copyFromProject(copySourceProjectId, project.id);
+        await fetchRisks(project.id);
+      }
+
+      toast.success(`${copyTabLabel[copyScope]} copied successfully`);
+      setCopyModalOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : `Failed to copy ${copyScope}`);
+    } finally {
+      setCopying(false);
+    }
+  };
+
   const allTabs = [
     { id: 'tasks',    label: 'Tasks',      icon: '📋', count: tasks.filter(t => t.projectId === project.id).length },
     { id: 'summary',  label: 'Summary',    icon: '📈' },
@@ -105,6 +181,12 @@ export default function ProjectDetail({ project }: Props) {
     window.addEventListener('app-set-tab', handleSetTab);
     return () => window.removeEventListener('app-set-tab', handleSetTab);
   }, []);
+
+  React.useEffect(() => {
+    if (!projects.length) {
+      fetchProjects();
+    }
+  }, [projects.length, fetchProjects]);
 
   React.useEffect(() => {
     if (!project?.id) return;
@@ -163,6 +245,29 @@ export default function ProjectDetail({ project }: Props) {
       </div>
 
       <div style={{ flex: 1, overflow: 'hidden', background: activeTab === 'tasks' ? C.white : C.bg }}>
+        {copyScope && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 14px 0', background: activeTab === 'tasks' ? C.white : C.bg }}>
+            <button
+              type="button"
+              onClick={openCopyModal}
+              title={`Copy ${copyTabLabel[copyScope]} from another project`}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                border: `1px solid ${C.border}`,
+                background: C.white,
+                color: C.primary,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Copy size={16} />
+            </button>
+          </div>
+        )}
         {activeTab === 'tasks'   && <div style={{ height: '100%' }}><TasksTab         projectId={project.id} /></div>}
         {activeTab === 'summary' && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectSummaryTab project={project} /></div>}
         {activeTab === 'members' && <div style={{ height: '100%', overflowY: 'auto' }}><MembersTab        projectId={project.id} /></div>}
@@ -174,6 +279,36 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
         {activeTab === 'report'  && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectReport project={project} /></div>}
       </div>
+
+      {copyModalOpen && copyScope && (
+        <Modal title={`Copy ${copyTabLabel[copyScope]} From Another Project`} onClose={() => setCopyModalOpen(false)} width={560}>
+          <div style={{ display: 'grid', gap: 10 }}>
+            <FormRow label="Source Project" required>
+              <Select
+                value={copySourceProjectId}
+                onChange={setCopySourceProjectId}
+                options={sourceProjectOptions.length ? sourceProjectOptions : [{ value: '', label: 'No source project available' }]}
+                disabled={!sourceProjectOptions.length}
+              />
+            </FormRow>
+
+            <FormRow label="Password" required>
+              <Input value={copyPassword} onChange={setCopyPassword} placeholder="*********" />
+            </FormRow>
+
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: C.amberBg, fontSize: 12, color: C.text2 }}>
+              Copy will append data from source project into this tab of current project.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Btn variant="ghost" onClick={() => setCopyModalOpen(false)} disabled={copying}>Cancel</Btn>
+              <Btn onClick={handleConfirmCopy} disabled={copying || !copySourceProjectId || !copyPassword.trim()}>
+                {copying ? 'Copying…' : 'Confirm Copy'}
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

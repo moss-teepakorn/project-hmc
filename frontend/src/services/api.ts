@@ -1263,6 +1263,25 @@ export const memberApi = {
     const { error } = await supabase.from('members').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
+
+  copyFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Member[] }> => {
+    const ok = await checkProjectPermission(targetProjectId, 'write');
+    if (!ok) throw new Error('FORBIDDEN');
+
+    const src = await memberApi.getByProject(sourceProjectId);
+    if (!src.data.length) return { data: [] };
+
+    const rows = src.data.map((m) => {
+      const row = objToRow({ ...m, projectId: targetProjectId } as Record<string, unknown>);
+      delete row.id;
+      delete row.created_at;
+      return row;
+    });
+
+    const { data, error } = await supabase.from('members').insert(rows).select();
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<Member>(data || []) };
+  },
 };
 
 // ── Milestones ──────────────────────────────────────────────────────────────
@@ -1307,6 +1326,25 @@ export const milestoneApi = {
   remove: async (id: string): Promise<void> => {
     const { error } = await supabase.from('milestones').delete().eq('id', id);
     if (error) throw new Error(error.message);
+  },
+
+  copyFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Milestone[] }> => {
+    const ok = await checkProjectPermission(targetProjectId, 'write');
+    if (!ok) throw new Error('FORBIDDEN');
+
+    const src = await milestoneApi.getByProject(sourceProjectId);
+    if (!src.data.length) return { data: [] };
+
+    const rows = src.data.map((m) => {
+      const row = objToRow({ ...m, projectId: targetProjectId } as Record<string, unknown>);
+      delete row.id;
+      delete row.created_at;
+      return row;
+    });
+
+    const { data, error } = await supabase.from('milestones').insert(rows).select();
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<Milestone>(data || []) };
   },
 };
 
@@ -1392,6 +1430,32 @@ export const effortApi = {
     // effort_monthly cascades via FK
     const { error } = await supabase.from('efforts').delete().eq('id', id);
     if (error) throw new Error(error.message);
+  },
+
+  copyFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Effort[] }> => {
+    const ok = await checkProjectPermission(targetProjectId, 'write');
+    if (!ok) throw new Error('FORBIDDEN');
+
+    const src = await effortApi.getByProject(sourceProjectId);
+    if (!src.data.length) return { data: [] };
+
+    const copied: Effort[] = [];
+    for (const e of src.data) {
+      const created = await effortApi.create({
+        projectId: targetProjectId,
+        module: e.module,
+        phase: e.phase,
+        budgetAmount: e.budgetAmount,
+        budgetManday: e.budgetManday,
+      });
+      const monthlyEntries = Object.entries(e.monthly || {});
+      if (monthlyEntries.length) {
+        await Promise.all(monthlyEntries.map(([month, manday]) => effortApi.updateMonthly(created.data.id, month, Number(manday || 0))));
+      }
+      copied.push({ ...created.data, monthly: { ...(e.monthly || {}) } });
+    }
+
+    return { data: copied };
   },
 };
 
@@ -1585,5 +1649,24 @@ export const riskApi = {
   remove: async (id: string): Promise<void> => {
     const { error } = await supabase.from('risks').delete().eq('id', id);
     if (error) throw new Error(error.message);
+  },
+
+  copyFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Risk[] }> => {
+    const ok = await checkProjectPermission(targetProjectId, 'write');
+    if (!ok) throw new Error('FORBIDDEN');
+
+    const src = await riskApi.getByProject(sourceProjectId);
+    if (!src.data.length) return { data: [] };
+
+    const rows = src.data.map((r) => {
+      const row = objToRow({ ...r, projectId: targetProjectId } as Record<string, unknown>);
+      delete row.id;
+      delete row.created_at;
+      return row;
+    });
+
+    const { data, error } = await supabase.from('risks').insert(rows).select();
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<Risk>(data || []) };
   },
 };
