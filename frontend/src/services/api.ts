@@ -997,7 +997,7 @@ async function deleteTaskAndChildren(taskId: string): Promise<void> {
 async function persistTaskChanges(origTasks: Task[], newTasks: Task[]): Promise<void> {
   // Build a Map for O(1) lookup instead of O(n²) find in loop
   const origById = new Map(origTasks.map((o) => [o.id, o]));
-  const writes: Promise<void>[] = [];
+  const writes: PromiseLike<void>[] = [];
 
   for (const t of newTasks) {
     const orig = origById.get(t.id);
