@@ -33,6 +33,7 @@ interface Store {
   fetchTasks:      (pid?: string) => Promise<void>;
   createTask:      (t: Partial<Task>) => Promise<void>;
   updateTask:      (id: string, t: Partial<Task>) => Promise<void>;
+  reorderTasks:    (projectId: string, orderedIds: string[]) => Promise<void>;
   deleteTask:      (id: string) => Promise<void>;
 
   fetchMembers:    (pid: string) => Promise<void>;
@@ -173,6 +174,18 @@ export const useStore = create<Store>((set, get) => ({
     set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
     try {
       const r = await taskApi.update(id, t);
+      set({ tasks: r.allTasks ?? get().tasks });
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  reorderTasks: async (projectId, orderedIds) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      const r = await taskApi.reorderSiblings(projectId, orderedIds);
       set({ tasks: r.allTasks ?? get().tasks });
     } finally {
       set((s: any) => {

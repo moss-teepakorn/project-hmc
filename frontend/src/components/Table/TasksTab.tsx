@@ -209,7 +209,7 @@ function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean
 }
 
 export default function TasksTab({ projectId }: Props) {
-  const { tasks, members, activeProject, fetchTasks, createTask, updateTask, deleteTask, masterCodes } = useStore();
+  const { tasks, members, activeProject, fetchTasks, createTask, updateTask, reorderTasks, deleteTask, masterCodes } = useStore();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView]         = useState<ViewMode>(() => typeof window !== 'undefined' && window.innerWidth < 768 ? 'table' : 'split');
@@ -657,11 +657,12 @@ export default function TasksTab({ projectId }: Props) {
 
   const handleReorderTask = async (mode: 'up' | 'down' | 'top' | 'bottom') => {
     const anchor = contextMenu.task;
-    if (!anchor) return;
+    if (!anchor || !activeProject) return;
 
-    const siblings = projectTasks
+    // Sort siblings by WBS — same order the user sees on screen
+    const siblings = [...projectTasks]
       .filter((t) => (t.parentId || '') === (anchor.parentId || ''))
-      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+      .sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''));
     const index = siblings.findIndex((t) => t.id === anchor.id);
 
     if (index < 0 || siblings.length <= 1) {
@@ -669,42 +670,28 @@ export default function TasksTab({ projectId }: Props) {
       return;
     }
 
-    let sortOrder = Number(anchor.sortOrder || 0);
+    let newIndex = index;
     if (mode === 'up') {
-      if (index === 0) {
-        toast('Task is already at top');
-        setContextMenu((prev) => ({ ...prev, visible: false }));
-        return;
-      }
-      sortOrder = Number(siblings[index - 1].sortOrder || 0) - 0.5;
-    }
-    if (mode === 'down') {
-      if (index === siblings.length - 1) {
-        toast('Task is already at bottom');
-        setContextMenu((prev) => ({ ...prev, visible: false }));
-        return;
-      }
-      sortOrder = Number(siblings[index + 1].sortOrder || 0) + 0.5;
-    }
-    if (mode === 'top') {
-      if (index === 0) {
-        toast('Task is already at top');
-        setContextMenu((prev) => ({ ...prev, visible: false }));
-        return;
-      }
-      sortOrder = Number(siblings[0].sortOrder || 0) - 0.5;
-    }
-    if (mode === 'bottom') {
-      if (index === siblings.length - 1) {
-        toast('Task is already at bottom');
-        setContextMenu((prev) => ({ ...prev, visible: false }));
-        return;
-      }
-      sortOrder = Number(siblings[siblings.length - 1].sortOrder || 0) + 0.5;
+      if (index === 0) { toast('Task is already at top'); setContextMenu((prev) => ({ ...prev, visible: false })); return; }
+      newIndex = index - 1;
+    } else if (mode === 'down') {
+      if (index === siblings.length - 1) { toast('Task is already at bottom'); setContextMenu((prev) => ({ ...prev, visible: false })); return; }
+      newIndex = index + 1;
+    } else if (mode === 'top') {
+      if (index === 0) { toast('Task is already at top'); setContextMenu((prev) => ({ ...prev, visible: false })); return; }
+      newIndex = 0;
+    } else /* bottom */ {
+      if (index === siblings.length - 1) { toast('Task is already at bottom'); setContextMenu((prev) => ({ ...prev, visible: false })); return; }
+      newIndex = siblings.length - 1;
     }
 
+    // Rebuild sibling list with anchor moved to new position
+    const reordered = [...siblings];
+    reordered.splice(index, 1);
+    reordered.splice(newIndex, 0, anchor);
+
     try {
-      await updateTask(anchor.id, { sortOrder });
+      await reorderTasks(activeProject.id, reordered.map((t) => t.id));
       toast.success('Task order updated');
     } catch {
       toast.error('Failed to reorder task');
@@ -766,50 +753,23 @@ export default function TasksTab({ projectId }: Props) {
       return;
     }
 
-    // IMPORTANT: compute insertion index from the exact order user sees on screen.
-    // This keeps drop behavior deterministic in Collapse all and mixed ordering states.
-    const siblingIdsInViewOrder = visible
-      .filter((t) => (t.parentId || '') === (targetTask.parentId || '') && t.id !== draggedTask.id)
-      .map((t) => t.id);
+    if (!activeProject) return;
 
-    const siblings = siblingIdsInViewOrder
-      .map((id) => projectTasks.find((t) => t.id === id))
-      .filter((t): t is Task => Boolean(t));
+    // Use the exact visual order (WBS-sorted) as the authoritative sequence.
+    // Remove the dragged task then re-insert at the desired drop position.
+    const siblingsInViewOrder = visible
+      .filter((t) => (t.parentId || '') === (targetTask.parentId || ''));
 
-    if (!siblings.length) return;
+    const withoutDragged = siblingsInViewOrder.filter((t) => t.id !== draggedTask.id);
+    const targetIdx = withoutDragged.findIndex((t) => t.id === targetTask.id);
+    if (targetIdx < 0) return;
 
-    let insertIndex = siblingIdsInViewOrder.findIndex((id) => id === targetTask.id);
-    if (insertIndex < 0) return;
-    if (dropPosition === 'after') insertIndex += 1;
-
-    let nextSortOrder = 1;
-    if (insertIndex <= 0) {
-      nextSortOrder = Number(siblings[0].sortOrder || 0) - 0.5;
-    } else if (insertIndex >= siblings.length) {
-      nextSortOrder = Number(siblings[siblings.length - 1].sortOrder || 0) + 1;
-    } else {
-      const prev = Number(siblings[insertIndex - 1].sortOrder || 0);
-      const next = Number(siblings[insertIndex].sortOrder || 0);
-      nextSortOrder = (prev + next) / 2;
-    }
-
-    // Adjacent drag/drop can mathematically produce the same sortOrder as current.
-    // Force a directional delta so the move is always applied.
-    const currentSortOrder = Number(draggedTask.sortOrder || 0);
-    if (Math.abs(nextSortOrder - currentSortOrder) < 0.000001) {
-      const targetSortOrder = Number(targetTask.sortOrder || 0);
-      nextSortOrder = dropPosition === 'before'
-        ? targetSortOrder - 0.25
-        : targetSortOrder + 0.25;
-      if (Math.abs(nextSortOrder - currentSortOrder) < 0.000001) {
-        nextSortOrder = dropPosition === 'before'
-          ? currentSortOrder - 0.5
-          : currentSortOrder + 0.5;
-      }
-    }
+    const insertAt = dropPosition === 'before' ? targetIdx : targetIdx + 1;
+    const newOrder = [...withoutDragged];
+    newOrder.splice(insertAt, 0, draggedTask);
 
     try {
-      await updateTask(draggedTask.id, { sortOrder: nextSortOrder });
+      await reorderTasks(activeProject.id, newOrder.map((t) => t.id));
       toast.success('Task moved');
     } catch {
       toast.error('Failed to move task');

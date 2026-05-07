@@ -555,6 +555,27 @@ export const taskApi = {
     return { data: updated, allTasks };
   },
 
+  reorderSiblings: async (projectId: string, orderedIds: string[]): Promise<{ allTasks: Task[] }> => {
+    const ok = await checkProjectPermission(projectId, 'write');
+    if (!ok) throw new Error('FORBIDDEN');
+    // Assign clean, monotonically-increasing sort_order values so recalcStructure
+    // will produce the exact WBS sequence that matches the desired visual order.
+    // Use individual UPDATE queries (not upsert) to avoid accidentally clearing
+    // other columns via partial upsert semantics.
+    const writeResults = await Promise.all(
+      orderedIds.map((id, i) =>
+        supabase.from('tasks').update({ sort_order: (i + 1) * 1000 }).eq('id', id)
+      )
+    );
+    const writeError = writeResults.find((r) => r.error);
+    if (writeError?.error) throw new Error(writeError.error.message);
+    const all = await taskApi.getByProject(projectId);
+    const structured = recalcStructure(all.data);
+    const allTasks = recalcParents(structured);
+    await persistTaskChanges(all.data, allTasks);
+    return { allTasks };
+  },
+
   setComplete: async (id: string, pct: number): Promise<{ allTasks: Task[] }> => {
     const { data, error } = await supabase
       .from('tasks')
