@@ -268,11 +268,29 @@ export default function TaskTemplateModal({ onClose }: Props) {
     });
   };
 
+  const addItem = () => {
+    const maxSort = itemsDraft.reduce((m, it) => Math.max(m, it.sortOrder || 0), 0);
+    setItemsDraft((prev) => [
+      ...prev,
+      { id: '', templateId: selectedTemplateId, wbs: '', parentWbs: '', level: 0, sortOrder: maxSort + 10, taskName: '', duration: 0, effortManday: 0 },
+    ]);
+  };
+
+  const removeItem = (index: number) => {
+    setItemsDraft((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+
+  const cellInput: React.CSSProperties = {
+    width: '100%', height: '100%', border: 'none', outline: 'none',
+    background: 'transparent', fontSize: 11, color: C.text, padding: '0 6px',
+    fontFamily: 'inherit',
+  };
 
   return (
     <Modal title="Task Copy & WBS Template" onClose={onClose} width={980}>
-      <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Btn small variant={activeView === 'copy' ? 'primary' : 'ghost'} onClick={() => setActiveView('copy')}>
             <Copy size={14} /> Copy Tasks
@@ -362,104 +380,127 @@ export default function TaskTemplateModal({ onClose }: Props) {
         )}
 
         {activeView === 'templates' && (
-          <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gap: 8 }}>
             {!isAdmin && (
-              <div style={{ padding: '10px 12px', borderRadius: 10, background: C.redBg, color: C.red, fontSize: 12 }}>
+              <div style={{ padding: '6px 10px', borderRadius: 8, background: C.redBg, color: C.red, fontSize: 11 }}>
                 Template create/edit/delete is available for admin only.
               </div>
             )}
 
-            <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, display: 'grid', gap: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>Create Template From Project</div>
-              <FormRow label="Template Name" required>
+            {/* Create Template */}
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 12px', display: 'grid', gap: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, textTransform: 'uppercase', letterSpacing: 1 }}>Create Template From Project</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Input value={createName} onChange={setCreateName} placeholder="Template name" />
-              </FormRow>
-              <FormRow label="Source Project" required>
                 <Select
                   value={createSourceProjectId}
                   onChange={setCreateSourceProjectId}
-                  options={allProjectOptions.length ? allProjectOptions : [{ value: '', label: 'No source project available' }]}
+                  options={allProjectOptions.length ? allProjectOptions : [{ value: '', label: 'No project' }]}
                   disabled={!allProjectOptions.length}
                 />
-              </FormRow>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Btn onClick={handleCreateTemplate} disabled={!isAdmin || loading || !createName.trim() || !createSourceProjectId}>
-                  <Plus size={14} /> Create Template
+                <Btn small onClick={handleCreateTemplate} disabled={!isAdmin || loading || !createName.trim() || !createSourceProjectId}>
+                  <Plus size={13} /> Create
                 </Btn>
               </div>
             </div>
 
-            <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, display: 'grid', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>Edit Template</div>
+            {/* Edit Template */}
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 12px', display: 'grid', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, textTransform: 'uppercase', letterSpacing: 1 }}>Edit Template</div>
                 <Btn small variant="ghost" onClick={loadTemplates} disabled={templatesLoading}>
-                  <FolderOpen size={14} /> Refresh
+                  <FolderOpen size={13} /> Refresh
                 </Btn>
               </div>
 
-              <FormRow label="Template">
-                <Select
-                  value={selectedTemplateId}
-                  onChange={setSelectedTemplateId}
-                  options={templateOptions.length ? templateOptions : [{ value: '', label: 'No template available' }]}
-                  disabled={!templateOptions.length}
-                />
-              </FormRow>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <Select
+                    value={selectedTemplateId}
+                    onChange={setSelectedTemplateId}
+                    options={templateOptions.length ? templateOptions : [{ value: '', label: 'No template' }]}
+                    disabled={!templateOptions.length}
+                  />
+                </div>
+                {selectedTemplate && (
+                  <>
+                    <div style={{ flex: 1, minWidth: 160 }}>
+                      <Input value={templateNameDraft} onChange={setTemplateNameDraft} placeholder="Template name" />
+                    </div>
+                    <Btn small onClick={handleSaveTemplateName} disabled={!isAdmin || loading || !templateNameDraft.trim()}>
+                      <Save size={13} /> Save Name
+                    </Btn>
+                    <Btn small variant="danger" onClick={handleDeleteTemplate} disabled={!isAdmin || loading}>
+                      <Trash2 size={13} />
+                    </Btn>
+                  </>
+                )}
+              </div>
 
               {selectedTemplate && (
                 <>
-                  <FormRow label="Template Name">
-                    <Input value={templateNameDraft} onChange={setTemplateNameDraft} />
-                  </FormRow>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <div style={{ fontSize: 12, color: C.text2 }}>
-                      Template {selectedTemplate.templateNo}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <Btn small onClick={handleSaveTemplateName} disabled={!isAdmin || loading || !templateNameDraft.trim()}>
-                        <Save size={14} /> Save Name
-                      </Btn>
-                      <Btn small variant="danger" onClick={handleDeleteTemplate} disabled={!isAdmin || loading}>
-                        <Trash2 size={14} /> Delete
-                      </Btn>
-                    </div>
-                  </div>
-
-                  <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '90px 100px 1fr 100px 110px', background: C.bg2 }}>
-                      {['WBS', 'Parent WBS', 'Task Name', 'Duration', 'Effort'].map((label) => (
-                        <div key={label} style={{ padding: '8px 10px', fontSize: 11, fontWeight: 700, color: C.text2 }}>
+                  {/* Compact items table */}
+                  <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', marginTop: 2 }}>
+                    {/* Header */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '70px 80px 1fr 70px 80px 32px',
+                      background: C.bg2,
+                      height: 32,
+                      borderBottom: `1px solid ${C.border}`,
+                    }}>
+                      {['WBS', 'Parent WBS', 'Task Name', 'Duration', 'Effort (MD)', ''].map((label) => (
+                        <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '0 6px', fontSize: 10, fontWeight: 700, color: C.text2 }}>
                           {label}
                         </div>
                       ))}
                     </div>
-                    <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                    {/* Rows */}
+                    <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+                      {itemsDraft.length === 0 && (
+                        <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: C.text3 }}>
+                          No items — click + Add Row below
+                        </div>
+                      )}
                       {itemsDraft.map((item, index) => (
-                        <div key={item.id || `${item.wbs}-${index}`} style={{ display: 'grid', gridTemplateColumns: '90px 100px 1fr 100px 110px', borderTop: `1px solid ${C.border}` }}>
-                          <div style={{ padding: 6 }}>
-                            <Input value={item.wbs} onChange={(v) => updateItemField(index, 'wbs', v)} />
-                          </div>
-                          <div style={{ padding: 6 }}>
-                            <Input value={item.parentWbs || ''} onChange={(v) => updateItemField(index, 'parentWbs', v)} />
-                          </div>
-                          <div style={{ padding: 6 }}>
-                            <Input value={item.taskName} onChange={(v) => updateItemField(index, 'taskName', v)} />
-                          </div>
-                          <div style={{ padding: 6 }}>
-                            <Input value={String(item.duration || 0)} onChange={(v) => updateItemField(index, 'duration', v)} type="number" />
-                          </div>
-                          <div style={{ padding: 6 }}>
-                            <Input value={String(item.effortManday || 0)} onChange={(v) => updateItemField(index, 'effortManday', v)} type="number" />
+                        <div
+                          key={item.id || `draft-${index}`}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '70px 80px 1fr 70px 80px 32px',
+                            height: 36,
+                            borderBottom: `1px solid ${C.border}`,
+                            background: index % 2 === 1 ? C.bg2 : C.white,
+                          }}
+                        >
+                          <input style={cellInput} value={item.wbs} onChange={(e) => updateItemField(index, 'wbs', e.target.value)} />
+                          <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}` }} value={item.parentWbs || ''} onChange={(e) => updateItemField(index, 'parentWbs', e.target.value)} />
+                          <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}` }} value={item.taskName} onChange={(e) => updateItemField(index, 'taskName', e.target.value)} />
+                          <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}`, textAlign: 'right' }} type="number" value={item.duration || 0} onChange={(e) => updateItemField(index, 'duration', e.target.value)} />
+                          <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}`, textAlign: 'right' }} type="number" value={item.effortManday || 0} onChange={(e) => updateItemField(index, 'effortManday', e.target.value)} />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeft: `1px solid ${C.border}` }}>
+                            <button
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              disabled={!isAdmin}
+                              style={{ background: 'none', border: 'none', cursor: isAdmin ? 'pointer' : 'default', color: C.red, opacity: isAdmin ? 1 : 0.3, padding: 4, display: 'flex', alignItems: 'center' }}
+                              title="Delete row"
+                            >
+                              <Trash2 size={13} />
+                            </button>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Btn onClick={handleSaveItems} disabled={!isAdmin || loading || !itemsDraft.length}>
-                      <Save size={14} /> Save Template Items
+                  {/* Add row + Save */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                    <Btn small variant="ghost" onClick={addItem} disabled={!isAdmin}>
+                      <Plus size={13} /> Add Row
+                    </Btn>
+                    <Btn small onClick={handleSaveItems} disabled={!isAdmin || loading}>
+                      <Save size={13} /> Save Items
                     </Btn>
                   </div>
                 </>
