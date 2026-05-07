@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, Download, Upload, ChevronDown, ZoomIn, ZoomOut } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { Plus, Download, Upload, ChevronDown, ZoomIn, ZoomOut, Lock, Unlock, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -80,6 +80,162 @@ const TASK_IMPORT_HEADERS = [
   'Owner',
   'Effort Manday',
 ] as const;
+
+type SuggestionInput = {
+  deliverableCompleteness: number;
+  acceptanceCompleteness: number;
+  ownershipCoverage: number;
+  effortCoverage: number;
+  estimationOutlierPenalty: number;
+  unitConsistency: number;
+  predecessorCoverage: number;
+  cycleSafety: number;
+  criticalPathCoverage: number;
+  overAllocationRate: number;
+  availabilityMatch: number;
+  roleCoverage: number;
+  workingDayFit: number;
+  milestoneHitRate: number;
+  criticalPathSlack: number;
+  bufferAdequacy: number;
+  highRiskCoverage: number;
+  similarDurationFit: number;
+  similarEffortFit: number;
+  teamSimilarityFit: number;
+};
+
+const SUGGESTION_WEIGHTS = {
+  scopeClarity: 15,
+  estimationAccuracy: 20,
+  dependencyQuality: 15,
+  resourceCapacityFit: 20,
+  scheduleFeasibility: 15,
+  riskBufferAdequacy: 10,
+  historicalSimilarityFit: 5,
+} as const;
+
+const SUGGESTION_DEFAULT_INPUT: SuggestionInput = {
+  deliverableCompleteness: 85,
+  acceptanceCompleteness: 80,
+  ownershipCoverage: 90,
+  effortCoverage: 85,
+  estimationOutlierPenalty: 15,
+  unitConsistency: 90,
+  predecessorCoverage: 80,
+  cycleSafety: 100,
+  criticalPathCoverage: 75,
+  overAllocationRate: 10,
+  availabilityMatch: 85,
+  roleCoverage: 80,
+  workingDayFit: 90,
+  milestoneHitRate: 80,
+  criticalPathSlack: 70,
+  bufferAdequacy: 75,
+  highRiskCoverage: 80,
+  similarDurationFit: 70,
+  similarEffortFit: 70,
+  teamSimilarityFit: 65,
+};
+
+const SUGGESTION_FIELDS: Array<{ key: keyof SuggestionInput; label: string; hint?: string }> = [
+  { key: 'deliverableCompleteness', label: 'Deliverable Completeness (%)' },
+  { key: 'acceptanceCompleteness', label: 'Acceptance Criteria Completeness (%)' },
+  { key: 'ownershipCoverage', label: 'Ownership Coverage (%)' },
+  { key: 'effortCoverage', label: 'Effort Coverage (%)' },
+  { key: 'estimationOutlierPenalty', label: 'Estimation Outlier Penalty (%)', hint: 'Penalty: lower is better' },
+  { key: 'unitConsistency', label: 'Unit Consistency (%)' },
+  { key: 'predecessorCoverage', label: 'Predecessor Coverage (%)' },
+  { key: 'cycleSafety', label: 'Cycle Safety (%)' },
+  { key: 'criticalPathCoverage', label: 'Critical Path Coverage (%)' },
+  { key: 'overAllocationRate', label: 'Over-allocation Rate (%)', hint: 'Penalty: lower is better' },
+  { key: 'availabilityMatch', label: 'Availability Match (%)' },
+  { key: 'roleCoverage', label: 'Role Coverage (%)' },
+  { key: 'workingDayFit', label: 'Working Day Fit (%)' },
+  { key: 'milestoneHitRate', label: 'Milestone Hit Rate (%)' },
+  { key: 'criticalPathSlack', label: 'Critical Path Slack (%)' },
+  { key: 'bufferAdequacy', label: 'Buffer Adequacy (%)' },
+  { key: 'highRiskCoverage', label: 'High-risk Coverage (%)' },
+  { key: 'similarDurationFit', label: 'Similar Duration Fit (%)' },
+  { key: 'similarEffortFit', label: 'Similar Effort Fit (%)' },
+  { key: 'teamSimilarityFit', label: 'Team Similarity Fit (%)' },
+];
+
+const DASHBOARD_SUGGESTION_JSON_SCHEMA = {
+  schemaVersion: '1.0.0',
+  type: 'object',
+  required: ['generatedAt', 'projectId', 'lockStatus', 'score', 'dimensions', 'inputs', 'dashboard'],
+  properties: {
+    generatedAt: { type: 'string', format: 'date-time' },
+    projectId: { type: 'string' },
+    lockStatus: { type: 'string', enum: ['locked', 'unlocked'] },
+    score: {
+      type: 'object',
+      required: ['total', 'grade'],
+      properties: {
+        total: { type: 'number', minimum: 0, maximum: 100 },
+        grade: { type: 'string' },
+      },
+    },
+    dimensions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['key', 'weight', 'score', 'weightedScore'],
+        properties: {
+          key: { type: 'string' },
+          weight: { type: 'number' },
+          score: { type: 'number', minimum: 0, maximum: 100 },
+          weightedScore: { type: 'number', minimum: 0, maximum: 100 },
+        },
+      },
+    },
+    inputs: { type: 'object' },
+    dashboard: {
+      type: 'object',
+      required: ['projectDurationDays', 'taskCount', 'recommendedAction'],
+      properties: {
+        projectDurationDays: { type: 'number' },
+        taskCount: { type: 'number' },
+        recommendedAction: { type: 'string' },
+      },
+    },
+  },
+} as const;
+
+function clampPct(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Number(value)));
+}
+
+function getPlanGrade(total: number): string {
+  if (total >= 85) return 'High Confidence';
+  if (total >= 70) return 'Review Recommended';
+  if (total >= 50) return 'Risky Plan';
+  return 'Re-plan Required';
+}
+
+function getRecommendedAction(total: number): string {
+  if (total >= 85) return 'Auto-suggest ready';
+  if (total >= 70) return 'Use with PM review';
+  if (total >= 50) return 'Rework critical factors before baseline';
+  return 'Do not apply schedule yet';
+}
+
+function getProjectDurationDays(startDate?: string, endDate?: string): number {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+}
+
+function getTodayPassword(): string {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(now.getFullYear());
+  return `${dd}${mm}${yyyy}`;
+}
 
 type InsertAction =
   | 'main-before'
@@ -177,6 +333,14 @@ export default function TasksTab({ projectId }: Props) {
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; taskLevel: number }>({ visible: false, x: 0, y: 0, task: null, taskLevel: 0 });
   const [newTaskInsert, setNewTaskInsert] = useState<NewTaskInsert | null>(null);
   const [moveToSubModal, setMoveToSubModal] = useState<{ task: Task; targetParentId: string } | null>(null);
+  const [suggestModalOpen, setSuggestModalOpen] = useState(false);
+  const [suggestionInput, setSuggestionInput] = useState<SuggestionInput>(SUGGESTION_DEFAULT_INPUT);
+  const [isSuggestionLocked, setIsSuggestionLocked] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('task-suggestion-locked') === 'true';
+  });
+  const [unlockModalOpen, setUnlockModalOpen] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState('');
   const [splitW, setSplitW]     = useState<number>(() => {
     if (typeof window !== 'undefined') {
       return Math.max(640, Math.round(window.innerWidth * 0.66));
@@ -321,6 +485,108 @@ export default function TasksTab({ projectId }: Props) {
       .filter((t) => !t.parentId && t.id !== moveToSubModal.task.id)
       .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
     : [];
+
+  const suggestionResult = useMemo(() => {
+    const scopeClarity = clampPct((
+      suggestionInput.deliverableCompleteness +
+      suggestionInput.acceptanceCompleteness +
+      suggestionInput.ownershipCoverage
+    ) / 3);
+
+    const estimationAccuracy = clampPct(
+      suggestionInput.effortCoverage * 0.5 +
+      (100 - suggestionInput.estimationOutlierPenalty) * 0.35 +
+      suggestionInput.unitConsistency * 0.15
+    );
+
+    const dependencyQuality = clampPct(
+      suggestionInput.predecessorCoverage * 0.4 +
+      suggestionInput.cycleSafety * 0.4 +
+      suggestionInput.criticalPathCoverage * 0.2
+    );
+
+    const resourceCapacityFit = clampPct(
+      (100 - suggestionInput.overAllocationRate) * 0.5 +
+      suggestionInput.availabilityMatch * 0.3 +
+      suggestionInput.roleCoverage * 0.2
+    );
+
+    const scheduleFeasibility = clampPct(
+      suggestionInput.workingDayFit * 0.4 +
+      suggestionInput.milestoneHitRate * 0.3 +
+      suggestionInput.criticalPathSlack * 0.3
+    );
+
+    const riskBufferAdequacy = clampPct(
+      suggestionInput.bufferAdequacy * 0.6 +
+      suggestionInput.highRiskCoverage * 0.4
+    );
+
+    const historicalSimilarityFit = clampPct(
+      suggestionInput.similarDurationFit * 0.5 +
+      suggestionInput.similarEffortFit * 0.3 +
+      suggestionInput.teamSimilarityFit * 0.2
+    );
+
+    const dimensions = [
+      { key: 'scopeClarity', weight: SUGGESTION_WEIGHTS.scopeClarity, score: scopeClarity },
+      { key: 'estimationAccuracy', weight: SUGGESTION_WEIGHTS.estimationAccuracy, score: estimationAccuracy },
+      { key: 'dependencyQuality', weight: SUGGESTION_WEIGHTS.dependencyQuality, score: dependencyQuality },
+      { key: 'resourceCapacityFit', weight: SUGGESTION_WEIGHTS.resourceCapacityFit, score: resourceCapacityFit },
+      { key: 'scheduleFeasibility', weight: SUGGESTION_WEIGHTS.scheduleFeasibility, score: scheduleFeasibility },
+      { key: 'riskBufferAdequacy', weight: SUGGESTION_WEIGHTS.riskBufferAdequacy, score: riskBufferAdequacy },
+      { key: 'historicalSimilarityFit', weight: SUGGESTION_WEIGHTS.historicalSimilarityFit, score: historicalSimilarityFit },
+    ].map((item) => ({ ...item, weightedScore: Number(((item.score * item.weight) / 100).toFixed(2)) }));
+
+    const total = Number(dimensions.reduce((sum, item) => sum + item.weightedScore, 0).toFixed(2));
+    const grade = getPlanGrade(total);
+    const projectDurationDays = getProjectDurationDays(activeProject?.startDate, activeProject?.endDate);
+    const recommendedAction = getRecommendedAction(total);
+
+    const dashboardPayload = {
+      generatedAt: new Date().toISOString(),
+      projectId,
+      lockStatus: isSuggestionLocked ? 'locked' : 'unlocked',
+      score: {
+        total,
+        grade,
+      },
+      dimensions,
+      inputs: suggestionInput,
+      formulas: {
+        scopeClarity: '(deliverableCompleteness + acceptanceCompleteness + ownershipCoverage) / 3',
+        estimationAccuracy: 'effortCoverage*0.5 + (100-estimationOutlierPenalty)*0.35 + unitConsistency*0.15',
+        dependencyQuality: 'predecessorCoverage*0.4 + cycleSafety*0.4 + criticalPathCoverage*0.2',
+        resourceCapacityFit: '(100-overAllocationRate)*0.5 + availabilityMatch*0.3 + roleCoverage*0.2',
+        scheduleFeasibility: 'workingDayFit*0.4 + milestoneHitRate*0.3 + criticalPathSlack*0.3',
+        riskBufferAdequacy: 'bufferAdequacy*0.6 + highRiskCoverage*0.4',
+        historicalSimilarityFit: 'similarDurationFit*0.5 + similarEffortFit*0.3 + teamSimilarityFit*0.2',
+        weightedTotal: 'sum(dimensionScore * weight / 100)',
+      },
+      dashboard: {
+        projectDurationDays,
+        taskCount: projectTasks.length,
+        recommendedAction,
+      },
+    };
+
+    return {
+      total,
+      grade,
+      dimensions,
+      dashboardPayload,
+      dashboardSchema: DASHBOARD_SUGGESTION_JSON_SCHEMA,
+    };
+  }, [activeProject?.endDate, activeProject?.startDate, isSuggestionLocked, projectId, projectTasks.length, suggestionInput]);
+
+  const suggestionPayloadText = useMemo(
+    () => JSON.stringify(suggestionResult.dashboardPayload, null, 2),
+    [suggestionResult.dashboardPayload],
+  );
+  const suggestionSchemaText = useMemo(
+    () => JSON.stringify(suggestionResult.dashboardSchema, null, 2),
+    [suggestionResult.dashboardSchema],
+  );
 
   const openTaskContextMenu = (task: Task) => (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -473,6 +739,11 @@ export default function TasksTab({ projectId }: Props) {
   }, [contextMenu.visible]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('task-suggestion-locked', String(isSuggestionLocked));
+  }, [isSuggestionLocked]);
+
+  useEffect(() => {
     if (isMobile && view !== 'table') setView('table');
   }, [isMobile, view]);
 
@@ -534,6 +805,36 @@ export default function TasksTab({ projectId }: Props) {
       useStore.setState({ tasks: res.allTasks ?? useStore.getState().tasks });
     } catch { toast.error('Failed to save'); }
   }, []);
+
+  const openSuggestionModal = () => {
+    if (isSuggestionLocked) {
+      toast.error('Suggestion is locked. Please unlock first.');
+      return;
+    }
+    setSuggestModalOpen(true);
+  };
+
+  const toggleSuggestionLock = () => {
+    if (!isSuggestionLocked) {
+      setIsSuggestionLocked(true);
+      setSuggestModalOpen(false);
+      toast.success('Suggestion locked');
+      return;
+    }
+    setUnlockPassword('');
+    setUnlockModalOpen(true);
+  };
+
+  const confirmUnlockSuggestion = () => {
+    if (unlockPassword.trim() !== getTodayPassword()) {
+      toast.error('Invalid password. Use today in ddmmyyyy format.');
+      return;
+    }
+    setIsSuggestionLocked(false);
+    setUnlockModalOpen(false);
+    setUnlockPassword('');
+    toast.success('Suggestion unlocked');
+  };
 
   const handleDelete = async (id: string) => {
     try { await deleteTask(id); toast.success('Deleted'); }
@@ -1451,6 +1752,10 @@ export default function TasksTab({ projectId }: Props) {
             )}
           </div>
           <Btn small onClick={openImportDialog} style={{ opacity: importing ? 0.7 : 1 }}><Upload size={13} /> {importing ? 'Importing…' : 'Import Excel'}</Btn>
+          <Btn small variant="ghost" onClick={toggleSuggestionLock}>
+            {isSuggestionLocked ? <Lock size={13} /> : <Unlock size={13} />} {isSuggestionLocked ? 'Lock On' : 'Lock Off'}
+          </Btn>
+          <Btn small onClick={openSuggestionModal} disabled={isSuggestionLocked}><Sparkles size={13} /> Suggest Plan</Btn>
           <Btn small onClick={openAddTaskDefault}><Plus size={13} /> Add Task</Btn>
         </div>
       </div>
@@ -1641,6 +1946,96 @@ export default function TasksTab({ projectId }: Props) {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <Btn variant="ghost" onClick={() => setImportPreview(null)} disabled={importing}>Cancel</Btn>
             <Btn variant="danger" onClick={confirmImportOverwrite} disabled={importing}>{importing ? 'Importing…' : 'Confirm Overwrite Import'}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {suggestModalOpen && (
+        <Modal title="Plan Suggestion Scoring Model" onClose={() => setSuggestModalOpen(false)} width={1080}>
+          <div style={{ display: 'grid', gap: 16 }}>
+            <Card style={{ padding: '14px 16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: C.text2 }}>TOTAL SCORE</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: C.primary }}>{suggestionResult.total}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.text2 }}>GRADE</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{suggestionResult.grade}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.text2 }}>LOCK STATUS</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: isSuggestionLocked ? C.red : C.green }}>{isSuggestionLocked ? 'LOCKED' : 'UNLOCKED'}</div>
+                </div>
+              </div>
+            </Card>
+
+            <Card style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>Input Fields (0-100)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+                {SUGGESTION_FIELDS.map((field) => (
+                  <FormRow key={field.key} label={field.label}>
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      <Input
+                        value={String((suggestionInput[field.key] ?? 0))}
+                        onChange={(v) => {
+                          const parsed = Number(v);
+                          setSuggestionInput((prev) => ({ ...prev, [field.key]: clampPct(Number.isFinite(parsed) ? parsed : 0) }));
+                        }}
+                        placeholder="0-100"
+                      />
+                      {field.hint && <div style={{ fontSize: 11, color: C.text3 }}>{field.hint}</div>}
+                    </div>
+                  </FormRow>
+                ))}
+              </div>
+            </Card>
+
+            <Card style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>Dimension Formula & Weights</div>
+              <div style={{ display: 'grid', gap: 8, fontSize: 12, color: C.text2 }}>
+                <div>scopeClarity (15): (deliverableCompleteness + acceptanceCompleteness + ownershipCoverage) / 3</div>
+                <div>estimationAccuracy (20): effortCoverage*0.5 + (100-estimationOutlierPenalty)*0.35 + unitConsistency*0.15</div>
+                <div>dependencyQuality (15): predecessorCoverage*0.4 + cycleSafety*0.4 + criticalPathCoverage*0.2</div>
+                <div>resourceCapacityFit (20): (100-overAllocationRate)*0.5 + availabilityMatch*0.3 + roleCoverage*0.2</div>
+                <div>scheduleFeasibility (15): workingDayFit*0.4 + milestoneHitRate*0.3 + criticalPathSlack*0.3</div>
+                <div>riskBufferAdequacy (10): bufferAdequacy*0.6 + highRiskCoverage*0.4</div>
+                <div>historicalSimilarityFit (5): similarDurationFit*0.5 + similarEffortFit*0.3 + teamSimilarityFit*0.2</div>
+                <div>totalScore: sum(dimensionScore * weight / 100)</div>
+              </div>
+            </Card>
+
+            <Card style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>Dashboard Output JSON (Payload)</div>
+              <pre style={{ margin: 0, padding: 12, background: C.bg, borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 11, maxHeight: 220, overflow: 'auto' }}>{suggestionPayloadText}</pre>
+            </Card>
+
+            <Card style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>Dashboard JSON Schema</div>
+              <pre style={{ margin: 0, padding: 12, background: C.bg, borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 11, maxHeight: 220, overflow: 'auto' }}>{suggestionSchemaText}</pre>
+            </Card>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Btn variant="ghost" onClick={() => setSuggestionInput(SUGGESTION_DEFAULT_INPUT)}>Reset Default</Btn>
+              <Btn onClick={() => setSuggestModalOpen(false)}>Done</Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {unlockModalOpen && (
+        <Modal title="Unlock Suggestion" onClose={() => setUnlockModalOpen(false)} width={520}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={{ fontSize: 13, color: C.text2 }}>
+              Enter password format <strong>ddmmyyyy</strong> using current date. Example: 07052026
+            </div>
+            <FormRow label="Password">
+              <Input value={unlockPassword} onChange={setUnlockPassword} placeholder="ddmmyyyy" />
+            </FormRow>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Btn variant="ghost" onClick={() => setUnlockModalOpen(false)}>Cancel</Btn>
+              <Btn onClick={confirmUnlockSuggestion}>Unlock</Btn>
+            </div>
           </div>
         </Modal>
       )}
