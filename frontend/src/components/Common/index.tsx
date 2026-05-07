@@ -29,8 +29,8 @@ export const Card: React.FC<{
 type BtnVariant = 'primary' | 'outline' | 'ghost' | 'danger';
 export const Btn: React.FC<{
   children: React.ReactNode; onClick?: () => void; variant?: BtnVariant;
-  small?: boolean; disabled?: boolean; style?: React.CSSProperties;
-}> = ({ children, onClick, variant = 'primary', small = false, disabled = false, style }) => {
+  small?: boolean; disabled?: boolean; style?: React.CSSProperties; title?: string;
+}> = ({ children, onClick, variant = 'primary', small = false, disabled = false, style, title }) => {
   const base: React.CSSProperties = {
     fontFamily: 'Poppins, sans-serif', fontWeight: 600, borderRadius: 8,
     cursor: disabled ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
@@ -44,7 +44,7 @@ export const Btn: React.FC<{
     danger:  { background: C.redBg, color: C.red, border: `1px solid #FECACA` },
   };
   return (
-    <button disabled={disabled} onClick={onClick} style={{ ...base, ...v[variant], ...style }}
+    <button disabled={disabled} onClick={onClick} title={title} style={{ ...base, ...v[variant], ...style }}
       onMouseEnter={e => { if (!disabled) { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
       onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}>
       {children}
