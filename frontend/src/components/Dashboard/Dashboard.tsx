@@ -617,103 +617,11 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
   const healthValue = `${prog}%`;
   const healthSubtitle = `Plan ${plannedPercent}% by today`;
 
-  const getStageLabel = (name: string) => {
-    const lower = String(name || '').toLowerCase();
-    const mapping = [
-      { label: 'Project Initiation', keywords: ['initiation', 'kick-off', 'kick off', 'project prep'] },
-      { label: 'Requirement & Gap Analysis', keywords: ['requirement', 'gap', 'analysis', 'gathering'] },
-      { label: 'Business Blueprint', keywords: ['blueprint', 'business blueprint'] },
-      { label: 'System Configuration', keywords: ['configuration', 'system config', 'environment', 'setup'] },
-      { label: 'Data Migration', keywords: ['migration', 'data migration', 'data move'] },
-      { label: 'UAT & Parallel Run', keywords: ['uat', 'parallel', 'parallel run', 'testing', 'defects'] },
-      { label: 'Go-live & Hypercare', keywords: ['go-live', 'go live', 'hypercare', 'production', 'support'] },
-    ];
-    const found = mapping.find((item) => item.keywords.some((k) => lower.includes(k)));
-    return found ? found.label : name || 'Main Task';
-  };
-
-  const normalizeText = (value: string) => String(value || '').trim();
-  const normalizeKey = (value: string) => normalizeText(value).toLowerCase();
-
-  const taskPhaseOptions = masterCodes
-    .filter((code) => code.codeType === 'task_phase' && code.active)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((code) => ({ value: normalizeText(code.codeValue), label: normalizeText(code.label) }));
-
-  const phaseLabelByValue = taskPhaseOptions.reduce<Record<string, string>>((acc, phase) => {
-    acc[phase.value] = phase.label;
-    return acc;
-  }, {});
-
-  const phaseLabelByText = taskPhaseOptions.reduce<Record<string, string>>((acc, phase) => {
-    acc[normalizeKey(phase.label)] = phase.label;
-    return acc;
-  }, {});
-
-  const phaseSortIndex = taskPhaseOptions.reduce<Record<string, number>>((acc, phase, index) => {
-    acc[normalizeKey(phase.label)] = index;
-    return acc;
-  }, {});
-
-  const phaseLabels = taskPhaseOptions.length > 0
-    ? taskPhaseOptions.map((phase) => phase.label)
-    : [
-      'Project Initiation',
-      'Requirement & Gap Analysis',
-      'Business Blueprint',
-      'System Configuration',
-      'Data Migration',
-      'UAT & Parallel Run',
-      'Go-live & Hypercare',
-    ];
-
-  const resolvePhaseLabel = (phaseValue: string, taskName: string) => {
-    const rawValue = normalizeText(phaseValue);
-    if (!rawValue) return getStageLabel(taskName);
-
-    const mappedByValue = phaseLabelByValue[rawValue];
-    if (mappedByValue) return mappedByValue;
-
-    const normalizedRaw = normalizeKey(rawValue);
-    const mappedByText = phaseLabelByText[normalizedRaw];
-    if (mappedByText) return mappedByText;
-
-    const rawStageLabel = getStageLabel(rawValue);
-    const normalizedRawStage = normalizeKey(rawStageLabel);
-    if (phaseLabelByText[normalizedRawStage]) return phaseLabelByText[normalizedRawStage];
-    if (phaseLabels.includes(rawStageLabel)) return rawStageLabel;
-
-    const taskNameStageLabel = getStageLabel(taskName);
-    const normalizedTaskNameStage = normalizeKey(taskNameStageLabel);
-    if (phaseLabelByText[normalizedTaskNameStage]) return phaseLabelByText[normalizedTaskNameStage];
-    return taskNameStageLabel;
-  };
-
-  const phaseProgress = rootTasksSorted.reduce<Record<string, { total: number; count: number }>>((acc, t) => {
-    const phaseValue = normalizeText(t.phase || '');
-    const label = resolvePhaseLabel(phaseValue, t.taskName);
-    if (!acc[label]) acc[label] = { total: 0, count: 0 };
-    acc[label].total += t.percentComplete;
-    acc[label].count += 1;
-    return acc;
-  }, {});
-
-  const stageTasks = Object.keys(phaseProgress)
-    .map((label) => ({
-      id: label,
-      name: label,
-      progress: Math.round(phaseProgress[label].total / phaseProgress[label].count),
-    }))
-    .sort((a, b) => {
-      const aIndex = phaseSortIndex[normalizeKey(a.name)];
-      const bIndex = phaseSortIndex[normalizeKey(b.name)];
-      if (aIndex != null || bIndex != null) {
-        if (aIndex == null) return 1;
-        if (bIndex == null) return -1;
-        return aIndex - bIndex;
-      }
-      return a.name.localeCompare(b.name);
-    });
+  const stageTasks = rootTasksSorted.map((t) => ({
+    id: t.id,
+    name: `${t.wbs || '-'} ${t.taskName}`.trim(),
+    progress: Math.round(Number(t.percentComplete || 0)),
+  }));
 
   const recentFinishedTasks = pt
     .filter((t) => t.actualFinish)
@@ -805,8 +713,8 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
         <Card style={{ padding: '16px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Progress by Phase</div>
-              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Map main task to stage and show completion percent</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Progress by Main Task</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Show main task completion sorted by WBS</div>
             </div>
             <button type="button" onClick={onOpen} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Task Detail</button>
           </div>
@@ -820,7 +728,7 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
                 <ProgressBar value={stage.progress} height={8} color={stage.progress >= 100 ? C.green : C.primary} />
               </div>
             ))}
-            {!stageTasks.length && <div style={{ fontSize: 12, color: C.text3 }}>No stage-level main tasks found.</div>}
+            {!stageTasks.length && <div style={{ fontSize: 12, color: C.text3 }}>No main tasks found.</div>}
           </div>
         </Card>
 
