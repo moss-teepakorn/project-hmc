@@ -224,6 +224,7 @@ export default function TasksTab({ projectId }: Props) {
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; taskLevel: number }>({ visible: false, x: 0, y: 0, task: null, taskLevel: 0 });
   const [newTaskInsert, setNewTaskInsert] = useState<NewTaskInsert | null>(null);
   const [moveToSubModal, setMoveToSubModal] = useState<{ task: Task; targetParentId: string } | null>(null);
+  const [moveToMainModal, setMoveToMainModal] = useState<{ task: Task; targetIndex: number } | null>(null);
   const [suggestModalOpen, setSuggestModalOpen] = useState(false);
   const [isSuggestionLocked, setIsSuggestionLocked] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -376,6 +377,24 @@ export default function TasksTab({ projectId }: Props) {
       .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
     : [];
 
+  const availableMoveToMainPositions = moveToMainModal
+    ? (() => {
+      const roots = projectTasks
+        .filter((t) => !t.parentId && t.id !== moveToMainModal.task.id)
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+      const options: { value: string; label: string }[] = [];
+      for (let i = 1; i <= roots.length + 1; i += 1) {
+        if (i <= roots.length) {
+          const target = roots[i - 1];
+          options.push({ value: String(i), label: `Row ${i} (WBS ${i}) - before ${target.wbs || i}. ${target.taskName}` });
+        } else {
+          options.push({ value: String(i), label: `Row ${i} (WBS ${i}) - end of main task list` });
+        }
+      }
+      return options;
+    })()
+    : [];
+
   const suggestionPreview = useMemo(() => {
     const projectStart = activeProject?.startDate || '';
     const projectEnd = activeProject?.endDate || '';
@@ -503,20 +522,50 @@ export default function TasksTab({ projectId }: Props) {
       return;
     }
 
-    try {
-      const maxRootSortOrder = projectTasks
-        .filter((t) => !t.parentId && t.id !== anchor.id)
-        .reduce((max, t) => Math.max(max, Number(t.sortOrder || 0)), 0);
+    const roots = projectTasks
+      .filter((t) => !t.parentId && t.id !== anchor.id)
+      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+    const firstWbs = Number(String(anchor.wbs || '').split('.')[0] || 0);
+    const suggestedIndex = Number.isFinite(firstWbs) && firstWbs > 0
+      ? Math.min(roots.length + 1, Math.max(1, firstWbs + 1))
+      : roots.length + 1;
 
+    setMoveToMainModal({ task: anchor, targetIndex: suggestedIndex });
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+  };
+
+  const confirmMoveToMainTask = async () => {
+    if (!moveToMainModal) return;
+    const anchor = moveToMainModal.task;
+    const roots = projectTasks
+      .filter((t) => !t.parentId && t.id !== anchor.id)
+      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+    const targetIndex = Math.max(1, Math.min(moveToMainModal.targetIndex, roots.length + 1));
+    const insertAt = targetIndex - 1;
+
+    let nextSortOrder = 1;
+    if (roots.length === 0) {
+      nextSortOrder = 1;
+    } else if (insertAt <= 0) {
+      nextSortOrder = Number(roots[0].sortOrder || 0) - 0.5;
+    } else if (insertAt >= roots.length) {
+      nextSortOrder = Number(roots[roots.length - 1].sortOrder || 0) + 1;
+    } else {
+      const prev = Number(roots[insertAt - 1].sortOrder || 0);
+      const next = Number(roots[insertAt].sortOrder || 0);
+      nextSortOrder = (prev + next) / 2;
+    }
+
+    try {
       await updateTask(anchor.id, {
         parentId: '',
-        sortOrder: maxRootSortOrder + 1,
+        sortOrder: nextSortOrder,
       });
-      toast.success('Moved to Main Task');
+      toast.success(`Moved to Main Task (WBS ${targetIndex})`);
     } catch {
       toast.error('Failed to move task');
     } finally {
-      setContextMenu((prev) => ({ ...prev, visible: false }));
+      setMoveToMainModal(null);
     }
   };
 
@@ -1858,6 +1907,30 @@ export default function TasksTab({ projectId }: Props) {
         </Modal>
       )}
 
+      {moveToMainModal && (
+        <Modal title="Move to Main Task" onClose={() => setMoveToMainModal(null)} width={620}>
+          <div style={{ display: 'grid', gap: 14 }}>
+            <div style={{ fontSize: 13, color: C.text2 }}>
+              Select target position for: <span style={{ color: C.text, fontWeight: 700 }}>{moveToMainModal.task.taskName}</span>
+            </div>
+            <FormRow label="Target Row / Main WBS">
+              <Select
+                value={String(moveToMainModal.targetIndex)}
+                onChange={(v) => setMoveToMainModal((prev) => prev ? ({ ...prev, targetIndex: Number(v) || 1 }) : prev)}
+                options={availableMoveToMainPositions}
+              />
+            </FormRow>
+            <div style={{ fontSize: 12, color: C.text2 }}>
+              This task will become main task at row <strong>{moveToMainModal.targetIndex}</strong> (WBS <strong>{moveToMainModal.targetIndex}</strong>).
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Btn variant="ghost" onClick={() => setMoveToMainModal(null)}>Cancel</Btn>
+              <Btn onClick={confirmMoveToMainTask}>Move to Main Task</Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {addModal  && (
         <TaskModal
           tasks={projectTasks}
@@ -2005,9 +2078,6 @@ export default function TasksTab({ projectId }: Props) {
       {unlockModalOpen && (
         <Modal title="Unlock Suggestion" onClose={() => setUnlockModalOpen(false)} width={520}>
           <div style={{ display: 'grid', gap: 12 }}>
-            <div style={{ fontSize: 13, color: C.text2 }}>
-              Enter password format <strong>ddmmyyyy</strong> using current date. Example: 07052026
-            </div>
             <FormRow label="Password">
               <Input value={unlockPassword} onChange={setUnlockPassword} placeholder="ddmmyyyy" />
             </FormRow>
