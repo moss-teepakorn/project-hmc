@@ -176,6 +176,7 @@ export default function TasksTab({ projectId }: Props) {
   const [buttonFocus, setButtonFocus] = useState<'expand' | 'collapse' | null>(null);
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; taskLevel: number }>({ visible: false, x: 0, y: 0, task: null, taskLevel: 0 });
   const [newTaskInsert, setNewTaskInsert] = useState<NewTaskInsert | null>(null);
+  const [moveToSubModal, setMoveToSubModal] = useState<{ task: Task; targetParentId: string } | null>(null);
   const [splitW, setSplitW]     = useState<number>(() => {
     if (typeof window !== 'undefined') {
       return Math.max(640, Math.round(window.innerWidth * 0.66));
@@ -315,6 +316,12 @@ export default function TasksTab({ projectId }: Props) {
       .sort((a, b) => compareWbs(a.wbs, b.wbs)),
   }));
 
+  const availableMoveToSubParents = moveToSubModal
+    ? projectTasks
+      .filter((t) => !t.parentId && t.id !== moveToSubModal.task.id)
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+    : [];
+
   const openTaskContextMenu = (task: Task) => (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -385,35 +392,45 @@ export default function TasksTab({ projectId }: Props) {
       return;
     }
 
-    const rootSiblings = projectTasks
+    const candidates = projectTasks
       .filter((t) => !t.parentId && t.id !== anchor.id)
       .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
 
-    const previousMainTask = rootSiblings
-      .filter((t) => Number(t.order || 0) < Number(anchor.order || 0))
-      .slice(-1)[0];
-
-    if (!previousMainTask) {
-      toast.error('Cannot move to Sub Task: no previous Main Task found');
+    if (!candidates.length) {
+      toast.error('Cannot move to Sub Task: no target Main Task found');
       setContextMenu((prev) => ({ ...prev, visible: false }));
+      return;
+    }
+
+    setMoveToSubModal({ task: anchor, targetParentId: candidates[0].id });
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+  };
+
+  const confirmMoveToSubTask = async () => {
+    if (!moveToSubModal) return;
+    const anchor = moveToSubModal.task;
+    const targetParentId = moveToSubModal.targetParentId;
+    const targetParent = projectTasks.find((t) => t.id === targetParentId);
+    if (!targetParent) {
+      toast.error('Target Main Task not found');
       return;
     }
 
     try {
       const children = projectTasks
-        .filter((t) => t.parentId === previousMainTask.id)
+        .filter((t) => t.parentId === targetParentId)
         .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
       const nextOrder = children.length ? Number(children[children.length - 1].order || 0) + 1 : 1;
 
       await updateTask(anchor.id, {
-        parentId: previousMainTask.id,
+        parentId: targetParentId,
         order: nextOrder,
       });
-      toast.success(`Moved to Sub Task under ${previousMainTask.taskName}`);
+      toast.success(`Moved to Sub Task under ${targetParent.taskName}`);
     } catch {
       toast.error('Failed to move task');
     } finally {
-      setContextMenu((prev) => ({ ...prev, visible: false }));
+      setMoveToSubModal(null);
     }
   };
 
@@ -1526,6 +1543,27 @@ export default function TasksTab({ projectId }: Props) {
             </>
           )}
         </div>
+      )}
+
+      {moveToSubModal && (
+        <Modal title="Move to Sub Task" onClose={() => setMoveToSubModal(null)} width={560}>
+          <div style={{ display: 'grid', gap: 14 }}>
+            <div style={{ fontSize: 13, color: C.text2 }}>
+              Choose target Main Task for: <span style={{ color: C.text, fontWeight: 700 }}>{moveToSubModal.task.taskName}</span>
+            </div>
+            <FormRow label="Target Main Task">
+              <Select
+                value={moveToSubModal.targetParentId}
+                onChange={(v) => setMoveToSubModal((prev) => prev ? ({ ...prev, targetParentId: v }) : prev)}
+                options={availableMoveToSubParents.map((t) => ({ value: t.id, label: `${t.wbs || ''} ${t.taskName}`.trim() }))}
+              />
+            </FormRow>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Btn variant="ghost" onClick={() => setMoveToSubModal(null)}>Cancel</Btn>
+              <Btn onClick={confirmMoveToSubTask} disabled={!moveToSubModal.targetParentId}>Move to Sub Task</Btn>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {addModal  && (
