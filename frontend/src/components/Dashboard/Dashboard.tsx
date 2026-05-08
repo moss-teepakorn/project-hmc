@@ -34,6 +34,7 @@ export default function Dashboard() {
   const permissions = useRolePermissions();
   const savedView = React.useMemo(() => loadDashboardViewState(), []);
   const [selected,   setSelected]   = useState<Project | null>(null);
+  const [restoreDone, setRestoreDone] = useState<boolean>(() => !savedView.selectedProjectId);
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [showAdd,    setShowAdd]    = useState(false);
@@ -59,11 +60,10 @@ export default function Dashboard() {
     const onHome = () => {
       setSelected(null);
       setDashboardTab('overview');
-      fetchTasks();
     };
     window.addEventListener('app-home', onHome);
     return () => window.removeEventListener('app-home', onHome);
-  }, [fetchTasks]);
+  }, []);
 
   // Note: fetchProjects is called from App.tsx, not needed here
 
@@ -134,21 +134,9 @@ export default function Dashboard() {
     setNotificationsShown(true);
   }, [tasks, milestones, notificationsShown]);
 
-  // Fetch remaining data when a project is opened from the overview cards
-  React.useEffect(() => {
-    if (activeProject?.id) {
-      fetchTasks(activeProject.id);
-      fetchMembers(activeProject.id);
-      fetchIssues(activeProject.id);
-      fetchRisks(activeProject.id);
-      fetchCRs(activeProject.id);
-      fetchMilestones(activeProject.id);
-      fetchEfforts(activeProject.id);
-    }
-  }, [activeProject?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]);
-
   React.useEffect(() => {
     if (!selected?.id) {
+      if (!restoreDone) return;
       fetchTasks();
       return;
     }
@@ -159,14 +147,23 @@ export default function Dashboard() {
     fetchCRs(selected.id);
     fetchMilestones(selected.id);
     fetchEfforts(selected.id);
-  }, [selected?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected?.id, restoreDone, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
-    if (selected?.id || !savedView.selectedProjectId) return;
+    if (selected?.id) {
+      if (!restoreDone) setRestoreDone(true);
+      return;
+    }
+    if (!savedView.selectedProjectId) {
+      if (!restoreDone) setRestoreDone(true);
+      return;
+    }
     if (!projects.length) return;
+
     const found = projects.find((p) => p.id === savedView.selectedProjectId);
     if (found) setSelected(found);
-  }, [projects, savedView.selectedProjectId, selected?.id]);
+    setRestoreDone(true);
+  }, [projects, savedView.selectedProjectId, selected?.id, restoreDone]);
 
   React.useEffect(() => {
     window.sessionStorage.setItem(
