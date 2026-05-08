@@ -926,7 +926,10 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
                     <span style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</span>
                   </div>
                   <div style={{ fontSize: 10, color: C.text2 }}>Resource: {task.resource || '-'}</div>
-                  <div style={{ fontSize: 10, color: C.primary, fontWeight: 700 }}>Progress: {Math.round(Number(task.percentComplete || 0))}%</div>
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    <div style={{ fontSize: 10, color: C.primary, fontWeight: 700 }}>Progress: {Math.round(Number(task.percentComplete || 0))}%</div>
+                    <ProgressBar value={Math.round(Number(task.percentComplete || 0))} height={6} color={C.primary} />
+                  </div>
                 </div>
               ))}
               {!inProgressTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No in-progress tasks</div>}
