@@ -9,10 +9,13 @@ import { fmtMoney, fmtMonth } from '../../utils';
 import type { Effort } from '../../types';
 import { format, addMonths, subMonths } from 'date-fns';
 
-interface Props { projectId: string; }
+interface Props {
+  projectId: string;
+  extraActions?: React.ReactNode;
+}
 const PHASE_OPTIONS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
 
-export default function EffortTab({ projectId }: Props) {
+export default function EffortTab({ projectId, extraActions }: Props) {
   const { efforts, tasks, masterCodes, fetchEfforts, fetchTasks, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
   const permissions = useRolePermissions();
   const [modal, setModal]       = useState<Partial<Effort> | null>(null);
@@ -179,6 +182,7 @@ export default function EffortTab({ projectId }: Props) {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
         <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto' }}>
+          {extraActions}
           <Btn variant="ghost" onClick={() => setPhaseSummaryOpen(true)} small style={{ width: isMobile ? '100%' : 'auto' }}>Phase Summary</Btn>
           <Btn onClick={() => setModal({})} small style={{ width: isMobile ? '100%' : 'auto' }}><Plus size={14} /> Add Task</Btn>
         </div>
