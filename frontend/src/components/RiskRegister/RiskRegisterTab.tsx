@@ -9,9 +9,12 @@ import type { Risk } from '../../types';
 const RISK_STATUSES = ['Monitoring', 'Mitigating', 'Closed'] as const;
 const LEVELS        = ['Low', 'Medium', 'High'] as const;
 
-interface Props { projectId: string; }
+interface Props {
+  projectId: string;
+  extraActions?: React.ReactNode;
+}
 
-export default function RiskRegisterTab({ projectId }: Props) {
+export default function RiskRegisterTab({ projectId, extraActions }: Props) {
   const { risks, members, fetchRisks, fetchMembers, createRisk, updateRisk, deleteRisk } = useStore();
   const [modal, setModal]       = useState<Partial<Risk> | null>(null);
   const [deleting, setDeleting] = useState<Risk | null>(null);
@@ -70,7 +73,8 @@ export default function RiskRegisterTab({ projectId }: Props) {
         ))}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14, gap: 8 }}>
+        {extraActions}
         <Btn onClick={() => setModal({})} small><Plus size={14} /> Add Risk</Btn>
       </div>
 

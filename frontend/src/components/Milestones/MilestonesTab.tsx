@@ -8,9 +8,12 @@ import type { Milestone } from '../../types';
 
 const PHASES = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
 
-interface Props { projectId: string; }
+interface Props {
+  projectId: string;
+  extraActions?: React.ReactNode;
+}
 
-export default function MilestonesTab({ projectId }: Props) {
+export default function MilestonesTab({ projectId, extraActions }: Props) {
   const { milestones, fetchMilestones, createMilestone, updateMilestone, deleteMilestone } = useStore();
   const [modal, setModal]       = useState<Partial<Milestone> | null>(null);
   const [deleting, setDeleting] = useState<Milestone | null>(null);
@@ -92,6 +95,7 @@ export default function MilestonesTab({ projectId }: Props) {
       </Card>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0, alignItems: isMobile ? 'stretch' : 'center' }}>
+        {extraActions}
         <Btn onClick={() => setModal({})} small style={{ width: isMobile ? '100%' : 'auto' }}><Plus size={14} /> Add Milestone</Btn>
       </div>
 

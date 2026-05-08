@@ -12,7 +12,10 @@ import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth, compareWbs, 
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import type { Task, ViewMode } from '../../types';
 
-interface Props { projectId: string; }
+interface Props {
+  projectId: string;
+  extraActions?: React.ReactNode;
+}
 
 export const ROW_H = 36;
 export const HDR_H = 48;   // unified header height for both table and gantt
@@ -208,7 +211,7 @@ function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean
   );
 }
 
-export default function TasksTab({ projectId }: Props) {
+export default function TasksTab({ projectId, extraActions }: Props) {
   const { tasks, members, activeProject, fetchTasks, createTask, updateTask, reorderTasks, deleteTask, masterCodes } = useStore();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
@@ -1887,6 +1890,7 @@ export default function TasksTab({ projectId }: Props) {
           )}
         </div>
         <div style={{ display:'flex', gap:8, position:'relative' }}>
+          {extraActions}
           <input ref={importInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImportFileChange} />
           <div style={{ position:'relative' }}>
             <Btn variant="ghost" small onClick={()=>setShowExport(v=>!v)} title="Export">

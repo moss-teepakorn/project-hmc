@@ -111,6 +111,31 @@ export default function ProjectDetail({ project }: Props) {
     setCopyModalOpen(true);
   };
 
+  const copyButton = (scope: CopyScope) => (
+    <button
+      type="button"
+      onClick={() => {
+        setActiveTab(scope);
+        openCopyModal();
+      }}
+      title={`Copy ${copyTabLabel[scope]} from another project`}
+      style={{
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        border: `1px solid ${C.border}`,
+        background: C.white,
+        color: C.primary,
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Copy size={16} />
+    </button>
+  );
+
   const handleConfirmCopy = async () => {
     if (!copyScope) return;
     if (!copySourceProjectId) {
@@ -245,37 +270,14 @@ export default function ProjectDetail({ project }: Props) {
       </div>
 
       <div style={{ flex: 1, overflow: 'hidden', background: activeTab === 'tasks' ? C.white : C.bg }}>
-        {copyScope && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 14px 0', background: activeTab === 'tasks' ? C.white : C.bg }}>
-            <button
-              type="button"
-              onClick={openCopyModal}
-              title={`Copy ${copyTabLabel[copyScope]} from another project`}
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 8,
-                border: `1px solid ${C.border}`,
-                background: C.white,
-                color: C.primary,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Copy size={16} />
-            </button>
-          </div>
-        )}
-        {activeTab === 'tasks'   && <div style={{ height: '100%' }}><TasksTab         projectId={project.id} /></div>}
+        {activeTab === 'tasks'   && <div style={{ height: '100%' }}><TasksTab         projectId={project.id} extraActions={copyButton('tasks')} /></div>}
         {activeTab === 'summary' && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectSummaryTab project={project} /></div>}
-        {activeTab === 'members' && <div style={{ height: '100%', overflowY: 'auto' }}><MembersTab        projectId={project.id} /></div>}
-        {activeTab === 'ms'      && <div style={{ height: '100%', overflowY: 'auto' }}><MilestonesTab     projectId={project.id} /></div>}
+        {activeTab === 'members' && <div style={{ height: '100%', overflowY: 'auto' }}><MembersTab        projectId={project.id} extraActions={copyButton('members')} /></div>}
+        {activeTab === 'ms'      && <div style={{ height: '100%', overflowY: 'auto' }}><MilestonesTab     projectId={project.id} extraActions={copyButton('ms')} /></div>}
         {activeTab === 'effort'  && <div style={{ height: '100%', overflowY: 'auto' }}><EffortTab         projectId={project.id} /></div>}
         {activeTab === 'cr'      && <div style={{ height: '100%', overflowY: 'auto' }}><ChangeRequestTab  projectId={project.id} /></div>}
         {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
-        {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} /></div>}
+        {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} extraActions={copyButton('risks')} /></div>}
         {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
         {activeTab === 'report'  && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectReport project={project} /></div>}
       </div>

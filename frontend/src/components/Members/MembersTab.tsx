@@ -14,7 +14,10 @@ export const ROLES = [
   'HRD User', 'HRM User', 'Key User', 'IT Support',
 ];
 
-interface Props { projectId: string; }
+interface Props {
+  projectId: string;
+  extraActions?: React.ReactNode;
+}
 
 const formatPhoneNumber = (value?: string) => {
   const raw = String(value || '').trim();
@@ -51,7 +54,7 @@ const formatPhoneNumber = (value?: string) => {
   return formatGroups(digits);
 };
 
-export default function MembersTab({ projectId }: Props) {
+export default function MembersTab({ projectId, extraActions }: Props) {
   const { members, fetchMembers, createMember, updateMember, deleteMember } = useStore();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>('member');
@@ -224,6 +227,7 @@ export default function MembersTab({ projectId }: Props) {
           ))}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {extraActions}
           <Btn variant="outline" small disabled={syncing} onClick={handleSyncProjectMembers}>
             <RefreshCcw size={14} /> Sync Members
           </Btn>
