@@ -13,17 +13,36 @@ import ProjectModal from './ProjectModal';
 import PortfolioReportSummary from './PortfolioReportSummary';
 
 const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care'];
+const DASHBOARD_VIEW_STATE_KEY = 'dashboard-view-state';
+
+function loadDashboardViewState(): { selectedProjectId: string | null; dashboardTab: 'overview' | 'report' | null } {
+  try {
+    const raw = window.sessionStorage.getItem(DASHBOARD_VIEW_STATE_KEY);
+    if (!raw) return { selectedProjectId: null, dashboardTab: null };
+    const parsed = JSON.parse(raw) as { selectedProjectId?: unknown; dashboardTab?: unknown };
+    const selectedProjectId = typeof parsed.selectedProjectId === 'string' && parsed.selectedProjectId ? parsed.selectedProjectId : null;
+    const dashboardTab = parsed.dashboardTab === 'overview' || parsed.dashboardTab === 'report' ? parsed.dashboardTab : null;
+    return { selectedProjectId, dashboardTab };
+  } catch {
+    return { selectedProjectId: null, dashboardTab: null };
+  }
+}
 
 export default function Dashboard() {
   const { projects, tasks, milestones, issues, risks, changeRequests, activeProject, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts, masterCodes } = useStore();
   const { profile } = useAuth();
   const permissions = useRolePermissions();
+  const savedView = React.useMemo(() => loadDashboardViewState(), []);
   const [selected,   setSelected]   = useState<Project | null>(null);
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [showAdd,    setShowAdd]    = useState(false);
   const [showHypercare, setShowHypercare] = useState(false);
-  const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>(permissions.canViewPortfolioOverview ? 'overview' : 'report');
+  const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>(() => {
+    if (savedView.dashboardTab === 'report') return 'report';
+    if (savedView.dashboardTab === 'overview' && permissions.canViewPortfolioOverview) return 'overview';
+    return permissions.canViewPortfolioOverview ? 'overview' : 'report';
+  });
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [notificationsShown, setNotificationsShown] = useState(false);
   const [sendingAll, setSendingAll] = useState(false);
@@ -141,6 +160,23 @@ export default function Dashboard() {
     fetchMilestones(selected.id);
     fetchEfforts(selected.id);
   }, [selected?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => {
+    if (selected?.id || !savedView.selectedProjectId) return;
+    if (!projects.length) return;
+    const found = projects.find((p) => p.id === savedView.selectedProjectId);
+    if (found) setSelected(found);
+  }, [projects, savedView.selectedProjectId, selected?.id]);
+
+  React.useEffect(() => {
+    window.sessionStorage.setItem(
+      DASHBOARD_VIEW_STATE_KEY,
+      JSON.stringify({
+        selectedProjectId: selected?.id || null,
+        dashboardTab,
+      })
+    );
+  }, [selected?.id, dashboardTab]);
 
   // Separate normal projects from Hypercare
   const statusOrder = masterCodes
