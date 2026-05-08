@@ -555,6 +555,9 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
 function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { project: Project; onOpen: () => void; onViewMilestones: () => void; isMobile: boolean }) {
   const { tasks, milestones, members, efforts, changeRequests, issues, risks, masterCodes } = useStore();
   const permissions = useRolePermissions();
+  const [showAllCompletedModal, setShowAllCompletedModal] = React.useState(false);
+  const accomplishedListRef = React.useRef<HTMLDivElement | null>(null);
+  const [accomplishedOverflow, setAccomplishedOverflow] = React.useState(false);
   const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
   const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: project.status || 'Unknown' };
 
@@ -623,26 +626,65 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
     progress: Math.round(Number(t.percentComplete || 0)),
   }));
 
-  const recentFinishedTasks = pt
-    .filter((t) => t.actualFinish)
-    .sort((a, b) => {
-      const da = parseISO(a.actualFinish || '');
-      const db = parseISO(b.actualFinish || '');
-      if (!isValid(db) && !isValid(da)) return 0;
-      if (!isValid(db)) return -1;
-      if (!isValid(da)) return 1;
-      return Number(db) - Number(da);
-    })
-    .slice(0, 3)
+  const accomplishedTasks = pt
+    .filter((t) => Number(t.percentComplete || 0) >= 100)
+    .sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''))
     .map((t) => ({
-      title: t.taskName,
-      subtitle: t.actualFinish ? `Finished ${fmtDate(t.actualFinish)}` : '',
-      date: t.actualFinish,
+      id: t.id,
+      wbs: t.wbs || '-',
+      taskName: t.taskName || '-',
+      completedDate: t.actualFinish || '',
+      resource: t.resource || '-',
     }));
 
-  const actionItems = recentFinishedTasks.length
-    ? recentFinishedTasks
-    : [{ title: 'No recent completed tasks', subtitle: 'No finished tasks found', date: '' }];
+  const today = parseISO(todayIso);
+
+  const inProgressTasks = pt
+    .filter((t) => String(t.status || '') === 'In Progress' && Number(t.percentComplete || 0) < 100)
+    .sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''));
+
+  const upcomingTasks = pt
+    .filter((t) => {
+      if (String(t.status || '') !== 'Todo') return false;
+      const start = parseISO(t.startDate || '');
+      return isValid(start) && start >= today;
+    })
+    .sort((a, b) => {
+      const as = parseISO(a.startDate || '');
+      const bs = parseISO(b.startDate || '');
+      if (isValid(as) && isValid(bs) && Number(as) !== Number(bs)) return Number(as) - Number(bs);
+      return compareWbs(a.wbs || '', b.wbs || '');
+    });
+
+  const overdueTasks = pt
+    .filter((t) => {
+      if (String(t.status || '') === 'Done') return false;
+      const due = parseISO(t.endDate || '');
+      return isValid(due) && due < today;
+    })
+    .sort((a, b) => {
+      const ad = parseISO(a.endDate || '');
+      const bd = parseISO(b.endDate || '');
+      if (isValid(ad) && isValid(bd) && Number(ad) !== Number(bd)) return Number(ad) - Number(bd);
+      return compareWbs(a.wbs || '', b.wbs || '');
+    });
+
+  React.useEffect(() => {
+    const checkOverflow = () => {
+      const el = accomplishedListRef.current;
+      if (!el) {
+        setAccomplishedOverflow(false);
+        return;
+      }
+      setAccomplishedOverflow(el.scrollHeight > el.clientHeight + 1);
+    };
+    const raf = window.requestAnimationFrame(checkOverflow);
+    window.addEventListener('resize', checkOverflow);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener('resize', checkOverflow);
+    };
+  }, [accomplishedTasks.length, isMobile, stageTasks.length]);
 
   const milestoneStatusCards = upcomingMilestones.map((m) => {
     const due = parseISO(m.dueDate || '');
@@ -732,35 +774,45 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
           </div>
         </Card>
 
-        <Card style={{ padding: '16px 18px' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Management Attention</div>
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-              <div style={{ fontSize: 11, color: C.text2 }}>NEXT MILESTONE</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginTop: 6 }}>{upcomingMilestones[0]?.name || 'No milestone due soon'}</div>
-              {upcomingMilestones[0] && <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>{upcomingMilestones[0].dueDate ? fmtDate(upcomingMilestones[0].dueDate) : 'TBD'} · Amount ฿{fmtMoney(permissions.getMaskedAmount(upcomingMilestones[0].amount || 0))}</div>}
+        <Card style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Accomplished Task</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Completed tasks sorted by WBS</div>
             </div>
-            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-              <div style={{ fontSize: 11, color: C.text2 }}>NEXT ACTION</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginTop: 6 }}>{actionItems[0]?.title || 'No immediate action required'}</div>
-              {actionItems[0]?.subtitle && <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>{actionItems[0].subtitle}</div>}
-            </div>
-            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-              <div style={{ fontSize: 11, color: C.text2 }}>TOP RISKS</div>
-              {rks.slice(0, 3).map((risk) => (
-                <div key={risk.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 10 }}>
-                  <span style={{ fontSize: 12, color: C.text }}>{risk.title || 'Risk item'}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: C.text2 }}>{risk.probability}</span>
-                </div>
-              ))}
-              {!rks.length && <div style={{ fontSize: 11, color: C.text3, marginTop: 10 }}>No active risks</div>}
-            </div>
-            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-              <div style={{ fontSize: 11, color: C.text2 }}>DECISION REQUIRED</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginTop: 6 }}>Approve or confirm revised Phase timeline</div>
-              <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>Required to keep Business Blueprint completion aligned with project plan.</div>
-            </div>
+            {!!accomplishedTasks.length && <span style={{ fontSize: 11, color: C.text2 }}>{accomplishedTasks.length} tasks</span>}
           </div>
+          <div
+            ref={accomplishedListRef}
+            style={{
+              display: 'grid',
+              gap: 8,
+              overflow: 'hidden',
+              maxHeight: isMobile ? 220 : 290,
+              flex: 1,
+            }}
+          >
+            {accomplishedTasks.map((task) => (
+              <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 10, background: C.bg }}>
+                <div style={{ minWidth: 0, fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${task.wbs} ${task.taskName}`}>
+                  {task.wbs} {task.taskName}
+                </div>
+                <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>{task.completedDate ? fmtDate(task.completedDate) : '-'}</div>
+              </div>
+            ))}
+            {!accomplishedTasks.length && <div style={{ fontSize: 12, color: C.text3 }}>No accomplished tasks found.</div>}
+          </div>
+          {accomplishedOverflow && (
+            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowAllCompletedModal(true)}
+                style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+              >
+                View all tasks
+              </button>
+            </div>
+          )}
         </Card>
       </div>
 
@@ -821,21 +873,94 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
         <Card style={{ padding: '16px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Action Items & Recent Updates</div>
-              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>รายการที่ต้องติดตามล่าสุด</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Upcoming Activities</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>งานที่กำลังดำเนินการ งานถัดไป และงานที่เลยกำหนด</div>
             </div>
           </div>
           <div style={{ display: 'grid', gap: 12 }}>
-            {actionItems.map((item, index) => (
-              <div key={`${item.title}-${index}`} style={{ display: 'grid', gap: 6, padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{item.title}</div>
-                <div style={{ fontSize: 11, color: C.text2 }}>{item.subtitle}</div>
-                {item.date && <div style={{ fontSize: 10, color: C.text3 }}>{fmtDate(item.date)}</div>}
-              </div>
-            ))}
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+              <div style={{ fontSize: 11, color: C.text2, marginBottom: 8 }}>IN PROGRESS TASKS</div>
+              {inProgressTasks.slice(0, 4).map((task) => (
+                <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
+                  <span style={{ fontSize: 12, color: C.text }}>{`${task.wbs || '-'} ${task.taskName}`}</span>
+                  <span style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</span>
+                </div>
+              ))}
+              {!inProgressTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No in-progress tasks</div>}
+              {inProgressTasks.length > 4 && <div style={{ fontSize: 10, color: C.text3, marginTop: 8 }}>+{inProgressTasks.length - 4} more</div>}
+            </div>
+
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+              <div style={{ fontSize: 11, color: C.text2, marginBottom: 8 }}>UPCOMING TASKS</div>
+              {upcomingTasks.slice(0, 4).map((task) => (
+                <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
+                  <span style={{ fontSize: 12, color: C.text }}>{`${task.wbs || '-'} ${task.taskName}`}</span>
+                  <span style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.startDate ? fmtDate(task.startDate) : '-'}</span>
+                </div>
+              ))}
+              {!upcomingTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming tasks</div>}
+              {upcomingTasks.length > 4 && <div style={{ fontSize: 10, color: C.text3, marginTop: 8 }}>+{upcomingTasks.length - 4} more</div>}
+            </div>
+
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+              <div style={{ fontSize: 11, color: C.text2, marginBottom: 8 }}>OVERDUE TASKS</div>
+              {overdueTasks.slice(0, 4).map((task) => (
+                <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
+                  <span style={{ fontSize: 12, color: C.text }}>{`${task.wbs || '-'} ${task.taskName}`}</span>
+                  <span style={{ fontSize: 10, color: C.red, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</span>
+                </div>
+              ))}
+              {!overdueTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No overdue tasks</div>}
+              {overdueTasks.length > 4 && <div style={{ fontSize: 10, color: C.text3, marginTop: 8 }}>+{overdueTasks.length - 4} more</div>}
+            </div>
           </div>
         </Card>
       </div>
+
+      {showAllCompletedModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 920, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: C.shadow }}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Accomplished Task (All)</div>
+                <div style={{ fontSize: 12, color: C.text2, marginTop: 4 }}>เสร็จแล้วทั้งหมด {accomplishedTasks.length} รายการ</div>
+              </div>
+              <button onClick={() => setShowAllCompletedModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, fontSize: 20, lineHeight: 1, padding: 2 }}>×</button>
+            </div>
+
+            <div style={{ overflow: 'auto', flex: 1 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
+                    {['WBS', 'Task Name', 'Completed Date', 'Owner/Resource'].map((h) => (
+                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {accomplishedTasks.map((task) => (
+                    <tr key={task.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                      <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, whiteSpace: 'nowrap' }}>{task.wbs}</td>
+                      <td style={{ padding: '9px 12px', color: C.text }}>{task.taskName}</td>
+                      <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{task.completedDate ? fmtDate(task.completedDate) : '-'}</td>
+                      <td style={{ padding: '9px 12px', color: C.text2 }}>{task.resource || '-'}</td>
+                    </tr>
+                  ))}
+                  {!accomplishedTasks.length && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '24px 12px', color: C.text3, textAlign: 'center' }}>No accomplished tasks found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
+              <Btn variant="ghost" onClick={() => setShowAllCompletedModal(false)}>Close</Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
