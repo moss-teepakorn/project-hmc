@@ -599,6 +599,7 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
   const permissions = useRolePermissions();
   const [showAllCompletedModal, setShowAllCompletedModal] = React.useState(false);
   const [showActivitiesModal, setShowActivitiesModal] = React.useState<null | 'inProgress' | 'upcoming' | 'overdue'>(null);
+  const [showAllIssuesModal, setShowAllIssuesModal] = React.useState(false);
   const accomplishedListRef = React.useRef<HTMLDivElement | null>(null);
   const [accomplishedOverflow, setAccomplishedOverflow] = React.useState(false);
   const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
@@ -639,16 +640,7 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
   const currentDate = new Date();
   const todayIso = currentDate.toISOString().slice(0, 10);
 
-  const upcomingMilestones = ms
-    .filter((m) => {
-      const due = parseISO(m.dueDate || '');
-      if (!isValid(due)) return false;
-      const inWindow = due <= addDays(currentDate, 30);
-      const isDelayed = due < currentDate && String(m.status).toLowerCase() !== 'paid';
-      return inWindow || isDelayed;
-    })
-    .sort((a, b) => Number(parseISO(a.dueDate || '')) - Number(parseISO(b.dueDate || '')))
-    .slice(0, 4);
+  const allMilestonesSorted = [...ms].sort((a, b) => Number(parseISO(a.dueDate || '')) - Number(parseISO(b.dueDate || '')));
 
   const todayBaseline = computeBaselineProgress(pt, [todayIso]);
   const plannedPercent = todayBaseline[0]?.baselinePercent ?? 0;
@@ -659,7 +651,6 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
     : 'On Track';
   const scheduleColor = scheduleStatus === 'Stoper' ? C.red : scheduleStatus === 'Delay' ? C.amber : C.green;
   const scheduleDetail = `Plan ${plannedPercent}% · Actual ${prog}%`;
-  const healthLabel = scheduleStatus;
   const healthValue = `${prog}%`;
   const healthSubtitle = `Plan ${plannedPercent}% by today`;
 
@@ -748,20 +739,11 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
     };
   }, [accomplishedTasks.length, isMobile, stageTasks.length]);
 
-  const milestoneStatusCards = upcomingMilestones.map((m) => {
-    const due = parseISO(m.dueDate || '');
-    const isDelayed = isValid(due) && due < currentDate && String(m.status).toLowerCase() !== 'paid';
-    return {
-      ...m,
-      isDelayed,
-    };
-  });
-
   const overviewText = todayBaseline.length
     ? `โครงการอยู่ในสถานะ ${s.label} มีความคืบหน้า ${prog}% และอยู่ในระดับ ${scheduleStatus.toLowerCase()} เมื่อเทียบกับแผนงาน. มี ${openIssues} issue, ${openRisks} risk และ ${openCRs} CR ที่ต้องติดตาม.`
     : `โครงการอยู่ในสถานะ ${s.label} มีความคืบหน้าปัจจุบัน ${prog}% และมี ${openIssues} issue, ${openRisks} risk, ${openCRs} CR ที่ต้องติดตาม.`;
 
-  const statusCard = ({ title, value, subtitle, color, bg }: any) => (
+  const _statusCard = ({ title, value, subtitle, color, bg }: any) => (
     <Card style={{ padding: '14px 16px', minHeight: 110, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
       <div>
         <div style={{ fontSize: 11, color: C.text2, marginBottom: 8 }}>{title}</div>
@@ -878,60 +860,141 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
         </Card>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 20 }}>
+      {/* Row 3: Milestone table (full width) */}
+      <div style={{ marginBottom: 16 }}>
         <Card style={{ padding: '16px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Upcoming Milestones</div>
-              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Delayed or due within 30 days</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Milestones</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>All project milestones sorted by due date</div>
             </div>
-            <button type="button" onClick={onViewMilestones} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Milestones</button>
+            <button type="button" onClick={onViewMilestones} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Milestones Tab</button>
           </div>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {milestoneStatusCards.map((m) => (
-              <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{m.name}</div>
-                  <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{m.phase || 'No phase'}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>฿{fmtMoney(permissions.getMaskedAmount(m.amount || 0))}</div>
-                  <div style={{ fontSize: 11, color: m.isDelayed ? C.red : C.text2, marginTop: 4 }}>{m.dueDate ? fmtDate(m.dueDate) : 'TBD'}</div>
-                  {(() => {
-                    const ss = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
-                    return (
-                      <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: ss.bg, color: ss.color, fontSize: 10, fontWeight: 700 }}>{ss.label}</div>
-                        {m.isDelayed && <div style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: C.redBg, color: C.red, fontSize: 9, fontWeight: 700 }}>Delayed</div>}
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-            ))}
-            {!milestoneStatusCards.length && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming milestones within 30 days</div>}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 16 }}>
-            <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: C.text2 }}>CONTRACT</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(visibleTotalContract)}</div>
-            </div>
-            <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: C.text2 }}>BILLED</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(visibleBilledAmt)}</div>
-            </div>
-            <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: C.text2 }}>COLLECTED</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(visiblePaidAmt)}</div>
-            </div>
-            <div style={{ background: C.bg, borderRadius: 12, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: C.text2 }}>NEXT BILLING</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>฿{fmtMoney(permissions.getMaskedAmount(upcomingMilestones[0]?.amount || 0))}</div>
-            </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: C.bg }}>
+                  {['Milestone', 'Due Date', 'Amount', 'Status'].map((h) => (
+                    <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', fontSize: 11 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {allMilestonesSorted.map((m, i) => {
+                  const due = parseISO(m.dueDate || '');
+                  const isDelayed = isValid(due) && due < currentDate && String(m.status).toLowerCase() !== 'paid';
+                  const ss = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
+                  return (
+                    <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
+                      <td style={{ padding: '9px 12px', color: C.text, fontWeight: 600 }}>{m.name}</td>
+                      <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: isDelayed ? C.red : C.text2, fontWeight: isDelayed ? 700 : 400 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
+                      <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: C.text, fontWeight: 600 }}>฿{fmtMoney(permissions.getMaskedAmount(m.amount || 0))}</td>
+                      <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 999, background: ss.bg, color: ss.color, fontSize: 11, fontWeight: 700 }}>{ss.label}</span>
+                        {isDelayed && <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: C.redBg, color: C.red, fontSize: 10, fontWeight: 700 }}>Delayed</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!allMilestonesSorted.length && (
+                  <tr><td colSpan={4} style={{ padding: '20px 12px', color: C.text3, textAlign: 'center' }}>No milestones found.</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </Card>
+      </div>
 
+      {/* Row 4: Issue card + Effort card (50/50) */}
+      {(() => {
+        const openIssueList = iss
+          .filter((i) => i.status === 'Open' || i.status === 'In Progress')
+          .sort((a, b) => (a.issueDate > b.issueDate ? -1 : 1));
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            {/* Issue Card */}
+            <Card style={{ padding: '16px 18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Open Issues</div>
+                  <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{openIssueList.length} open issue{openIssueList.length !== 1 ? 's' : ''}</div>
+                </div>
+              </div>
+              {openIssueList.length === 0 ? (
+                <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No open issues 🎉</div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 80px 86px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+                    {['#', 'Issue', 'Status', 'Assignee'].map((h) => (
+                      <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                    ))}
+                  </div>
+                  {openIssueList.slice(0, 3).map((issue, index) => {
+                    const ss2 = (() => { const key = issue.status; return key === 'Open' ? { color: C.primary, bg: C.primaryBg } : key === 'In Progress' ? { color: C.amber, bg: C.amberBg } : { color: C.text2, bg: C.bg }; })();
+                    return (
+                      <div key={issue.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 80px 86px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                        <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
+                        <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={issue.title}>{issue.title}</div>
+                        <div style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: ss2.bg, color: ss2.color, fontWeight: 700, whiteSpace: 'nowrap' }}>{issue.status}</div>
+                        <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issue.assignedTo || '—'}</div>
+                      </div>
+                    );
+                  })}
+                  {openIssueList.length > 3 && (
+                    <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+                      <button type="button" onClick={() => setShowAllIssuesModal(true)} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                        +{openIssueList.length - 3} more
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </Card>
+
+            {/* Effort Card */}
+            <Card style={{ padding: '16px 18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Effort Summary</div>
+                  <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Budget vs. used mandays by module</div>
+                </div>
+              </div>
+              {ef.length === 0 ? (
+                <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No effort data found.</div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+                    {['Module / Task', 'Budget MD', 'Used MD', 'Remain MD'].map((h) => (
+                      <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                    ))}
+                  </div>
+                  {ef.map((e) => {
+                    const usedMD = Object.values(e.monthly || {}).reduce((acc, v) => acc + Number(v || 0), 0);
+                    const remainMD = (e.budgetManday || 0) - usedMD;
+                    return (
+                      <div key={e.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                        <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={e.module}>{e.module || '—'}</div>
+                        <div style={{ fontSize: 12, color: C.text2, fontWeight: 600 }}>{Number(e.budgetManday || 0).toFixed(1)}</div>
+                        <div style={{ fontSize: 12, color: usedMD > (e.budgetManday || 0) ? C.red : C.primary, fontWeight: 600 }}>{usedMD.toFixed(1)}</div>
+                        <div style={{ fontSize: 12, color: remainMD < 0 ? C.red : C.green, fontWeight: 600 }}>{remainMD.toFixed(1)}</div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.border}`, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: C.text }}>TOTAL</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: C.text }}>{ef.reduce((s, e) => s + (e.budgetManday || 0), 0).toFixed(1)}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: C.primary }}>{tUsedMD.toFixed(1)}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: tUsedMD > tBudMD ? C.red : C.green }}>{(tBudMD - tUsedMD).toFixed(1)}</div>
+                  </div>
+                </>
+              )}
+            </Card>
+          </div>
+        );
+      })()}
+
+      {/* Row 5: Upcoming Activities (full width) */}
+      <div style={{ marginBottom: 20 }}>
         <Card style={{ padding: '16px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div>
@@ -1020,6 +1083,58 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
           </div>
         </Card>
       </div>
+
+      {showAllIssuesModal && (() => {
+        const openIssueList = iss
+          .filter((i) => i.status === 'Open' || i.status === 'In Progress')
+          .sort((a, b) => (a.issueDate > b.issueDate ? -1 : 1));
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: C.shadow }}>
+              <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Open Issues (All)</div>
+                  <div style={{ fontSize: 12, color: C.text2, marginTop: 4 }}>ทั้งหมด {openIssueList.length} รายการ</div>
+                </div>
+                <button onClick={() => setShowAllIssuesModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, fontSize: 20, lineHeight: 1, padding: 2 }}>×</button>
+              </div>
+              <div style={{ overflow: 'auto', flex: 1 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
+                      {['#', 'Issue Title', 'Issue Date', 'Status', 'Assignee'].map((h) => (
+                        <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {openIssueList.map((issue, index) => {
+                      const ss2 = issue.status === 'Open' ? { color: C.primary, bg: C.primaryBg } : issue.status === 'In Progress' ? { color: C.amber, bg: C.amberBg } : { color: C.text2, bg: C.bg };
+                      return (
+                        <tr key={issue.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                          <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, whiteSpace: 'nowrap' }}>{index + 1}</td>
+                          <td style={{ padding: '9px 12px', color: C.text, fontWeight: 600 }}>{issue.title}</td>
+                          <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{issue.issueDate ? fmtDate(issue.issueDate) : '—'}</td>
+                          <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: ss2.color, background: ss2.bg, padding: '3px 10px', borderRadius: 20 }}>{issue.status}</span>
+                          </td>
+                          <td style={{ padding: '9px 12px', color: C.text2 }}>{issue.assignedTo || '—'}</td>
+                        </tr>
+                      );
+                    })}
+                    {!openIssueList.length && (
+                      <tr><td colSpan={5} style={{ padding: '24px 12px', color: C.text3, textAlign: 'center' }}>No open issues found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
+                <Btn variant="ghost" onClick={() => setShowAllIssuesModal(false)}>Close</Btn>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {showActivitiesModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
