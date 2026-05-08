@@ -598,6 +598,7 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
   const { tasks, milestones, members, efforts, changeRequests, issues, risks, masterCodes } = useStore();
   const permissions = useRolePermissions();
   const [showAllCompletedModal, setShowAllCompletedModal] = React.useState(false);
+  const [showActivitiesModal, setShowActivitiesModal] = React.useState<null | 'inProgress' | 'upcoming' | 'overdue'>(null);
   const accomplishedListRef = React.useRef<HTMLDivElement | null>(null);
   const [accomplishedOverflow, setAccomplishedOverflow] = React.useState(false);
   const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
@@ -713,6 +714,22 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
       if (isValid(ad) && isValid(bd) && Number(ad) !== Number(bd)) return Number(ad) - Number(bd);
       return compareWbs(a.wbs || '', b.wbs || '');
     });
+
+  const activityTaskRows = {
+    inProgress: inProgressTasks,
+    upcoming: upcomingTasks,
+    overdue: overdueTasks,
+  } as const;
+
+  const activityModalTitle = showActivitiesModal === 'inProgress'
+    ? 'In Progress Tasks (All)'
+    : showActivitiesModal === 'upcoming'
+      ? 'Upcoming Tasks (All)'
+      : showActivitiesModal === 'overdue'
+        ? 'Overdue Tasks (All)'
+        : '';
+
+  const activityModalRows = showActivitiesModal ? activityTaskRows[showActivitiesModal] : [];
 
   React.useEffect(() => {
     const checkOverflow = () => {
@@ -925,55 +942,130 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
           <div style={{ display: 'grid', gap: 12 }}>
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>IN PROGRESS TASKS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                ))}
+              </div>
               {inProgressTasks.slice(0, 4).map((task, index) => (
-                <div key={task.id} style={{ display: 'grid', gap: 2, marginTop: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: C.text }}>{`${index + 1}. ${task.taskName}`}</span>
-                    <span style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</span>
-                  </div>
-                  <div style={{ fontSize: 10, color: C.text2 }}>Resource: {task.resource || '-'}</div>
-                  <div style={{ display: 'grid', gap: 4 }}>
-                    <div style={{ fontSize: 10, color: C.primary, fontWeight: 700 }}>Progress: {Math.round(Number(task.percentComplete || 0))}%</div>
-                    <ProgressBar value={Math.round(Number(task.percentComplete || 0))} height={6} color={C.primary} />
-                  </div>
+                <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
+                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
+                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
+                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</div>
+                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
                 </div>
               ))}
               {!inProgressTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No in-progress tasks</div>}
-              {inProgressTasks.length > 4 && <div style={{ fontSize: 10, color: C.text3, marginTop: 8 }}>+{inProgressTasks.length - 4} more</div>}
+              {inProgressTasks.length > 4 && (
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setShowActivitiesModal('inProgress')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                    +{inProgressTasks.length - 4} more
+                  </button>
+                </div>
+              )}
             </div>
 
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>UPCOMING TASKS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                ))}
+              </div>
               {upcomingTasks.slice(0, 4).map((task, index) => (
-                <div key={task.id} style={{ display: 'grid', gap: 2, marginTop: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: C.text }}>{`${index + 1}. ${task.taskName}`}</span>
-                    <span style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.startDate ? fmtDate(task.startDate) : '-'}</span>
-                  </div>
-                  <div style={{ fontSize: 10, color: C.text2 }}>Resource: {task.resource || '-'}</div>
+                <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
+                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
+                  <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
+                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</div>
+                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
                 </div>
               ))}
               {!upcomingTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming tasks</div>}
-              {upcomingTasks.length > 4 && <div style={{ fontSize: 10, color: C.text3, marginTop: 8 }}>+{upcomingTasks.length - 4} more</div>}
+              {upcomingTasks.length > 4 && (
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setShowActivitiesModal('upcoming')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                    +{upcomingTasks.length - 4} more
+                  </button>
+                </div>
+              )}
             </div>
 
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>OVERDUE TASKS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                ))}
+              </div>
               {overdueTasks.slice(0, 4).map((task, index) => (
-                <div key={task.id} style={{ display: 'grid', gap: 2, marginTop: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: C.text }}>{`${index + 1}. ${task.taskName}`}</span>
-                    <span style={{ fontSize: 10, color: C.red, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</span>
-                  </div>
-                  <div style={{ fontSize: 10, color: C.text2 }}>Resource: {task.resource || '-'}</div>
+                <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
+                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
+                  <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
+                  <div style={{ fontSize: 10, color: C.red, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</div>
+                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
                 </div>
               ))}
               {!overdueTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No overdue tasks</div>}
-              {overdueTasks.length > 4 && <div style={{ fontSize: 10, color: C.text3, marginTop: 8 }}>+{overdueTasks.length - 4} more</div>}
+              {overdueTasks.length > 4 && (
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setShowActivitiesModal('overdue')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                    +{overdueTasks.length - 4} more
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </Card>
       </div>
+
+      {showActivitiesModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 980, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: C.shadow }}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{activityModalTitle}</div>
+                <div style={{ fontSize: 12, color: C.text2, marginTop: 4 }}>ทั้งหมด {activityModalRows.length} รายการ</div>
+              </div>
+              <button onClick={() => setShowActivitiesModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, fontSize: 20, lineHeight: 1, padding: 2 }}>×</button>
+            </div>
+
+            <div style={{ overflow: 'auto', flex: 1 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
+                    {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {activityModalRows.map((task, index) => (
+                    <tr key={task.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                      <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, whiteSpace: 'nowrap' }}>{index + 1}</td>
+                      <td style={{ padding: '9px 12px', color: C.text }}>{task.taskName}</td>
+                      <td style={{ padding: '9px 12px', color: C.text2 }}>{Math.round(Number(task.percentComplete || 0))}%</td>
+                      <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</td>
+                      <td style={{ padding: '9px 12px', color: C.text2 }}>{task.resource || '-'}</td>
+                    </tr>
+                  ))}
+                  {!activityModalRows.length && (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '24px 12px', color: C.text3, textAlign: 'center' }}>No tasks found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
+              <Btn variant="ghost" onClick={() => setShowActivitiesModal(null)}>Close</Btn>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAllCompletedModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
