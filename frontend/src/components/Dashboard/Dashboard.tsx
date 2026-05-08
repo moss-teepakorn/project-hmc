@@ -662,7 +662,10 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
     progress: Math.round(Number(t.percentComplete || 0)),
   }));
 
-  const accomplishedTasks = pt
+  const parentTaskIds = new Set(pt.map((t) => String(t.parentId || '')).filter(Boolean));
+  const leafTasks = pt.filter((t) => !parentTaskIds.has(String(t.id || '')));
+
+  const accomplishedTasks = leafTasks
     .filter((t) => Number(t.percentComplete || 0) >= 100)
     .sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''))
     .map((t) => ({
@@ -675,11 +678,11 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
 
   const today = parseISO(todayIso);
 
-  const inProgressTasks = pt
+  const inProgressTasks = leafTasks
     .filter((t) => String(t.status || '') === 'In Progress' && Number(t.percentComplete || 0) < 100)
     .sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''));
 
-  const upcomingTasks = pt
+  const upcomingTasks = leafTasks
     .filter((t) => {
       if (String(t.status || '') !== 'Todo') return false;
       const start = parseISO(t.startDate || '');
@@ -692,7 +695,7 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
       return compareWbs(a.wbs || '', b.wbs || '');
     });
 
-  const overdueTasks = pt
+  const overdueTasks = leafTasks
     .filter((t) => {
       if (String(t.status || '') === 'Done') return false;
       const due = parseISO(t.endDate || '');
@@ -828,10 +831,10 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
               flex: 1,
             }}
           >
-            {accomplishedTasks.map((task) => (
+            {accomplishedTasks.map((task, index) => (
               <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 10, background: C.bg }}>
-                <div style={{ minWidth: 0, fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${task.wbs} ${task.taskName}`}>
-                  {task.wbs} {task.taskName}
+                <div style={{ minWidth: 0, fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>
+                  {`${index + 1}. ${task.taskName}`}
                 </div>
                 <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>{task.completedDate ? fmtDate(task.completedDate) : '-'}</div>
               </div>
@@ -915,11 +918,15 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
           </div>
           <div style={{ display: 'grid', gap: 12 }}>
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-              <div style={{ fontSize: 11, color: C.text2, marginBottom: 8 }}>IN PROGRESS TASKS</div>
-              {inProgressTasks.slice(0, 4).map((task) => (
-                <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
-                  <span style={{ fontSize: 12, color: C.text }}>{`${task.wbs || '-'} ${task.taskName}`}</span>
-                  <span style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</span>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>IN PROGRESS TASKS</div>
+              {inProgressTasks.slice(0, 4).map((task, index) => (
+                <div key={task.id} style={{ display: 'grid', gap: 2, marginTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: C.text }}>{`${index + 1}. ${task.taskName}`}</span>
+                    <span style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: C.text2 }}>Resource: {task.resource || '-'}</div>
+                  <div style={{ fontSize: 10, color: C.primary, fontWeight: 700 }}>Progress: {Math.round(Number(task.percentComplete || 0))}%</div>
                 </div>
               ))}
               {!inProgressTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No in-progress tasks</div>}
@@ -927,11 +934,14 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
             </div>
 
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-              <div style={{ fontSize: 11, color: C.text2, marginBottom: 8 }}>UPCOMING TASKS</div>
-              {upcomingTasks.slice(0, 4).map((task) => (
-                <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
-                  <span style={{ fontSize: 12, color: C.text }}>{`${task.wbs || '-'} ${task.taskName}`}</span>
-                  <span style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.startDate ? fmtDate(task.startDate) : '-'}</span>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>UPCOMING TASKS</div>
+              {upcomingTasks.slice(0, 4).map((task, index) => (
+                <div key={task.id} style={{ display: 'grid', gap: 2, marginTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: C.text }}>{`${index + 1}. ${task.taskName}`}</span>
+                    <span style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.startDate ? fmtDate(task.startDate) : '-'}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: C.text2 }}>Resource: {task.resource || '-'}</div>
                 </div>
               ))}
               {!upcomingTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming tasks</div>}
@@ -939,11 +949,14 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
             </div>
 
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-              <div style={{ fontSize: 11, color: C.text2, marginBottom: 8 }}>OVERDUE TASKS</div>
-              {overdueTasks.slice(0, 4).map((task) => (
-                <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
-                  <span style={{ fontSize: 12, color: C.text }}>{`${task.wbs || '-'} ${task.taskName}`}</span>
-                  <span style={{ fontSize: 10, color: C.red, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</span>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>OVERDUE TASKS</div>
+              {overdueTasks.slice(0, 4).map((task, index) => (
+                <div key={task.id} style={{ display: 'grid', gap: 2, marginTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: C.text }}>{`${index + 1}. ${task.taskName}`}</span>
+                    <span style={{ fontSize: 10, color: C.red, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: C.text2 }}>Resource: {task.resource || '-'}</div>
                 </div>
               ))}
               {!overdueTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No overdue tasks</div>}
@@ -968,15 +981,15 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
-                    {['WBS', 'Task Name', 'Completed Date', 'Owner/Resource'].map((h) => (
+                    {['No.', 'Task Name', 'Completed Date', 'Owner/Resource'].map((h) => (
                       <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {accomplishedTasks.map((task) => (
+                  {accomplishedTasks.map((task, index) => (
                     <tr key={task.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                      <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, whiteSpace: 'nowrap' }}>{task.wbs}</td>
+                      <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, whiteSpace: 'nowrap' }}>{index + 1}</td>
                       <td style={{ padding: '9px 12px', color: C.text }}>{task.taskName}</td>
                       <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{task.completedDate ? fmtDate(task.completedDate) : '-'}</td>
                       <td style={{ padding: '9px 12px', color: C.text2 }}>{task.resource || '-'}</td>
