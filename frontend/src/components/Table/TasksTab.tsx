@@ -1742,6 +1742,8 @@ export default function TasksTab({ projectId }: Props) {
               {!loading && visible.length === 0 && (
                 <div style={{ padding:40, textAlign:'center', color:C.text3 }}>No tasks. Click "+ Add Task".</div>
               )}
+              {/* Reserve extra space at the bottom so users can work with last rows comfortably. */}
+              <div style={{ height: ROW_H * 4, flexShrink: 0 }} />
             </div>
             <div style={{ flexShrink:0, padding:'5px 12px', borderTop:`1px solid ${C.border}`, display:'flex', gap:16, fontSize:11, color:C.text3 }}>
               <span>{projectTasks.filter(t => !t.parentId).length} root</span>
