@@ -375,7 +375,7 @@ export default function Dashboard() {
               !restoreDone ? (
                 <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', color: C.text2, fontSize: 13 }}>Loading dashboard…</div>
               ) : selected ? (
-                <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} onOpenWithTab={(tab) => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab } })), 80); }} isMobile={isMobile} />
+                <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onEdit={() => setEditing(selected)} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} onOpenWithTab={(tab) => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab } })), 80); }} isMobile={isMobile} />
               ) : (
                 <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setSelected} onEdit={setEditing} onDelete={setDeleting} isMobile={isMobile} />
               )
@@ -543,7 +543,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Project ID', 'Project Name', 'Customer', 'Start Date', 'End Date', 'Stage', '% Progress'].map((label) => (
+                {['Project ID', 'Project Name', 'Customer', 'Start Date', 'End Date', 'Stage', '% Progress', ''].map((label) => (
                   <th key={label} style={{ textAlign: 'left', padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 12, color: C.text2 }}>{label}</th>
                 ))}
               </tr>
@@ -565,6 +565,21 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{fmtDate(p.endDate)}</td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{stage}</td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{prog}%</td>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text, width: 56 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(p);
+                        }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'inline-flex', alignItems: 'center' }}
+                        title="Edit Project"
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.primary; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -594,7 +609,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
 }
 
 // ── Per-project summary panel ─────────────────────────────────────────────────
-function ProjectSummaryPanel({ project, onOpen, onViewMilestones, onOpenWithTab, isMobile }: { project: Project; onOpen: () => void; onViewMilestones: () => void; onOpenWithTab: (tab: string) => void; isMobile: boolean }) {
+function ProjectSummaryPanel({ project, onOpen, onEdit, onViewMilestones, onOpenWithTab, isMobile }: { project: Project; onOpen: () => void; onEdit: () => void; onViewMilestones: () => void; onOpenWithTab: (tab: string) => void; isMobile: boolean }) {
   const { tasks, milestones, members, efforts, changeRequests, issues, risks, masterCodes } = useStore();
   const permissions = useRolePermissions();
   const [showAllCompletedModal, setShowAllCompletedModal] = React.useState(false);
@@ -771,8 +786,23 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, onOpenWithTab,
         <Card style={{ padding: '14px 16px', minHeight: 120 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
             <div>
+              <div style={{ fontSize: 11, color: C.text2, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>Project: {(project.code || project.id || '-').replace(/\s+/g, ' ').trim()}</span>
+                <span>Client: {project.client || '-'}</span>
+                <span>{fmtDate(project.startDate)} - {fmtDate(project.endDate)}</span>
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 0, display: 'inline-flex', alignItems: 'center' }}
+                  title="Edit Project"
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.primary; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Executive Summary</div>
-              <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.45, marginTop: 10, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{overviewText}</div>
+              <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.45, marginTop: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{overviewText}</div>
             </div>
           </div>
         </Card>
