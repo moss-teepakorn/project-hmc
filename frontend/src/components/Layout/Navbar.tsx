@@ -132,6 +132,7 @@ export default function Navbar() {
       {/* Brand */}
       <div
         onClick={() => {
+          window.sessionStorage.removeItem('dashboard-view-state');
           setActiveProject(null);
           window.dispatchEvent(new CustomEvent('app-home'));
         }}

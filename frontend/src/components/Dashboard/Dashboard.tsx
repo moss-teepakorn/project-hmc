@@ -375,7 +375,7 @@ export default function Dashboard() {
               !restoreDone ? (
                 <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', color: C.text2, fontSize: 13 }}>Loading dashboard…</div>
               ) : selected ? (
-                <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} isMobile={isMobile} />
+                <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} onOpenWithTab={(tab) => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab } })), 80); }} isMobile={isMobile} />
               ) : (
                 <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setSelected} onEdit={setEditing} onDelete={setDeleting} isMobile={isMobile} />
               )
@@ -594,7 +594,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
 }
 
 // ── Per-project summary panel ─────────────────────────────────────────────────
-function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { project: Project; onOpen: () => void; onViewMilestones: () => void; isMobile: boolean }) {
+function ProjectSummaryPanel({ project, onOpen, onViewMilestones, onOpenWithTab, isMobile }: { project: Project; onOpen: () => void; onViewMilestones: () => void; onOpenWithTab: (tab: string) => void; isMobile: boolean }) {
   const { tasks, milestones, members, efforts, changeRequests, issues, risks, masterCodes } = useStore();
   const permissions = useRolePermissions();
   const [showAllCompletedModal, setShowAllCompletedModal] = React.useState(false);
@@ -1007,6 +1007,7 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Open Issues</div>
                   <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{openIssueList.length} open issue{openIssueList.length !== 1 ? 's' : ''}</div>
                 </div>
+                <button type="button" onClick={() => onOpenWithTab('issues')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Issues</button>
               </div>
               {openIssueList.length === 0 ? (
                 <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No open issues 🎉</div>
@@ -1046,6 +1047,7 @@ function ProjectSummaryPanel({ project, onOpen, onViewMilestones, isMobile }: { 
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Effort Summary</div>
                   <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Budget vs. used mandays by module</div>
                 </div>
+                <button type="button" onClick={() => onOpenWithTab('effort')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Effort</button>
               </div>
               {ef.length === 0 ? (
                 <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No effort data found.</div>
