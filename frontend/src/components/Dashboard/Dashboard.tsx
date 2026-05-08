@@ -33,8 +33,9 @@ export default function Dashboard() {
   const { profile } = useAuth();
   const permissions = useRolePermissions();
   const savedView = React.useMemo(() => loadDashboardViewState(), []);
+  const restoreSelectedProjectIdRef = React.useRef<string | null>(savedView.selectedProjectId);
   const [selected,   setSelected]   = useState<Project | null>(null);
-  const [restoreDone, setRestoreDone] = useState<boolean>(() => !savedView.selectedProjectId);
+  const [restoreDone, setRestoreDone] = useState<boolean>(() => !restoreSelectedProjectIdRef.current);
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [showAdd,    setShowAdd]    = useState(false);
@@ -60,6 +61,9 @@ export default function Dashboard() {
     const onHome = () => {
       setSelected(null);
       setDashboardTab('overview');
+      // Disable one-time restore after explicit Home navigation.
+      restoreSelectedProjectIdRef.current = null;
+      setRestoreDone(true);
     };
     window.addEventListener('app-home', onHome);
     return () => window.removeEventListener('app-home', onHome);
@@ -154,16 +158,19 @@ export default function Dashboard() {
       if (!restoreDone) setRestoreDone(true);
       return;
     }
-    if (!savedView.selectedProjectId) {
+    const restoreId = restoreSelectedProjectIdRef.current;
+    if (!restoreId) {
       if (!restoreDone) setRestoreDone(true);
       return;
     }
     if (!projects.length) return;
 
-    const found = projects.find((p) => p.id === savedView.selectedProjectId);
+    const found = projects.find((p) => p.id === restoreId);
     if (found) setSelected(found);
+    // Restore exactly once per mount.
+    restoreSelectedProjectIdRef.current = null;
     setRestoreDone(true);
-  }, [projects, savedView.selectedProjectId, selected?.id, restoreDone]);
+  }, [projects, selected?.id, restoreDone]);
 
   React.useEffect(() => {
     window.sessionStorage.setItem(
@@ -365,7 +372,9 @@ export default function Dashboard() {
               </div>
             </div>
             {dashboardTab === 'overview' ? (
-              selected ? (
+              !restoreDone ? (
+                <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', color: C.text2, fontSize: 13 }}>Loading dashboard…</div>
+              ) : selected ? (
                 <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} isMobile={isMobile} />
               ) : (
                 <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setSelected} onEdit={setEditing} onDelete={setDeleting} isMobile={isMobile} />
