@@ -187,6 +187,7 @@ function EffortRows({ efforts }: { efforts: Effort[] }) {
 export default function ExecutiveOnePage({ project }: Props) {
   const isMobile = useIsMobile();
   const { tasks, milestones, issues, efforts, changeRequests } = useStore();
+  const [showActivitiesModal, setShowActivitiesModal] = React.useState<null | 'inProgress' | 'upcoming' | 'overdue'>(null);
 
   const projectTasks = React.useMemo(() => tasks.filter((t) => t.projectId === project.id), [tasks, project.id]);
   const mainTasks = React.useMemo(() => getMainTasks(projectTasks), [projectTasks]);
@@ -279,6 +280,22 @@ export default function ExecutiveOnePage({ project }: Props) {
     () => projectCRs.slice().sort((a, b) => (a.requestDate > b.requestDate ? -1 : 1)),
     [projectCRs],
   );
+
+  const activityTaskRows = React.useMemo(() => ({
+    inProgress: inProgressTasks,
+    upcoming: upcomingTasks,
+    overdue: overdueTasks,
+  }), [inProgressTasks, upcomingTasks, overdueTasks]);
+
+  const activityModalTitle = showActivitiesModal === 'inProgress'
+    ? 'In Progress Tasks (All)'
+    : showActivitiesModal === 'upcoming'
+      ? 'Upcoming Tasks (All)'
+      : showActivitiesModal === 'overdue'
+        ? 'Overdue Tasks (All)'
+        : '';
+
+  const activityModalRows = showActivitiesModal ? activityTaskRows[showActivitiesModal] : [];
 
   const monthColWidth = 90;
   const fixedColsWidth = 52 + 260 + 120 + 120 + 90 + 130;
@@ -479,7 +496,7 @@ export default function ExecutiveOnePage({ project }: Props) {
               {!inProgressTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No in-progress tasks</div>}
               {inProgressTasks.length > 4 && (
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                  <button type="button" onClick={() => setShowActivitiesModal('inProgress')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
                     +{inProgressTasks.length - 4} more
                   </button>
                 </div>
@@ -505,7 +522,7 @@ export default function ExecutiveOnePage({ project }: Props) {
               {!upcomingTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming tasks</div>}
               {upcomingTasks.length > 4 && (
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                  <button type="button" onClick={() => setShowActivitiesModal('upcoming')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
                     +{upcomingTasks.length - 4} more
                   </button>
                 </div>
@@ -531,7 +548,7 @@ export default function ExecutiveOnePage({ project }: Props) {
               {!overdueTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No overdue tasks</div>}
               {overdueTasks.length > 4 && (
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                  <button type="button" onClick={() => setShowActivitiesModal('overdue')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
                     +{overdueTasks.length - 4} more
                   </button>
                 </div>
@@ -659,6 +676,52 @@ export default function ExecutiveOnePage({ project }: Props) {
           )}
         </Card>
       </div>
+
+      {showActivitiesModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 980, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: C.shadow }}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{activityModalTitle}</div>
+                <div style={{ fontSize: 12, color: C.text2, marginTop: 4 }}>ทั้งหมด {activityModalRows.length} รายการ</div>
+              </div>
+              <button onClick={() => setShowActivitiesModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, fontSize: 20, lineHeight: 1, padding: 2 }}>×</button>
+            </div>
+
+            <div style={{ overflow: 'auto', flex: 1 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
+                    {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {activityModalRows.map((task, index) => (
+                    <tr key={task.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                      <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, whiteSpace: 'nowrap' }}>{index + 1}</td>
+                      <td style={{ padding: '9px 12px', color: C.text }}>{task.taskName}</td>
+                      <td style={{ padding: '9px 12px', color: C.text2 }}>{Math.round(Number(task.percentComplete || 0))}%</td>
+                      <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</td>
+                      <td style={{ padding: '9px 12px', color: C.text2 }}>{task.resource || '-'}</td>
+                    </tr>
+                  ))}
+                  {!activityModalRows.length && (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '24px 12px', color: C.text3, textAlign: 'center' }}>No tasks found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setShowActivitiesModal(null)} style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: 'pointer', padding: '6px 14px', background: 'transparent', color: C.text2, border: `1px solid ${C.border}` }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
