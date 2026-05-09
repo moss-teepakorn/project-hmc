@@ -1,6 +1,6 @@
 import React from 'react';
 import { addMonths, differenceInCalendarDays, isValid, parseISO, startOfDay, startOfMonth } from 'date-fns';
-import { C, Card } from '../Common';
+import { C, Card, MILESTONE_STATUS } from '../Common';
 import { useStore } from '../../store';
 import { compareWbs, fmtDate } from '../../utils';
 import type { ChangeRequest, Effort, Issue, Milestone, Project, Task } from '../../types';
@@ -280,6 +280,11 @@ export default function ExecutiveOnePage({ project }: Props) {
     [projectCRs],
   );
 
+  const monthColWidth = 90;
+  const fixedColsWidth = 52 + 260 + 120 + 120 + 90 + 130;
+  const timelineWidth = months.length * monthColWidth;
+  const ganttGridTemplate = `52px 260px 120px 120px 90px 130px ${timelineWidth}px`;
+
   return (
     <div style={{ minHeight: '100%', overflowY: 'auto', background: '#F3F6FB', padding: isMobile ? 14 : 18 }}>
       {/* Old Section: previous executive report is intentionally preserved in ProjectReport.tsx */}
@@ -317,34 +322,35 @@ export default function ExecutiveOnePage({ project }: Props) {
           </div>
         </div>
 
-        <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '52px minmax(220px,1.3fr) 120px 120px 90px 130px minmax(420px,2fr)',
-              alignItems: 'center',
-              background: '#0EA5B7',
-              color: '#FFFFFF',
-              fontWeight: 700,
-              fontSize: 12,
-            }}
-          >
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflowX: 'auto', overflowY: 'hidden' }}>
+          <div style={{ minWidth: fixedColsWidth + timelineWidth }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: ganttGridTemplate,
+                alignItems: 'center',
+                background: '#0EA5B7',
+                color: '#FFFFFF',
+                fontWeight: 700,
+                fontSize: 12,
+              }}
+            >
             <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)', textAlign: 'center' }}>WBS</div>
             <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Task</div>
             <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Start Date</div>
             <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>End Date</div>
             <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>PIC</div>
             <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Status</div>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${months.length}, minmax(90px, 1fr))` }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${months.length}, ${monthColWidth}px)` }}>
               {months.map((month) => (
                 <div key={month.toISOString()} style={{ padding: '9px 8px', borderLeft: '1px solid rgba(255,255,255,0.3)', textAlign: 'center' }}>
                   {monthLabel(month)}
                 </div>
               ))}
             </div>
-          </div>
+            </div>
 
-          {mainTasks.map((task) => {
+            {mainTasks.map((task) => {
             const planStart = toDate(task.startDate);
             const planEnd = toDate(task.endDate);
             if (!planStart || !planEnd) return null;
@@ -366,7 +372,7 @@ export default function ExecutiveOnePage({ project }: Props) {
                 key={task.id}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '52px minmax(220px,1.3fr) 120px 120px 90px 130px minmax(420px,2fr)',
+                  gridTemplateColumns: ganttGridTemplate,
                   borderTop: `1px solid ${C.border}`,
                   background: '#FFFFFF',
                   alignItems: 'center',
@@ -381,7 +387,7 @@ export default function ExecutiveOnePage({ project }: Props) {
                 <div style={{ padding: '6px 8px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
                 <div style={{ padding: '6px 8px', fontSize: 11, color: state.color, fontWeight: 800 }}>{state.label}</div>
                 <div style={{ position: 'relative', minHeight: 36, borderLeft: `1px solid ${C.border}` }}>
-                  <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${months.length}, minmax(90px, 1fr))` }}>
+                  <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${months.length}, ${monthColWidth}px)` }}>
                     {months.map((month) => (
                       <div key={`${task.id}-${month.toISOString()}`} style={{ borderLeft: `1px solid ${C.border}` }} />
                     ))}
@@ -414,11 +420,12 @@ export default function ExecutiveOnePage({ project }: Props) {
                 </div>
               </div>
             );
-          })}
+            })}
 
-          {mainTasks.length === 0 && (
-            <div style={{ padding: '16px 12px', textAlign: 'center', color: C.text3, fontSize: 12 }}>No main tasks with plan dates.</div>
-          )}
+            {mainTasks.length === 0 && (
+              <div style={{ padding: '16px 12px', textAlign: 'center', color: C.text3, fontSize: 12 }}>No main tasks with plan dates.</div>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -470,6 +477,13 @@ export default function ExecutiveOnePage({ project }: Props) {
                 </div>
               ))}
               {!inProgressTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No in-progress tasks</div>}
+              {inProgressTasks.length > 4 && (
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                    +{inProgressTasks.length - 4} more
+                  </button>
+                </div>
+              )}
             </div>
 
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
@@ -489,6 +503,13 @@ export default function ExecutiveOnePage({ project }: Props) {
                 </div>
               ))}
               {!upcomingTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming tasks</div>}
+              {upcomingTasks.length > 4 && (
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                    +{upcomingTasks.length - 4} more
+                  </button>
+                </div>
+              )}
             </div>
 
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
@@ -508,6 +529,13 @@ export default function ExecutiveOnePage({ project }: Props) {
                 </div>
               ))}
               {!overdueTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No overdue tasks</div>}
+              {overdueTasks.length > 4 && (
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                    +{overdueTasks.length - 4} more
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -533,11 +561,15 @@ export default function ExecutiveOnePage({ project }: Props) {
                 {projectMilestones.map((m: Milestone, i) => {
                   const due = parseISO(m.dueDate || '');
                   const isDelayed = isValid(due) && due < today && String(m.status).toLowerCase() !== 'paid';
+                  const msState = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
                   return (
                     <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
                       <td style={{ padding: '9px 12px', color: C.text, fontWeight: 600 }}>{m.name}</td>
                       <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: isDelayed ? C.red : C.text2, fontWeight: isDelayed ? 700 : 400 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
-                      <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: C.text2, fontWeight: 700 }}>{String(m.status || '').toUpperCase()}</td>
+                      <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 999, background: msState.bg, color: msState.color, fontSize: 11, fontWeight: 700 }}>{msState.label}</span>
+                        {isDelayed && <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: C.redBg, color: C.red, fontSize: 10, fontWeight: 700 }}>Delayed</span>}
+                      </td>
                     </tr>
                   );
                 })}
@@ -561,7 +593,7 @@ export default function ExecutiveOnePage({ project }: Props) {
             <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No open issues</div>
           ) : (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 80px 86px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '32px minmax(0,1fr) 76px 132px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
                 {['#', 'Issue', 'Status', 'Assignee'].map((h) => (
                   <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
                 ))}
@@ -569,11 +601,11 @@ export default function ExecutiveOnePage({ project }: Props) {
               {openIssueList.slice(0, 6).map((issue: Issue, index) => {
                 const tag = issue.status === 'Open' ? { color: C.primary, bg: C.primaryBg } : { color: C.amber, bg: C.amberBg };
                 return (
-                  <div key={issue.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 80px 86px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                  <div key={issue.id} style={{ display: 'grid', gridTemplateColumns: '32px minmax(0,1fr) 76px 132px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
                     <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
-                    <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={issue.title}>{issue.title}</div>
+                    <div style={{ fontSize: 11, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={issue.title}>{issue.title}</div>
                     <div style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: tag.bg, color: tag.color, fontWeight: 700, whiteSpace: 'nowrap' }}>{issue.status}</div>
-                    <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issue.assignedTo || '—'}</div>
+                    <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>{issue.assignedTo || '—'}</div>
                   </div>
                 );
               })}
