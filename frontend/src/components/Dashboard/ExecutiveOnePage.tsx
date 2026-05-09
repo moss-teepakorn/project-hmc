@@ -3,7 +3,7 @@ import { addMonths, differenceInCalendarDays, isValid, parseISO, startOfDay, sta
 import { C, Card } from '../Common';
 import { useStore } from '../../store';
 import { compareWbs, fmtDate } from '../../utils';
-import type { Effort, Issue, Milestone, Project, Task } from '../../types';
+import type { ChangeRequest, Effort, Issue, Milestone, Project, Task } from '../../types';
 
 interface Props {
   project: Project;
@@ -18,6 +18,8 @@ const ACTUAL_STATE: Record<ActualStateKey, { label: string; color: string }> = {
   delay: { label: 'Delay', color: '#EF4444' },
   completed: { label: 'Completed', color: '#2563EB' },
 };
+
+const PLAN_PATTERN = 'repeating-linear-gradient(135deg, #8F9AA8 0px, #8F9AA8 2px, #C5CDD8 2px, #C5CDD8 4px)';
 
 function toDate(value?: string): Date | null {
   if (!value) return null;
@@ -184,7 +186,7 @@ function EffortRows({ efforts }: { efforts: Effort[] }) {
 
 export default function ExecutiveOnePage({ project }: Props) {
   const isMobile = useIsMobile();
-  const { tasks, milestones, issues, efforts } = useStore();
+  const { tasks, milestones, issues, efforts, changeRequests } = useStore();
 
   const projectTasks = React.useMemo(() => tasks.filter((t) => t.projectId === project.id), [tasks, project.id]);
   const mainTasks = React.useMemo(() => getMainTasks(projectTasks), [projectTasks]);
@@ -200,6 +202,10 @@ export default function ExecutiveOnePage({ project }: Props) {
   const projectEfforts = React.useMemo(
     () => efforts.filter((e) => e.projectId === project.id),
     [efforts, project.id],
+  );
+  const projectCRs = React.useMemo(
+    () => changeRequests.filter((cr) => cr.projectId === project.id),
+    [changeRequests, project.id],
   );
 
   const today = startOfDay(new Date());
@@ -260,6 +266,20 @@ export default function ExecutiveOnePage({ project }: Props) {
     [projectIssues],
   );
 
+  const openTab = React.useCallback((tab: string) => {
+    window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab } }));
+  }, []);
+
+  const openIssueList = React.useMemo(
+    () => openIssues.slice().sort((a, b) => (a.issueDate > b.issueDate ? -1 : 1)),
+    [openIssues],
+  );
+
+  const allCRs = React.useMemo(
+    () => projectCRs.slice().sort((a, b) => (a.requestDate > b.requestDate ? -1 : 1)),
+    [projectCRs],
+  );
+
   return (
     <div style={{ minHeight: '100%', overflowY: 'auto', background: '#F3F6FB', padding: isMobile ? 14 : 18 }}>
       {/* Old Section: previous executive report is intentionally preserved in ProjectReport.tsx */}
@@ -287,7 +307,7 @@ export default function ExecutiveOnePage({ project }: Props) {
           <div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>Project Plan (Plan vs Actual)</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: '#64748B' }}>Plan</span>
-            <span style={{ width: 16, height: 8, borderRadius: 99, background: '#CBD5E1', display: 'inline-block' }} />
+            <span style={{ width: 16, height: 8, borderRadius: 99, background: PLAN_PATTERN, display: 'inline-block' }} />
             {Object.entries(ACTUAL_STATE).map(([key, state]) => (
               <React.Fragment key={key}>
                 <span style={{ fontSize: 11, color: '#64748B' }}>{state.label}</span>
@@ -302,22 +322,22 @@ export default function ExecutiveOnePage({ project }: Props) {
             style={{
               display: 'grid',
               gridTemplateColumns: '52px minmax(220px,1.3fr) 120px 120px 90px 130px minmax(420px,2fr)',
-              alignItems: 'stretch',
+              alignItems: 'center',
               background: '#0EA5B7',
               color: '#FFFFFF',
               fontWeight: 700,
               fontSize: 12,
             }}
           >
-            <div style={{ padding: '10px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>WBS</div>
-            <div style={{ padding: '10px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Task</div>
-            <div style={{ padding: '10px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Start Date</div>
-            <div style={{ padding: '10px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>End Date</div>
-            <div style={{ padding: '10px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>PIC</div>
-            <div style={{ padding: '10px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Status</div>
+            <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)', textAlign: 'center' }}>WBS</div>
+            <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Task</div>
+            <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Start Date</div>
+            <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>End Date</div>
+            <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>PIC</div>
+            <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Status</div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${months.length}, minmax(90px, 1fr))` }}>
               {months.map((month) => (
-                <div key={month.toISOString()} style={{ padding: '10px 8px', borderLeft: '1px solid rgba(255,255,255,0.3)', textAlign: 'center' }}>
+                <div key={month.toISOString()} style={{ padding: '9px 8px', borderLeft: '1px solid rgba(255,255,255,0.3)', textAlign: 'center' }}>
                   {monthLabel(month)}
                 </div>
               ))}
@@ -349,44 +369,45 @@ export default function ExecutiveOnePage({ project }: Props) {
                   gridTemplateColumns: '52px minmax(220px,1.3fr) 120px 120px 90px 130px minmax(420px,2fr)',
                   borderTop: `1px solid ${C.border}`,
                   background: '#FFFFFF',
+                  alignItems: 'center',
                 }}
               >
-                <div style={{ padding: '8px 8px', fontSize: 12, color: C.text2 }}>{task.wbs || '-'}</div>
-                <div style={{ padding: '8px 8px', fontSize: 12, color: C.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>
+                <div style={{ padding: '6px 8px', fontSize: 12, color: C.text2, textAlign: 'center' }}>{task.wbs || '-'}</div>
+                <div style={{ padding: '6px 8px', fontSize: 12, color: C.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>
                   {task.taskName}
                 </div>
-                <div style={{ padding: '8px 8px', fontSize: 12, color: C.text2 }}>{fmtDate(task.startDate)}</div>
-                <div style={{ padding: '8px 8px', fontSize: 12, color: C.text2 }}>{fmtDate(task.endDate)}</div>
-                <div style={{ padding: '8px 8px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
-                <div style={{ padding: '8px 8px', fontSize: 11, color: state.color, fontWeight: 800 }}>{state.label}</div>
-                <div style={{ position: 'relative', minHeight: 52, borderLeft: `1px solid ${C.border}` }}>
+                <div style={{ padding: '6px 8px', fontSize: 12, color: C.text2 }}>{fmtDate(task.startDate)}</div>
+                <div style={{ padding: '6px 8px', fontSize: 12, color: C.text2 }}>{fmtDate(task.endDate)}</div>
+                <div style={{ padding: '6px 8px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
+                <div style={{ padding: '6px 8px', fontSize: 11, color: state.color, fontWeight: 800 }}>{state.label}</div>
+                <div style={{ position: 'relative', minHeight: 36, borderLeft: `1px solid ${C.border}` }}>
                   <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${months.length}, minmax(90px, 1fr))` }}>
                     {months.map((month) => (
                       <div key={`${task.id}-${month.toISOString()}`} style={{ borderLeft: `1px solid ${C.border}` }} />
                     ))}
                   </div>
 
-                  <div style={{ position: 'relative', height: 52 }}>
+                  <div style={{ position: 'relative', height: 36 }}>
                     <div
                       style={{
                         position: 'absolute',
-                        top: 12,
+                        top: 8,
                         left: `${planLeft}%`,
                         width: `${planWidth}%`,
-                        height: 8,
+                        height: 7,
                         borderRadius: 99,
-                        background: '#B8C2CF',
+                        background: PLAN_PATTERN,
                       }}
                     />
                     <div
                       style={{
                         position: 'absolute',
-                        top: 28,
+                        top: 20,
                         left: `${actualLeft}%`,
                         width: `${actualWidth}%`,
-                        height: 10,
+                        height: 8,
                         borderRadius: 99,
-                        background: state.color,
+                        background: actual.key === 'notStart' ? '#9AA6B2' : state.color,
                       }}
                     />
                   </div>
@@ -401,95 +422,173 @@ export default function ExecutiveOnePage({ project }: Props) {
         </div>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
-        <Card style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 13, color: C.text, fontWeight: 800, marginBottom: 10 }}>Accomplished Task</div>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {accomplishedTasks.slice(0, 8).map((task, index) => (
-              <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(0,1fr) 100px', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 10, background: C.bg }}>
-                <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>{index + 1}</div>
-                <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>{task.taskName}</div>
-                <div style={{ fontSize: 11, color: C.text2, textAlign: 'right' }}>{task.actualFinish ? fmtDate(task.actualFinish) : '-'}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <Card style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Accomplished Task</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Completed tasks sorted by WBS</div>
+            </div>
+            <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Task Detail</button>
+          </div>
+          <div style={{ display: 'grid', gap: 8, maxHeight: isMobile ? 230 : 285, overflow: 'auto' }}>
+            {accomplishedTasks.map((task, index) => (
+              <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 10, background: C.bg }}>
+                <div style={{ minWidth: 0, fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>
+                  {`${index + 1}. ${task.taskName}`}
+                </div>
+                <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>{task.actualFinish ? fmtDate(task.actualFinish) : '-'}</div>
               </div>
             ))}
-            {accomplishedTasks.length === 0 && <div style={{ fontSize: 12, color: C.text3 }}>No accomplished tasks.</div>}
+            {!accomplishedTasks.length && <div style={{ fontSize: 12, color: C.text3 }}>No accomplished tasks found.</div>}
           </div>
         </Card>
 
-        <Card style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 13, color: C.text, fontWeight: 800, marginBottom: 10 }}>Upcoming Activities</div>
+        <Card style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Upcoming Activities</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>งานที่กำลังดำเนินการ งานถัดไป และงานที่เลยกำหนด</div>
+            </div>
+            <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Tasks Tab</button>
+          </div>
           <div style={{ display: 'grid', gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.primary, marginBottom: 6 }}>In Progress ({inProgressTasks.length})</div>
-              <div style={{ display: 'grid', gap: 6 }}>
-                {inProgressTasks.slice(0, 3).map((task) => (
-                  <div key={task.id} style={{ fontSize: 12, color: C.text, background: C.bg, borderRadius: 8, padding: '7px 9px' }}>
-                    {task.taskName}
-                  </div>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>IN PROGRESS TASKS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
                 ))}
-                {inProgressTasks.length === 0 && <div style={{ fontSize: 12, color: C.text3 }}>No in-progress tasks.</div>}
               </div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.green, marginBottom: 6 }}>Upcoming ({upcomingTasks.length})</div>
-              <div style={{ display: 'grid', gap: 6 }}>
-                {upcomingTasks.slice(0, 3).map((task) => (
-                  <div key={task.id} style={{ fontSize: 12, color: C.text, background: C.bg, borderRadius: 8, padding: '7px 9px' }}>
-                    {task.taskName}
-                  </div>
-                ))}
-                {upcomingTasks.length === 0 && <div style={{ fontSize: 12, color: C.text3 }}>No upcoming tasks.</div>}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.red, marginBottom: 6 }}>Overdue ({overdueTasks.length})</div>
-              <div style={{ display: 'grid', gap: 6 }}>
-                {overdueTasks.slice(0, 3).map((task) => (
-                  <div key={task.id} style={{ fontSize: 12, color: C.text, background: C.bg, borderRadius: 8, padding: '7px 9px' }}>
-                    {task.taskName}
-                  </div>
-                ))}
-                {overdueTasks.length === 0 && <div style={{ fontSize: 12, color: C.text3 }}>No overdue tasks.</div>}
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 13, color: C.text, fontWeight: 800, marginBottom: 10 }}>Milestones</div>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {projectMilestones.slice(0, 8).map((milestone: Milestone) => (
-              <div key={milestone.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 95px 95px', gap: 8, alignItems: 'center', borderBottom: `1px solid ${C.border}`, paddingBottom: 8 }}>
-                <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={milestone.name}>{milestone.name}</div>
-                <div style={{ fontSize: 11, color: C.text2, textAlign: 'right' }}>{fmtDate(milestone.dueDate)}</div>
-                <div style={{ fontSize: 11, color: C.text2, textAlign: 'right' }}>{String(milestone.status || '').toUpperCase()}</div>
-              </div>
-            ))}
-            {projectMilestones.length === 0 && <div style={{ fontSize: 12, color: C.text3 }}>No milestones.</div>}
-          </div>
-        </Card>
-
-        <Card style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 13, color: C.text, fontWeight: 800, marginBottom: 10 }}>Open Issues</div>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {openIssues.slice(0, 8).map((issue: Issue) => (
-              <div key={issue.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 110px', gap: 8, alignItems: 'center', borderBottom: `1px solid ${C.border}`, paddingBottom: 8 }}>
-                <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={issue.title}>
-                  {issue.title}
+              {inProgressTasks.slice(0, 4).map((task, index) => (
+                <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
+                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
+                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
+                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</div>
+                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
                 </div>
-                <div style={{ fontSize: 11, color: issue.status === 'Open' ? C.red : C.amber, textAlign: 'right', fontWeight: 700 }}>
-                  {issue.status}
-                </div>
+              ))}
+              {!inProgressTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No in-progress tasks</div>}
+            </div>
+
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>UPCOMING TASKS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                ))}
               </div>
-            ))}
-            {openIssues.length === 0 && <div style={{ fontSize: 12, color: C.text3 }}>No open issues.</div>}
+              {upcomingTasks.slice(0, 4).map((task, index) => (
+                <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
+                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
+                  <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
+                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</div>
+                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
+                </div>
+              ))}
+              {!upcomingTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming tasks</div>}
+            </div>
+
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>OVERDUE TASKS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                ))}
+              </div>
+              {overdueTasks.slice(0, 4).map((task, index) => (
+                <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
+                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
+                  <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
+                  <div style={{ fontSize: 10, color: C.red, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</div>
+                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
+                </div>
+              ))}
+              {!overdueTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No overdue tasks</div>}
+            </div>
           </div>
         </Card>
 
-        <Card style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 13, color: C.text, fontWeight: 800, marginBottom: 10 }}>Effort Summary</div>
+        <Card style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Milestones</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>All project milestones sorted by due date</div>
+            </div>
+            <button type="button" onClick={() => openTab('ms')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Milestones Tab</button>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: C.bg }}>
+                  {['Milestone', 'Due Date', 'Status'].map((h) => (
+                    <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', fontSize: 11 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {projectMilestones.map((m: Milestone, i) => {
+                  const due = parseISO(m.dueDate || '');
+                  const isDelayed = isValid(due) && due < today && String(m.status).toLowerCase() !== 'paid';
+                  return (
+                    <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
+                      <td style={{ padding: '9px 12px', color: C.text, fontWeight: 600 }}>{m.name}</td>
+                      <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: isDelayed ? C.red : C.text2, fontWeight: isDelayed ? 700 : 400 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
+                      <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: C.text2, fontWeight: 700 }}>{String(m.status || '').toUpperCase()}</td>
+                    </tr>
+                  );
+                })}
+                {!projectMilestones.length && (
+                  <tr><td colSpan={3} style={{ padding: '20px 12px', color: C.text3, textAlign: 'center' }}>No milestones found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <Card style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Open Issues</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{openIssueList.length} open issue{openIssueList.length !== 1 ? 's' : ''}</div>
+            </div>
+            <button type="button" onClick={() => openTab('issues')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Issues</button>
+          </div>
+          {openIssueList.length === 0 ? (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No open issues</div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 80px 86px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+                {['#', 'Issue', 'Status', 'Assignee'].map((h) => (
+                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                ))}
+              </div>
+              {openIssueList.slice(0, 6).map((issue: Issue, index) => {
+                const tag = issue.status === 'Open' ? { color: C.primary, bg: C.primaryBg } : { color: C.amber, bg: C.amberBg };
+                return (
+                  <div key={issue.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 80px 86px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                    <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
+                    <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={issue.title}>{issue.title}</div>
+                    <div style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: tag.bg, color: tag.color, fontWeight: 700, whiteSpace: 'nowrap' }}>{issue.status}</div>
+                    <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issue.assignedTo || '—'}</div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </Card>
+
+        <Card style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Effort Summary</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Budget vs. used mandays by module</div>
+            </div>
+            <button type="button" onClick={() => openTab('effort')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Effort</button>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 88px 88px 88px', gap: 8, paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>
             <div style={{ fontSize: 10, color: C.text2, fontWeight: 700 }}>Module</div>
             <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textAlign: 'right' }}>Budget</div>
@@ -497,6 +596,35 @@ export default function ExecutiveOnePage({ project }: Props) {
             <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textAlign: 'right' }}>Remain</div>
           </div>
           <EffortRows efforts={projectEfforts} />
+        </Card>
+
+        <Card style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Change Requests</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>All CRs (including closed)</div>
+            </div>
+            <button type="button" onClick={() => openTab('cr')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View CR Tab</button>
+          </div>
+          {allCRs.length === 0 ? (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No change requests.</div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '88px minmax(0,1fr) 96px 96px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+                {['CR ID', 'Title', 'Date', 'Status'].map((h) => (
+                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                ))}
+              </div>
+              {allCRs.slice(0, 6).map((cr: ChangeRequest) => (
+                <div key={cr.id} style={{ display: 'grid', gridTemplateColumns: '88px minmax(0,1fr) 96px 96px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{cr.crId || '-'}</div>
+                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={cr.title}>{cr.title || '-'}</div>
+                  <div style={{ fontSize: 11, color: C.text2 }}>{cr.requestDate ? fmtDate(cr.requestDate) : '-'}</div>
+                  <div style={{ fontSize: 10, color: C.text2, fontWeight: 700 }}>{cr.status || '-'}</div>
+                </div>
+              ))}
+            </>
+          )}
         </Card>
       </div>
     </div>
