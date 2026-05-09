@@ -18,12 +18,12 @@ export interface RolePermissions {
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'cr', 'issues', 'risks', 'env', 'report'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'cr', 'issues', 'risks', 'env', 'onepage', 'report'],
     maskFinancialAmounts: false,
     canViewPortfolioOverview: true,
   },
   member: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'cr', 'issues', 'risks', 'env', 'report'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'cr', 'issues', 'risks', 'env', 'onepage', 'report'],
     // Note: 'ms' (Milestone) is excluded
     maskFinancialAmounts: true,
     canViewPortfolioOverview: true,

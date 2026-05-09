@@ -14,6 +14,7 @@ import IssuesTab         from '../Issues/IssuesTab';
 import RiskRegisterTab   from '../RiskRegister/RiskRegisterTab';
 import ProjectEnvironmentTab from './ProjectEnvironmentTab';
 import ProjectReport     from './ProjectReport';
+import ExecutiveOnePage  from './ExecutiveOnePage';
 import { useStore }      from '../../store';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
 import { effortApi, memberApi, milestoneApi, riskApi, taskApi } from '../../services/api';
@@ -175,6 +176,7 @@ export default function ProjectDetail({ project }: Props) {
     }
   };
 
+  /* Old Section
   const allTabs = [
     { id: 'tasks',    label: 'Tasks',      icon: '📋', count: tasks.filter(t => t.projectId === project.id).length },
     { id: 'summary',  label: 'Summary',    icon: '📈' },
@@ -185,6 +187,20 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'issues',   label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
     { id: 'risks',    label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
     { id: 'env',      label: 'Program URL', icon: '🌐', count: projectEnvironments.filter((e) => e.projectId === project.id).length },
+    { id: 'report',   label: 'Report',     icon: '📊' },
+  ];
+  */
+  const allTabs = [
+    { id: 'tasks',    label: 'Tasks',      icon: '📋', count: tasks.filter(t => t.projectId === project.id).length },
+    { id: 'summary',  label: 'Summary',    icon: '📈' },
+    { id: 'members',  label: 'Members',    icon: '👥', count: members.length },
+    { id: 'ms',       label: 'Milestones', icon: '🏁', count: milestones.length },
+    { id: 'effort',   label: 'Effort',     icon: '⚡', count: efforts.length },
+    { id: 'cr',       label: 'Change Req', icon: '📝', count: changeRequests.length },
+    { id: 'issues',   label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
+    { id: 'risks',    label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
+    { id: 'env',      label: 'Program URL', icon: '🌐', count: projectEnvironments.filter((e) => e.projectId === project.id).length },
+    { id: 'onepage',  label: 'One Page',   icon: '🧭' },
     { id: 'report',   label: 'Report',     icon: '📊' },
   ];
 
@@ -279,6 +295,10 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
         {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} extraActions={copyButton('risks')} /></div>}
         {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
+        {/* Old Section
+        {activeTab === 'report'  && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectReport project={project} /></div>}
+        */}
+        {activeTab === 'onepage' && <div style={{ height: '100%', overflowY: 'auto' }}><ExecutiveOnePage project={project} /></div>}
         {activeTab === 'report'  && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectReport project={project} /></div>}
       </div>
 
