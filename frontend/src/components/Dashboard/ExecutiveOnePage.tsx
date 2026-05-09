@@ -188,6 +188,8 @@ export default function ExecutiveOnePage({ project }: Props) {
   const isMobile = useIsMobile();
   const { tasks, milestones, issues, efforts, changeRequests } = useStore();
   const [showActivitiesModal, setShowActivitiesModal] = React.useState<null | 'inProgress' | 'upcoming' | 'overdue'>(null);
+  const ganttWrapRef = React.useRef<HTMLDivElement | null>(null);
+  const [ganttWrapWidth, setGanttWrapWidth] = React.useState(0);
 
   const projectTasks = React.useMemo(() => tasks.filter((t) => t.projectId === project.id), [tasks, project.id]);
   const mainTasks = React.useMemo(() => getMainTasks(projectTasks), [projectTasks]);
@@ -297,8 +299,29 @@ export default function ExecutiveOnePage({ project }: Props) {
 
   const activityModalRows = showActivitiesModal ? activityTaskRows[showActivitiesModal] : [];
 
-  const monthColWidth = 90;
+  React.useEffect(() => {
+    const node = ganttWrapRef.current;
+    if (!node) return;
+
+    const updateWidth = () => setGanttWrapWidth(node.clientWidth || 0);
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(node);
+    window.addEventListener('resize', updateWidth);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, []);
+
   const fixedColsWidth = 52 + 260 + 120 + 120 + 90 + 130;
+  const monthCount = Math.max(1, months.length);
+  const availableTimelineWidth = Math.max(420, ganttWrapWidth - fixedColsWidth - 2);
+  const minMonthColWidth = 82;
+  const maxMonthColWidth = 180;
+  const monthColWidth = Math.max(minMonthColWidth, Math.min(maxMonthColWidth, Math.floor(availableTimelineWidth / monthCount) || minMonthColWidth));
   const timelineWidth = months.length * monthColWidth;
   const ganttGridTemplate = `52px 260px 120px 120px 90px 130px ${timelineWidth}px`;
 
@@ -339,7 +362,7 @@ export default function ExecutiveOnePage({ project }: Props) {
           </div>
         </div>
 
-        <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflowX: 'auto', overflowY: 'hidden' }}>
+        <div ref={ganttWrapRef} style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflowX: 'auto', overflowY: 'hidden' }}>
           <div style={{ minWidth: fixedColsWidth + timelineWidth }}>
             <div
               style={{
