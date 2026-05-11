@@ -808,310 +808,118 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, onViewMilestones, onOpen
         </Card>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 12, marginBottom: 18 }}>
-        {[
-          { title: 'Overall Progress', value: `${prog}%`, detail: `${doneTasks}/${totalTasks} completed`, color: C.primary, bg: C.primaryBg },
-          { title: 'Schedule Status', value: `${plannedPercent}%`, detail: scheduleDetail, color: scheduleColor, bg: scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg },
-          { title: 'Project Health', value: healthValue, detail: healthSubtitle, color: scheduleColor, bg: scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg },
-          { title: 'Payment Collected', value: `฿${fmtMoney(visiblePaidAmt)}`, detail: `Outstanding ฿${fmtMoney(visibleOutstandingAmt)}`, color: C.green, bg: C.greenBg },
-          { title: 'Resource Usage', value: `${tUsedMD}/${tBudMD}`, detail: 'Mandays used / budget', color: C.amber, bg: C.amberBg },
-          { title: 'Risks / Issues', value: `${openRisks}/${openIssues}`, detail: `${openRisks} open risks`, color: openRisks ? C.red : C.green, bg: openRisks ? C.redBg : C.greenBg },
-        ].map((item) => (
-          <Card key={item.title} style={{ padding: '14px 14px', minHeight: 106 }}>
-            <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>{item.title}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: item.color }}>{item.value}</div>
-            <div style={{ fontSize: 11, color: C.text2, marginTop: 8 }}>{item.detail}</div>
-          </Card>
-        ))}
-      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
-        <Card style={{ padding: '16px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Progress by Main Task</div>
-              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Show main task completion sorted by WBS</div>
-            </div>
-            <button type="button" onClick={onOpen} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Task Detail</button>
+
+      {/* Row 1: Progress by Main Task */}
+      <Card style={{ padding: '16px 18px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Progress by Main Task</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Show main task completion sorted by WBS</div>
           </div>
-          <div style={{ display: 'grid', gap: 12 }}>
-            {stageTasks.map((stage) => (
-              <div key={stage.id} style={{ display: 'grid', gap: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.text2 }}>
-                  <span>{stage.name}</span>
-                  <span style={{ fontWeight: 700, color: C.text }}>{stage.progress}%</span>
-                </div>
-                <ProgressBar value={stage.progress} height={8} color={stage.progress >= 100 ? C.green : C.primary} />
+          <button type="button" onClick={onOpen} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Task Detail</button>
+        </div>
+        <div style={{ display: 'grid', gap: 12 }}>
+          {stageTasks.map((stage) => (
+            <div key={stage.id} style={{ display: 'grid', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.text2 }}>
+                <span>{stage.name}</span>
+                <span style={{ fontWeight: 700, color: C.text }}>{stage.progress}%</span>
               </div>
-            ))}
-            {!stageTasks.length && <div style={{ fontSize: 12, color: C.text3 }}>No main tasks found.</div>}
-          </div>
-        </Card>
+              <ProgressBar value={stage.progress} height={8} color={stage.progress >= 100 ? C.green : C.primary} />
+            </div>
+          ))}
+          {!stageTasks.length && <div style={{ fontSize: 12, color: C.text3 }}>No main tasks found.</div>}
+        </div>
+      </Card>
 
-        <Card style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Accomplished Task</div>
-              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Completed tasks sorted by WBS</div>
-            </div>
-            {!!accomplishedTasks.length && <span style={{ fontSize: 11, color: C.text2 }}>{accomplishedTasks.length} tasks</span>}
+      {/* Row 2: Effort Summary */}
+      <Card style={{ padding: '16px 18px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Effort Summary</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Budget vs. used mandays by module</div>
           </div>
-          <div
-            ref={accomplishedListRef}
-            style={{
-              display: 'grid',
-              gap: 8,
-              overflow: 'hidden',
-              maxHeight: isMobile ? 220 : 290,
-              flex: 1,
-            }}
-          >
-            {accomplishedTasks.map((task, index) => (
-              <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 10, background: C.bg }}>
-                <div style={{ minWidth: 0, fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>
-                  {`${index + 1}. ${task.taskName}`}
-                </div>
-                <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>{task.completedDate ? fmtDate(task.completedDate) : '-'}</div>
-              </div>
-            ))}
-            {!accomplishedTasks.length && <div style={{ fontSize: 12, color: C.text3 }}>No accomplished tasks found.</div>}
-          </div>
-          {accomplishedOverflow && (
-            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setShowAllCompletedModal(true)}
-                style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
-              >
-                View all tasks
-              </button>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Row 3: Milestone + Upcoming Activities (50/50) */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        <Card style={{ padding: '16px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Milestones</div>
-              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>All project milestones sorted by due date</div>
-            </div>
-            <button type="button" onClick={onViewMilestones} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Milestones Tab</button>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: C.bg }}>
-                  {['Milestone', 'Due Date', 'Amount', 'Status'].map((h) => (
-                    <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', fontSize: 11 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {allMilestonesSorted.map((m, i) => {
-                  const due = parseISO(m.dueDate || '');
-                  const isDelayed = isValid(due) && due < currentDate && String(m.status).toLowerCase() !== 'paid';
-                  const ss = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
-                  return (
-                    <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
-                      <td style={{ padding: '9px 12px', color: C.text, fontWeight: 600 }}>{m.name}</td>
-                      <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: isDelayed ? C.red : C.text2, fontWeight: isDelayed ? 700 : 400 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
-                      <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: C.text, fontWeight: 600 }}>฿{fmtMoney(permissions.getMaskedAmount(m.amount || 0))}</td>
-                      <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 999, background: ss.bg, color: ss.color, fontSize: 11, fontWeight: 700 }}>{ss.label}</span>
-                        {isDelayed && <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: C.redBg, color: C.red, fontSize: 10, fontWeight: 700 }}>Delayed</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {!allMilestonesSorted.length && (
-                  <tr><td colSpan={4} style={{ padding: '20px 12px', color: C.text3, textAlign: 'center' }}>No milestones found.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        <Card style={{ padding: '16px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Upcoming Activities</div>
-              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>งานที่กำลังดำเนินการ งานถัดไป และงานที่เลยกำหนด</div>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>IN PROGRESS TASKS</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
-                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
-                ))}
-              </div>
-              {inProgressTasks.slice(0, 4).map((task, index) => (
-                <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
-                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
-                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
-                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
-                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</div>
-                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
-                </div>
+          <button type="button" onClick={() => onOpenWithTab('effort')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Effort</button>
+        </div>
+        {ef.length === 0 ? (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No effort data found.</div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+              {['Module / Task', 'Budget MD', 'Used MD', 'Remain MD'].map((h) => (
+                <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
               ))}
-              {!inProgressTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No in-progress tasks</div>}
-              {inProgressTasks.length > 4 && (
-                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => setShowActivitiesModal('inProgress')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-                    +{inProgressTasks.length - 4} more
-                  </button>
-                </div>
-              )}
             </div>
+            {ef.map((e) => {
+              const usedMD = Object.values(e.monthly || {}).reduce((acc, v) => acc + Number(v || 0), 0);
+              const remainMD = (e.budgetManday || 0) - usedMD;
+              return (
+                <div key={e.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
+                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={e.module}>{e.module || '—'}</div>
+                  <div style={{ fontSize: 12, color: C.text2, fontWeight: 600 }}>{Number(e.budgetManday || 0).toFixed(1)}</div>
+                  <div style={{ fontSize: 12, color: usedMD > (e.budgetManday || 0) ? C.red : C.primary, fontWeight: 600 }}>{usedMD.toFixed(1)}</div>
+                  <div style={{ fontSize: 12, color: remainMD < 0 ? C.red : C.green, fontWeight: 600 }}>{remainMD.toFixed(1)}</div>
+                </div>
+              );
+            })}
+            <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.border}`, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.text }}>TOTAL</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: C.text }}>{ef.reduce((s, e) => s + (e.budgetManday || 0), 0).toFixed(1)}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: C.primary }}>{tUsedMD.toFixed(1)}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: tUsedMD > tBudMD ? C.red : C.green }}>{(tBudMD - tUsedMD).toFixed(1)}</div>
+            </div>
+          </>
+        )}
+      </Card>
 
-            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>UPCOMING TASKS</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
-                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
-                ))}
-              </div>
-              {upcomingTasks.slice(0, 4).map((task, index) => (
-                <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
-                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
-                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
-                  <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
-                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</div>
-                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
-                </div>
-              ))}
-              {!upcomingTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming tasks</div>}
-              {upcomingTasks.length > 4 && (
-                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => setShowActivitiesModal('upcoming')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-                    +{upcomingTasks.length - 4} more
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>OVERDUE TASKS</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
-                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
-                ))}
-              </div>
-              {overdueTasks.slice(0, 4).map((task, index) => (
-                <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
-                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
-                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
-                  <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
-                  <div style={{ fontSize: 10, color: C.red, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</div>
-                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
-                </div>
-              ))}
-              {!overdueTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No overdue tasks</div>}
-              {overdueTasks.length > 4 && (
-                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => setShowActivitiesModal('overdue')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-                    +{overdueTasks.length - 4} more
-                  </button>
-                </div>
-              )}
-            </div>
+      {/* Row 3: Milestones */}
+      <Card style={{ padding: '16px 18px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Milestones</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>All project milestones sorted by due date</div>
           </div>
-        </Card>
+          <button type="button" onClick={onViewMilestones} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Milestones Tab</button>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                {['Milestone', 'Due Date', 'Amount', 'Status'].map((h) => (
+                  <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', fontSize: 11 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {allMilestonesSorted.map((m, i) => {
+                const due = parseISO(m.dueDate || '');
+                const isDelayed = isValid(due) && due < currentDate && String(m.status).toLowerCase() !== 'paid';
+                const ss = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
+                return (
+                  <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
+                    <td style={{ padding: '9px 12px', color: C.text, fontWeight: 600 }}>{m.name}</td>
+                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: isDelayed ? C.red : C.text2, fontWeight: isDelayed ? 700 : 400 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
+                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: C.text, fontWeight: 600 }}>฿{fmtMoney(permissions.getMaskedAmount(m.amount || 0))}</td>
+                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 999, background: ss.bg, color: ss.color, fontSize: 11, fontWeight: 700 }}>{ss.label}</span>
+                      {isDelayed && <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: C.redBg, color: C.red, fontSize: 10, fontWeight: 700 }}>Delayed</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!allMilestonesSorted.length && (
+                <tr><td colSpan={4} style={{ padding: '20px 12px', color: C.text3, textAlign: 'center' }}>No milestones found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Old rows that are no longer displayed (modals preserved) */}
+      <div style={{ display: 'none' }}>
+
       </div>
-
-      {/* Row 4: Issue card + Effort card (50/50) */}
-      {(() => {
-        const openIssueList = iss
-          .filter((i) => i.status === 'Open' || i.status === 'In Progress')
-          .sort((a, b) => (a.issueDate > b.issueDate ? -1 : 1));
-        return (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
-            {/* Issue Card */}
-            <Card style={{ padding: '16px 18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Open Issues</div>
-                  <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{openIssueList.length} open issue{openIssueList.length !== 1 ? 's' : ''}</div>
-                </div>
-                <button type="button" onClick={() => onOpenWithTab('issues')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Issues</button>
-              </div>
-              {openIssueList.length === 0 ? (
-                <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No open issues 🎉</div>
-              ) : (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 80px 86px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-                    {['#', 'Issue', 'Status', 'Assignee'].map((h) => (
-                      <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
-                    ))}
-                  </div>
-                  {openIssueList.slice(0, 3).map((issue, index) => {
-                    const ss2 = (() => { const key = issue.status; return key === 'Open' ? { color: C.primary, bg: C.primaryBg } : key === 'In Progress' ? { color: C.amber, bg: C.amberBg } : { color: C.text2, bg: C.bg }; })();
-                    return (
-                      <div key={issue.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 80px 86px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
-                        <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
-                        <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={issue.title}>{issue.title}</div>
-                        <div style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: ss2.bg, color: ss2.color, fontWeight: 700, whiteSpace: 'nowrap' }}>{issue.status}</div>
-                        <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issue.assignedTo || '—'}</div>
-                      </div>
-                    );
-                  })}
-                  {openIssueList.length > 3 && (
-                    <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
-                      <button type="button" onClick={() => setShowAllIssuesModal(true)} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-                        +{openIssueList.length - 3} more
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </Card>
-
-            {/* Effort Card */}
-            <Card style={{ padding: '16px 18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Effort Summary</div>
-                  <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Budget vs. used mandays by module</div>
-                </div>
-                <button type="button" onClick={() => onOpenWithTab('effort')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Effort</button>
-              </div>
-              {ef.length === 0 ? (
-                <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No effort data found.</div>
-              ) : (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-                    {['Module / Task', 'Budget MD', 'Used MD', 'Remain MD'].map((h) => (
-                      <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
-                    ))}
-                  </div>
-                  {ef.map((e) => {
-                    const usedMD = Object.values(e.monthly || {}).reduce((acc, v) => acc + Number(v || 0), 0);
-                    const remainMD = (e.budgetManday || 0) - usedMD;
-                    return (
-                      <div key={e.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
-                        <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={e.module}>{e.module || '—'}</div>
-                        <div style={{ fontSize: 12, color: C.text2, fontWeight: 600 }}>{Number(e.budgetManday || 0).toFixed(1)}</div>
-                        <div style={{ fontSize: 12, color: usedMD > (e.budgetManday || 0) ? C.red : C.primary, fontWeight: 600 }}>{usedMD.toFixed(1)}</div>
-                        <div style={{ fontSize: 12, color: remainMD < 0 ? C.red : C.green, fontWeight: 600 }}>{remainMD.toFixed(1)}</div>
-                      </div>
-                    );
-                  })}
-                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.border}`, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: C.text }}>TOTAL</div>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: C.text }}>{ef.reduce((s, e) => s + (e.budgetManday || 0), 0).toFixed(1)}</div>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: C.primary }}>{tUsedMD.toFixed(1)}</div>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: tUsedMD > tBudMD ? C.red : C.green }}>{(tBudMD - tUsedMD).toFixed(1)}</div>
-                  </div>
-                </>
-              )}
-            </Card>
-          </div>
-        );
-      })()}
 
       {showAllIssuesModal && (() => {
         const openIssueList = iss
