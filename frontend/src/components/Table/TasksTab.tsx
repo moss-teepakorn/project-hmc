@@ -270,15 +270,27 @@ function getColumnPrefsUserKeyFromLocalStorage(): string {
   }
 }
 
-function normalizeTaskDateRange(startDate?: string, endDate?: string): { startDate: string; endDate: string; swapped: boolean } {
-  const start = String(startDate || '').trim();
-  const end = String(endDate || '').trim();
+function normalizeDateInputToIso(value?: string): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  return dmyToIso(raw) || '';
+}
+
+function toDisplayDmy(value?: string): string {
+  const iso = normalizeDateInputToIso(value);
+  return iso ? isoToDmy(iso) : '';
+}
+
+function normalizeTaskDateRange(startDate?: string, endDate?: string): { startDate: string; endDate: string; adjusted: boolean } {
+  const start = normalizeDateInputToIso(startDate);
+  const end = normalizeDateInputToIso(endDate);
   const startParsed = parseIsoDateSafe(start);
   const endParsed = parseIsoDateSafe(end);
   if (!startParsed || !endParsed || startParsed <= endParsed) {
-    return { startDate: start, endDate: end, swapped: false };
+    return { startDate: start, endDate: end, adjusted: false };
   }
-  return { startDate: end, endDate: start, swapped: true };
+  return { startDate: start, endDate: start, adjusted: true };
 }
 
 function makeColumnVisibilityStorageKey(projectId: string, userKey: string): string {
@@ -1128,6 +1140,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       return;
     }
     const normalized = normalizeTaskDateRange(newTaskInsert.startDate, newTaskInsert.endDate);
+    const normalizedActualFinish = normalizeDateInputToIso(newTaskInsert.actualFinish);
     try {
       await createTask({
         projectId,
@@ -1137,7 +1150,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         effortManday: roundEffortManday(newTaskInsert.effortManday),
         startDate: normalized.startDate,
         endDate: normalized.endDate,
-        actualFinish: newTaskInsert.actualFinish,
+        actualFinish: normalizedActualFinish,
         duration: calcDuration(normalized.startDate, normalized.endDate),
         resource: newTaskInsert.resource,
         phase: newTaskInsert.phase,
@@ -1146,8 +1159,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         relatedTaskType: newTaskInsert.relatedTaskType,
         relatedTaskLagDays: newTaskInsert.relatedTaskLagDays,
       });
-      if (normalized.swapped) {
-        toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+      if (normalized.adjusted) {
+        toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
       }
       toast.success('Task created');
       setNewTaskInsert(null);
@@ -1247,7 +1260,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       catch { toast.error('Failed to save'); }
       return;
     }
-    const iso = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : dmyToIso(raw);
+    const iso = normalizeDateInputToIso(raw);
     if (!iso) {
       toast.error('วันที่ต้องเป็นรูปแบบ DD/MM/YYYY');
       return;
@@ -1260,8 +1273,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       updates.startDate = normalized.startDate;
       updates.endDate = normalized.endDate;
       updates.duration = calcDuration(normalized.startDate, normalized.endDate);
-      if (normalized.swapped) {
-        toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+      if (normalized.adjusted) {
+        toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
       }
     }
     try { await updateTask(id, updates); }
@@ -2034,14 +2047,14 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       <div style={{ width:colWidths[2], minWidth:colWidths[2], padding:'0 6px', flexShrink:0 }}>
                         <EditableCell
                           type="date"
-                          value={isNew ? newRow.startDate : isoToDmy(rowTask.startDate)}
+                          value={isNew ? toDisplayDmy(newRow.startDate) : isoToDmy(rowTask.startDate)}
                           placeholder="—"
                           onSave={(v) => {
                             if (isNew) setNewTaskInsert((prev) => {
                               if (!prev) return prev;
                               const normalized = normalizeTaskDateRange(v, prev.endDate);
-                              if (normalized.swapped) {
-                                toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+                              if (normalized.adjusted) {
+                                toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
                               }
                               return { ...prev, startDate: normalized.startDate, endDate: normalized.endDate };
                             });
@@ -2056,14 +2069,14 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       <div style={{ width:colWidths[3], minWidth:colWidths[3], padding:'0 6px', flexShrink:0 }}>
                         <EditableCell
                           type="date"
-                          value={isNew ? newRow.endDate : isoToDmy(rowTask.endDate)}
+                          value={isNew ? toDisplayDmy(newRow.endDate) : isoToDmy(rowTask.endDate)}
                           placeholder="—"
                           onSave={(v) => {
                             if (isNew) setNewTaskInsert((prev) => {
                               if (!prev) return prev;
                               const normalized = normalizeTaskDateRange(prev.startDate, v);
-                              if (normalized.swapped) {
-                                toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+                              if (normalized.adjusted) {
+                                toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
                               }
                               return { ...prev, startDate: normalized.startDate, endDate: normalized.endDate };
                             });
@@ -2078,10 +2091,10 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
                         <EditableCell
                           type="date"
-                          value={isNew ? newRow.actualFinish : rowTask.actualFinish ? isoToDmy(rowTask.actualFinish) : ''}
+                          value={isNew ? toDisplayDmy(newRow.actualFinish) : rowTask.actualFinish ? isoToDmy(rowTask.actualFinish) : ''}
                           placeholder="—"
                           onSave={(v) => {
-                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, actualFinish: v } : prev);
+                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, actualFinish: normalizeDateInputToIso(v) } : prev);
                             else handleUpdateDate(rowTask.id, 'actualFinish', v);
                           }}
                           alwaysSave
@@ -2965,8 +2978,8 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
               phaseOptions[0]?.value
             ),
           });
-          if (normalized.swapped) {
-            toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+          if (normalized.adjusted) {
+            toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
           }
         }}>Create Task</Btn>
       </div>
@@ -3131,8 +3144,8 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
             actualFinish: String(form.actualFinish || ''),
             duration: calcDuration(normalized.startDate, normalized.endDate),
           });
-          if (normalized.swapped) {
-            toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+          if (normalized.adjusted) {
+            toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
           }
         }}>Save Changes</Btn>
       </div>

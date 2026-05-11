@@ -248,15 +248,22 @@ export const EditableCell: React.FC<{
   type?: string; placeholder?: string; style?: React.CSSProperties;
   alwaysSave?: boolean;
 }> = ({ value, onSave, type = 'text', placeholder = '—', style, alwaysSave = false }) => {
+  const toDateInputValue = useCallback((raw: string) => {
+    const text = String(raw || '').trim();
+    if (!text) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    return dmyToIso(text);
+  }, []);
+
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState(value);
-  const [dateValue, setDateValue] = useState(type === 'date' ? dmyToIso(value) : value);
+  const [dateValue, setDateValue] = useState(type === 'date' ? toDateInputValue(value) : value);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setDraft(value);
-    if (type === 'date') setDateValue(dmyToIso(value));
-  }, [value, type]);
+    if (type === 'date') setDateValue(toDateInputValue(value));
+  }, [value, type, toDateInputValue]);
   useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
 
   const commit = useCallback(() => {
@@ -276,7 +283,7 @@ export const EditableCell: React.FC<{
           else setDraft(e.target.value);
         }}
         onBlur={commit}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setDraft(value); if (type === 'date') setDateValue(dmyToIso(value)); } }}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setDraft(value); if (type === 'date') setDateValue(toDateInputValue(value)); } }}
         style={{ width: '100%', border: `1.5px solid ${C.primary}`, borderRadius: 4, padding: '2px 6px', fontSize: 12, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg, colorScheme: type === 'date' ? 'light' : undefined, ...style }}
       />
     );
