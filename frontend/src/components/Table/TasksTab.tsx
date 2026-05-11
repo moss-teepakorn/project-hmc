@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Download, Upload, ChevronDown, ZoomIn, ZoomOut, Lock, Unlock, Sparkles, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Download, Upload, ChevronDown, ZoomIn, ZoomOut, Lock, Unlock, Sparkles, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Pencil, Trash2, Check, X, SlidersHorizontal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
+import { supabase } from '../../services/supabase';
 import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C } from '../Common';
 import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, PROCESS_STATUS_STYLE } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
@@ -21,19 +22,35 @@ export const ROW_H = 36;
 export const HDR_H = 48;   // unified header height for both table and gantt
 
 // Columns for table view
-const COLS = [
-  { label: 'WBS',           w: 52  },
-  { label: 'Task Name',     w: 320 },
-  { label: 'Start',         w: 94  },
-  { label: 'Finish',        w: 94  },
-  { label: 'Actual Finish', w: 120 },
-  { label: 'Days',          w: 46  },
-  { label: '% Done',        w: 120 },
-  { label: 'Effort (MD)',   w: 94  },
-  { label: 'Resource',      w: 160 },
-  { label: '',              w: 76  },
+type TaskColumnId =
+  | 'wbs'
+  | 'taskName'
+  | 'startDate'
+  | 'endDate'
+  | 'actualFinish'
+  | 'duration'
+  | 'percentComplete'
+  | 'effortManday'
+  | 'resource'
+  | 'actions';
+
+const COLS: Array<{ id: TaskColumnId; label: string; w: number; canHide: boolean }> = [
+  { id: 'wbs',             label: 'WBS',           w: 52,  canHide: false },
+  { id: 'taskName',        label: 'Task Name',     w: 320, canHide: false },
+  { id: 'startDate',       label: 'Start',         w: 94,  canHide: true },
+  { id: 'endDate',         label: 'Finish',        w: 94,  canHide: true },
+  { id: 'actualFinish',    label: 'Actual Finish', w: 120, canHide: true },
+  { id: 'duration',        label: 'Days',          w: 46,  canHide: true },
+  { id: 'percentComplete', label: '% Done',        w: 120, canHide: true },
+  { id: 'effortManday',    label: 'Effort (MD)',   w: 94,  canHide: true },
+  { id: 'resource',        label: 'Resource',      w: 160, canHide: true },
+  { id: 'actions',         label: '',              w: 76,  canHide: true },
 ];
-const TABLE_FIXED_W = 52 + 94 + 94 + 120 + 46 + 120 + 94 + 160 + 76;
+const DEFAULT_COLUMN_VISIBILITY: Record<TaskColumnId, boolean> = COLS.reduce((acc, col) => {
+  acc[col.id] = true;
+  return acc;
+}, {} as Record<TaskColumnId, boolean>);
+const MANDATORY_COLUMN_IDS = new Set<TaskColumnId>(['wbs', 'taskName']);
 const EFFORT_STEP = 0.025;
 
 const PHASE_OPTIONS = [
@@ -239,6 +256,26 @@ function roundEffortManday(value: number): number {
   return Number((Math.round(value / EFFORT_STEP) * EFFORT_STEP).toFixed(3));
 }
 
+function makeColumnVisibilityStorageKey(projectId: string, userKey: string): string {
+  return `tasks-column-visibility:v1:${projectId}:${userKey}`;
+}
+
+function normalizeColumnVisibility(value: unknown): Record<TaskColumnId, boolean> {
+  const normalized = { ...DEFAULT_COLUMN_VISIBILITY };
+  if (value && typeof value === 'object') {
+    for (const col of COLS) {
+      const raw = (value as Record<string, unknown>)[col.id];
+      if (typeof raw === 'boolean') {
+        normalized[col.id] = raw;
+      }
+    }
+  }
+  for (const id of MANDATORY_COLUMN_IDS) {
+    normalized[id] = true;
+  }
+  return normalized;
+}
+
 // Inline % editor
 function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean; onSave: (n: number) => void }) {
   const [editing, setEditing] = useState(false);
@@ -305,6 +342,10 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   });
   const [zoomIndex, setZoomIndex] = useState(3); // default = Week
   const [colWidths, setColWidths] = useState<number[]>(COLS.map((c) => c.w));
+  const [columnModalOpen, setColumnModalOpen] = useState(false);
+  const [columnPrefsUserKey, setColumnPrefsUserKey] = useState('anonymous');
+  const [columnPrefsLoaded, setColumnPrefsLoaded] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState<Record<TaskColumnId, boolean>>({ ...DEFAULT_COLUMN_VISIBILITY });
   const [addPreset, setAddPreset] = useState<{ anchorId: string | null; mode: 'main' | 'sub'; position: 'before' | 'after' | 'append' }>({
     anchorId: null,
     mode: 'main',
@@ -355,6 +396,46 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setColumnPrefsUserKey(data.user?.id || 'anonymous');
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setColumnPrefsUserKey('anonymous');
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const columnStorageKey = useMemo(() => makeColumnVisibilityStorageKey(projectId, columnPrefsUserKey), [projectId, columnPrefsUserKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setColumnPrefsLoaded(false);
+    try {
+      const raw = window.localStorage.getItem(columnStorageKey);
+      if (!raw) {
+        setColumnVisibility({ ...DEFAULT_COLUMN_VISIBILITY });
+      } else {
+        setColumnVisibility(normalizeColumnVisibility(JSON.parse(raw)));
+      }
+    } catch {
+      setColumnVisibility({ ...DEFAULT_COLUMN_VISIBILITY });
+    } finally {
+      setColumnPrefsLoaded(true);
+    }
+  }, [columnStorageKey]);
+
+  useEffect(() => {
+    if (!columnPrefsLoaded || typeof window === 'undefined') return;
+    window.localStorage.setItem(columnStorageKey, JSON.stringify(columnVisibility));
+  }, [columnStorageKey, columnPrefsLoaded, columnVisibility]);
 
   const projectTasks = tasks.filter(t => t.projectId === projectId);
   const phaseOptions = masterCodes
@@ -1812,6 +1893,22 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     </div>
   );
 
+  const isColumnVisible = useCallback((columnId: TaskColumnId) => columnVisibility[columnId] !== false, [columnVisibility]);
+
+  const visibleHeaderColumns = useMemo(
+    () => COLS.map((col, index) => ({ col, index })).filter(({ col }) => isColumnVisible(col.id)),
+    [isColumnVisible],
+  );
+
+  const handleToggleColumnVisibility = (columnId: TaskColumnId) => {
+    if (MANDATORY_COLUMN_IDS.has(columnId)) return;
+    setColumnVisibility((prev) => normalizeColumnVisibility({ ...prev, [columnId]: !prev[columnId] }));
+  };
+
+  const handleResetColumnVisibility = () => {
+    setColumnVisibility({ ...DEFAULT_COLUMN_VISIBILITY });
+  };
+
   const tableContent = (
     <div style={{ display:'flex', flex:1, flexDirection:'column', height:'100%', overflow:'hidden', minHeight:0 }}>
       {isMobile ? taskCardContent : (
@@ -1820,15 +1917,15 @@ export default function TasksTab({ projectId, extraActions }: Props) {
             <div style={{ overflowX:'auto', overflowY:'hidden', minWidth:0 }}>
               {/* Table header — same height as Gantt header (HDR_H) */}
               <div ref={tableHeaderRef} onScroll={onHeaderScroll} style={{ minWidth:'max-content', display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
-                {COLS.map((c, i) => (
-                  <div key={c.label} style={{
+                {visibleHeaderColumns.map(({ col, index }) => (
+                  <div key={col.id} style={{
                     position:'relative',
-                    width: colWidths[i],
-                    minWidth: colWidths[i],
+                    width: colWidths[index],
+                    minWidth: colWidths[index],
                     padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center'
                   }}>
-                    {c.label}
-                    <div onMouseDown={e => onColumnResizeStart(i, e)}
+                    {col.label}
+                    <div onMouseDown={e => onColumnResizeStart(index, e)}
                       style={{ position:'absolute', right:0, top:0, width:8, height:'100%', cursor:'col-resize', zIndex:2 }} />
                   </div>
                 ))}
@@ -1867,144 +1964,164 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       cursor: !isNew ? (dragTaskId === rowTask.id ? 'grabbing' : 'grab') : 'pointer',
                       flexShrink:0,
                     }}>
-                    <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{isNew ? '—' : rowTask!.wbs}</div>
-                    <div style={{
-                      width: colWidths[1],
-                      minWidth: colWidths[1],
-                      padding:`0 4px 0 ${8 + level * 20}px`,
-                      display:'flex', alignItems:'center', gap:4, flexShrink:0
-                    }}>
-                      {!isNew && (isPar ? (
-                        <button onClick={e => { e.stopPropagation(); toggle(rowTask.id); }}
-                          style={{ width:18, height:18, background:C.primaryBg, border:`1px solid ${C.primary}33`, borderRadius:4, cursor:'pointer', color:C.primary, padding:0, fontSize:11, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                          {isExp ? '▾' : '▸'}
-                        </button>
-                      ) : (
-                        <span style={{ width:18, flexShrink:0, display:'inline-flex', justifyContent:'center' }}>
-                          {!isNew && !!rowTask.parentId && <span style={{ color:C.border2, fontSize:10 }}>└</span>}
-                        </span>
-                      ))}
-                      {!isNew && isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
-                      <EditableCell
-                        value={isNew ? newRow.taskName : rowTask.taskName}
-                        onSave={(v) => {
-                          if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, taskName: v } : prev);
-                          else handleUpdate(rowTask.id, { taskName: v });
-                        }}
-                      />
-                    </div>
-                    <div style={{ width:colWidths[2], minWidth:colWidths[2], padding:'0 6px', flexShrink:0 }}>
-                      <EditableCell
-                        type="date"
-                        value={isNew ? newRow.startDate : isoToDmy(rowTask.startDate)}
-                        placeholder="—"
-                        onSave={(v) => {
-                          if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, startDate: v } : prev);
-                          else handleUpdateDate(rowTask.id, 'startDate', v);
-                        }}
-                        alwaysSave
-                        style={{ color:isNew ? C.text : isPar ? C.text3 : C.text }}
-                      />
-                    </div>
-                    <div style={{ width:colWidths[3], minWidth:colWidths[3], padding:'0 6px', flexShrink:0 }}>
-                      <EditableCell
-                        type="date"
-                        value={isNew ? newRow.endDate : isoToDmy(rowTask.endDate)}
-                        placeholder="—"
-                        onSave={(v) => {
-                          if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, endDate: v } : prev);
-                          else handleUpdateDate(rowTask.id, 'endDate', v);
-                        }}
-                        alwaysSave
-                        style={{ color:isNew ? C.text : isPar ? C.text3 : C.text }}
-                      />
-                    </div>
-                    <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
-                      <EditableCell
-                        type="date"
-                        value={isNew ? newRow.actualFinish : rowTask.actualFinish ? isoToDmy(rowTask.actualFinish) : ''}
-                        placeholder="—"
-                        onSave={(v) => {
-                          if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, actualFinish: v } : prev);
-                          else handleUpdateDate(rowTask.id, 'actualFinish', v);
-                        }}
-                        alwaysSave
-                        style={{ color:isNew ? C.text3 : rowTask.actualFinish ? C.green : C.text3 }}
-                      />
-                    </div>
-                    <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{durationDays}d</div>
-                    <div style={{ width:colWidths[6], minWidth:colWidths[6], padding:'0 6px', flexShrink:0 }}>
-                      {isNew ? (
-                        <PctCell value={newRow.percentComplete} isParent={false} onSave={(n) => setNewTaskInsert((prev) => prev ? { ...prev, percentComplete: n } : prev)} />
-                      ) : (
-                        <PctCell value={rowTask.percentComplete} isParent={isPar} onSave={(n) => handlePct(rowTask.id, n)} />
-                      )}
-                    </div>
-                    <div style={{ width:colWidths[7], minWidth:colWidths[7], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>
-                      {isNew ? (
+                    {isColumnVisible('wbs') && (
+                      <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{isNew ? '—' : rowTask!.wbs}</div>
+                    )}
+                    {isColumnVisible('taskName') && (
+                      <div style={{
+                        width: colWidths[1],
+                        minWidth: colWidths[1],
+                        padding:`0 4px 0 ${8 + level * 20}px`,
+                        display:'flex', alignItems:'center', gap:4, flexShrink:0
+                      }}>
+                        {!isNew && (isPar ? (
+                          <button onClick={e => { e.stopPropagation(); toggle(rowTask.id); }}
+                            style={{ width:18, height:18, background:C.primaryBg, border:`1px solid ${C.primary}33`, borderRadius:4, cursor:'pointer', color:C.primary, padding:0, fontSize:11, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            {isExp ? '▾' : '▸'}
+                          </button>
+                        ) : (
+                          <span style={{ width:18, flexShrink:0, display:'inline-flex', justifyContent:'center' }}>
+                            {!isNew && !!rowTask.parentId && <span style={{ color:C.border2, fontSize:10 }}>└</span>}
+                          </span>
+                        ))}
+                        {!isNew && isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
                         <EditableCell
-                          value={String(newRow.effortManday || 0)}
-                          placeholder="0"
+                          value={isNew ? newRow.taskName : rowTask.taskName}
                           onSave={(v) => {
-                            const next = roundEffortManday(Number(v) || 0);
-                            setNewTaskInsert((prev) => prev ? { ...prev, effortManday: next } : prev);
+                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, taskName: v } : prev);
+                            else handleUpdate(rowTask.id, { taskName: v });
                           }}
-                          style={{ color: canEditEffort ? C.text : C.text3 }}
                         />
-                      ) : (
-                        canEditEffort ? (
+                      </div>
+                    )}
+                    {isColumnVisible('startDate') && (
+                      <div style={{ width:colWidths[2], minWidth:colWidths[2], padding:'0 6px', flexShrink:0 }}>
+                        <EditableCell
+                          type="date"
+                          value={isNew ? newRow.startDate : isoToDmy(rowTask.startDate)}
+                          placeholder="—"
+                          onSave={(v) => {
+                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, startDate: v } : prev);
+                            else handleUpdateDate(rowTask.id, 'startDate', v);
+                          }}
+                          alwaysSave
+                          style={{ color:isNew ? C.text : isPar ? C.text3 : C.text }}
+                        />
+                      </div>
+                    )}
+                    {isColumnVisible('endDate') && (
+                      <div style={{ width:colWidths[3], minWidth:colWidths[3], padding:'0 6px', flexShrink:0 }}>
+                        <EditableCell
+                          type="date"
+                          value={isNew ? newRow.endDate : isoToDmy(rowTask.endDate)}
+                          placeholder="—"
+                          onSave={(v) => {
+                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, endDate: v } : prev);
+                            else handleUpdateDate(rowTask.id, 'endDate', v);
+                          }}
+                          alwaysSave
+                          style={{ color:isNew ? C.text : isPar ? C.text3 : C.text }}
+                        />
+                      </div>
+                    )}
+                    {isColumnVisible('actualFinish') && (
+                      <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
+                        <EditableCell
+                          type="date"
+                          value={isNew ? newRow.actualFinish : rowTask.actualFinish ? isoToDmy(rowTask.actualFinish) : ''}
+                          placeholder="—"
+                          onSave={(v) => {
+                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, actualFinish: v } : prev);
+                            else handleUpdateDate(rowTask.id, 'actualFinish', v);
+                          }}
+                          alwaysSave
+                          style={{ color:isNew ? C.text3 : rowTask.actualFinish ? C.green : C.text3 }}
+                        />
+                      </div>
+                    )}
+                    {isColumnVisible('duration') && (
+                      <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{durationDays}d</div>
+                    )}
+                    {isColumnVisible('percentComplete') && (
+                      <div style={{ width:colWidths[6], minWidth:colWidths[6], padding:'0 6px', flexShrink:0 }}>
+                        {isNew ? (
+                          <PctCell value={newRow.percentComplete} isParent={false} onSave={(n) => setNewTaskInsert((prev) => prev ? { ...prev, percentComplete: n } : prev)} />
+                        ) : (
+                          <PctCell value={rowTask.percentComplete} isParent={isPar} onSave={(n) => handlePct(rowTask.id, n)} />
+                        )}
+                      </div>
+                    )}
+                    {isColumnVisible('effortManday') && (
+                      <div style={{ width:colWidths[7], minWidth:colWidths[7], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>
+                        {isNew ? (
                           <EditableCell
-                            value={String(Number(rowTask.effortManday || 0))}
+                            value={String(newRow.effortManday || 0)}
                             placeholder="0"
-                            onSave={(v) => handleUpdate(rowTask.id, { effortManday: roundEffortManday(Number(v) || 0) })}
+                            onSave={(v) => {
+                              const next = roundEffortManday(Number(v) || 0);
+                              setNewTaskInsert((prev) => prev ? { ...prev, effortManday: next } : prev);
+                            }}
+                            style={{ color: canEditEffort ? C.text : C.text3 }}
                           />
                         ) : (
-                          <span title="Auto-calculated from child tasks" style={{ color: C.text3, fontWeight: 600 }}>
-                            {Number(rowTask.effortManday || 0).toFixed(3)}
-                          </span>
-                        )
-                      )}
-                    </div>
-                    <div style={{ width:colWidths[8], minWidth:colWidths[8], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
-                      {!isNew && rowTask.resource && <Avatar name={rowTask.resource} size={20} />}
-                      <EditableCell
-                        value={isNew ? newRow.resource : rowTask.resource}
-                        onSave={(v) => {
-                          if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, resource: v } : prev);
-                          else handleUpdate(rowTask.id, { resource: v });
-                        }}
-                        placeholder="Assign..."
-                      />
-                    </div>
-                    <div style={{ width:colWidths[9], minWidth:colWidths[9], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
-                      {isNew ? (
-                        <>
-                          <button onClick={e => { e.stopPropagation(); saveNewTask(); }}
-                            title="Save"
-                            style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary }}>
-                            <Check size={12} />
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); cancelNewTask(); }}
-                            title="Cancel"
-                            style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.border2, border:'none', borderRadius:5, cursor:'pointer', color:C.text2 }}>
-                            <X size={12} />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button onClick={e => { e.stopPropagation(); setEditModal(rowTask); }}
-                            title="Edit"
-                            style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary }}>
-                            <Pencil size={12} />
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); handleDelete(rowTask.id); }}
-                            title="Delete"
-                            style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red }}>
-                            <Trash2 size={12} />
-                          </button>
-                        </>
-                      )}
-                    </div>
+                          canEditEffort ? (
+                            <EditableCell
+                              value={String(Number(rowTask.effortManday || 0))}
+                              placeholder="0"
+                              onSave={(v) => handleUpdate(rowTask.id, { effortManday: roundEffortManday(Number(v) || 0) })}
+                            />
+                          ) : (
+                            <span title="Auto-calculated from child tasks" style={{ color: C.text3, fontWeight: 600 }}>
+                              {Number(rowTask.effortManday || 0).toFixed(3)}
+                            </span>
+                          )
+                        )}
+                      </div>
+                    )}
+                    {isColumnVisible('resource') && (
+                      <div style={{ width:colWidths[8], minWidth:colWidths[8], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+                        {!isNew && rowTask.resource && <Avatar name={rowTask.resource} size={20} />}
+                        <EditableCell
+                          value={isNew ? newRow.resource : rowTask.resource}
+                          onSave={(v) => {
+                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, resource: v } : prev);
+                            else handleUpdate(rowTask.id, { resource: v });
+                          }}
+                          placeholder="Assign..."
+                        />
+                      </div>
+                    )}
+                    {isColumnVisible('actions') && (
+                      <div style={{ width:colWidths[9], minWidth:colWidths[9], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
+                        {isNew ? (
+                          <>
+                            <button onClick={e => { e.stopPropagation(); saveNewTask(); }}
+                              title="Save"
+                              style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary }}>
+                              <Check size={12} />
+                            </button>
+                            <button onClick={e => { e.stopPropagation(); cancelNewTask(); }}
+                              title="Cancel"
+                              style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.border2, border:'none', borderRadius:5, cursor:'pointer', color:C.text2 }}>
+                              <X size={12} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={e => { e.stopPropagation(); setEditModal(rowTask); }}
+                              title="Edit"
+                              style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary }}>
+                              <Pencil size={12} />
+                            </button>
+                            <button onClick={e => { e.stopPropagation(); handleDelete(rowTask.id); }}
+                              title="Delete"
+                              style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red }}>
+                              <Trash2 size={12} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -2175,6 +2292,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
               </div>
             )}
           </div>
+          <Btn small variant="ghost" onClick={() => setColumnModalOpen(true)} title="Show/Hide Columns">
+            <SlidersHorizontal size={13} />
+          </Btn>
           <Btn small onClick={openImportDialog} title={importing ? 'Importing' : 'Import Excel'} style={{ opacity: importing ? 0.7 : 1 }}><Upload size={13} /></Btn>
           <Btn small variant="ghost" onClick={toggleSuggestionLock} title={isSuggestionLocked ? 'Unlock Suggestion' : 'Lock Suggestion'}>
             {isSuggestionLocked ? <Lock size={13} /> : <Unlock size={13} />}
@@ -2298,6 +2418,63 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           )}
         </div>,
         document.body,
+      )}
+
+      {columnModalOpen && (
+        <Modal title="Task Columns" onClose={() => setColumnModalOpen(false)} width={560}>
+          <div style={{ display:'grid', gap:14 }}>
+            <div style={{ fontSize:12, color:C.text2 }}>
+              Save by project and user. WBS and Task Name are always visible.
+            </div>
+            <div style={{ display:'grid', gap:8, maxHeight:420, overflowY:'auto', paddingRight:4 }}>
+              {COLS.map((col) => {
+                const checked = isColumnVisible(col.id);
+                return (
+                  <div key={col.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', background:C.white }}>
+                    <div style={{ fontSize:13, color:C.text, fontWeight:600 }}>{col.label || 'Actions'}</div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleColumnVisibility(col.id)}
+                      disabled={!col.canHide}
+                      style={{
+                        width:48,
+                        height:26,
+                        border:'none',
+                        borderRadius:999,
+                        cursor: col.canHide ? 'pointer' : 'not-allowed',
+                        background: checked ? C.primary : C.border2,
+                        opacity: col.canHide ? 1 : 0.55,
+                        position:'relative',
+                        transition:'all 0.2s ease',
+                      }}
+                      title={col.canHide ? (checked ? 'Hide column' : 'Show column') : 'Required column'}
+                    >
+                      <span
+                        style={{
+                          position:'absolute',
+                          top:3,
+                          left: checked ? 25 : 3,
+                          width:20,
+                          height:20,
+                          borderRadius:'50%',
+                          background:C.white,
+                          transition:'all 0.2s ease',
+                          boxShadow:'0 1px 3px rgba(0,0,0,0.2)',
+                        }}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', gap:10 }}>
+              <Btn variant="ghost" onClick={handleResetColumnVisibility}>Reset All</Btn>
+              <div style={{ display:'flex', gap:10 }}>
+                <Btn variant="ghost" onClick={() => setColumnModalOpen(false)}>Close</Btn>
+              </div>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {moveToSubModal && (
