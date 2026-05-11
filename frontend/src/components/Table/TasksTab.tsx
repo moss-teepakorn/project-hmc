@@ -47,6 +47,7 @@ const PHASE_OPTIONS = [
 ] as const;
 
 const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Block/Delay', 'Done'] as const;
+const TASK_DEPENDENCY_OPTIONS = ['FS', 'SS', 'FF', 'SF'] as const;
 
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
 export type PhaseOption = { value: string; label: string };
@@ -62,6 +63,8 @@ type TaskImportRow = {
   status: TaskStatus;
   phase: string;
   predecessorWbs: string;
+  predecessorType: 'FS' | 'SS' | 'FF' | 'SF';
+  predecessorLagDays: number;
   resource: string;
   effortManday: number;
 };
@@ -70,7 +73,7 @@ type TaskImportPreview = {
   rows: TaskImportRow[];
 };
 
-const TASK_IMPORT_HEADERS = [
+const TASK_IMPORT_REQUIRED_HEADERS = [
   'WBS',
   'Task Name',
   'Parent WBS',
@@ -83,6 +86,12 @@ const TASK_IMPORT_HEADERS = [
   'Predecessor WBS',
   'Owner',
   'Effort Manday',
+] as const;
+
+const TASK_IMPORT_HEADERS = [
+  ...TASK_IMPORT_REQUIRED_HEADERS,
+  'Predecessor Type',
+  'Predecessor Lag Days',
 ] as const;
 
 type SuggestedDateAssignment = {
@@ -124,6 +133,48 @@ function getWorkingDatesBetween(startDate?: string, endDate?: string): string[] 
   return dates;
 }
 
+function parseIsoDateSafe(value?: string): Date | null {
+  const text = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+  const date = new Date(`${text}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function addWorkingDays(base: Date, deltaDays: number): Date {
+  if (deltaDays === 0) return new Date(base);
+  const step = deltaDays > 0 ? 1 : -1;
+  let remaining = Math.abs(deltaDays);
+  const cursor = new Date(base);
+  while (remaining > 0) {
+    cursor.setDate(cursor.getDate() + step);
+    if (!isWeekend(cursor)) remaining -= 1;
+  }
+  return cursor;
+}
+
+function nextWorkingOnOrAfter(date: Date): Date {
+  const cursor = new Date(date);
+  while (isWeekend(cursor)) {
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return cursor;
+}
+
+function prevWorkingOnOrBefore(date: Date): Date {
+  const cursor = new Date(date);
+  while (isWeekend(cursor)) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return cursor;
+}
+
+function toIso(date: Date): string {
+  const y = String(date.getFullYear());
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function getTodayPassword(): string {
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, '0');
@@ -156,6 +207,9 @@ interface NewTaskInsert {
   percentComplete: number;
   phase: string;
   level: number;
+  relatedTask: string;
+  relatedTaskType: 'FS' | 'SS' | 'FF' | 'SF';
+  relatedTaskLagDays: number;
 }
 
 function isNewTaskInsert(task: TaskRow): task is NewTaskInsert {
@@ -427,7 +481,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const projectStart = activeProject?.startDate || '';
     const projectEnd = activeProject?.endDate || '';
     const workingDates = getWorkingDatesBetween(projectStart, projectEnd);
+    const projectStartDate = parseIsoDateSafe(projectStart);
     const childrenByParent = new Map<string, Task[]>();
+    const taskById = new Map(projectTasks.map((task) => [task.id, task]));
 
     const sortTasks = (items: Task[]) => [...items].sort((a, b) => {
       const sortOrderDiff = Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
@@ -445,55 +501,234 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       childrenByParent.set(key, sortTasks(items));
     }
 
-    const leafCountCache = new Map<string, number>();
-    const getLeafCount = (taskId: string): number => {
-      const cached = leafCountCache.get(taskId);
-      if (cached != null) return cached;
-      const children = childrenByParent.get(taskId) || [];
-      if (!children.length) {
-        leafCountCache.set(taskId, 1);
-        return 1;
+    const getDurationDays = (task: Task): number => {
+      const explicit = Number(task.duration || 0);
+      if (Number.isFinite(explicit) && explicit > 0) return Math.max(1, Math.trunc(explicit));
+
+      const s = parseIsoDateSafe(task.startDate);
+      const e = parseIsoDateSafe(task.endDate);
+      if (!s || !e || e < s) return 1;
+
+      let count = 0;
+      const cursor = new Date(s);
+      while (cursor <= e) {
+        if (!isWeekend(cursor)) count += 1;
+        cursor.setDate(cursor.getDate() + 1);
       }
-      const count = children.reduce((sum, child) => sum + getLeafCount(child.id), 0);
-      leafCountCache.set(taskId, count);
       return Math.max(1, count);
     };
 
     const assignments: SuggestedDateAssignment[] = [];
-    const assignDates = (tasksToAssign: Task[], dates: string[]) => {
-      if (!tasksToAssign.length || !dates.length) return;
-      const weights = tasksToAssign.map((task) => getLeafCount(task.id));
-      const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || 1;
-      let consumedWeight = 0;
+    const assignmentById = new Map<string, { start: Date; end: Date }>();
+    const existingScheduleById = new Map<string, { start: Date; end: Date }>();
 
-      tasksToAssign.forEach((task, index) => {
-        const startIndex = Math.min(
-          dates.length - 1,
-          Math.floor((dates.length * consumedWeight) / totalWeight),
-        );
-        consumedWeight += weights[index];
-        const computedEndIndex = index === tasksToAssign.length - 1
-          ? dates.length - 1
-          : Math.floor((dates.length * consumedWeight) / totalWeight) - 1;
-        const endIndex = Math.max(startIndex, Math.min(dates.length - 1, computedEndIndex));
-        const assignedDates = dates.slice(startIndex, endIndex + 1);
-        const children = childrenByParent.get(task.id) || [];
-        if (!children.length) {
-          assignments.push({
-            id: task.id,
-            taskName: task.taskName,
-            level: task.level ?? 0,
-            startDate: assignedDates[0],
-            endDate: assignedDates[assignedDates.length - 1],
-          });
-          return;
-        }
-        assignDates(children, assignedDates.length ? assignedDates : [dates[startIndex]]);
+    projectTasks.forEach((task) => {
+      const s = parseIsoDateSafe(task.startDate);
+      const e = parseIsoDateSafe(task.endDate);
+      if (!s || !e) return;
+      existingScheduleById.set(task.id, {
+        start: nextWorkingOnOrAfter(s),
+        end: nextWorkingOnOrAfter(e),
       });
+    });
+
+    const rootCache = new Map<string, string>();
+    const getRootId = (taskId: string): string => {
+      const cached = rootCache.get(taskId);
+      if (cached) return cached;
+      let current = taskById.get(taskId);
+      if (!current) return taskId;
+      while (current?.parentId) {
+        const parent = taskById.get(current.parentId);
+        if (!parent) break;
+        current = parent;
+      }
+      const rootId = current?.id || taskId;
+      rootCache.set(taskId, rootId);
+      return rootId;
     };
 
-    const rootTasks = sortTasks(projectTasks.filter((task) => !task.parentId));
-    assignDates(rootTasks, workingDates);
+    const leafTasks = sortTasks(projectTasks.filter((task) => !(childrenByParent.get(task.id) || []).length));
+    const leafByParent = new Map<string, Task[]>();
+    const leafByRoot = new Map<string, Task[]>();
+
+    leafTasks.forEach((task) => {
+      const parentKey = String(task.parentId || '');
+      const parentList = leafByParent.get(parentKey) || [];
+      parentList.push(task);
+      leafByParent.set(parentKey, parentList);
+
+      const rootKey = getRootId(task.id);
+      const rootList = leafByRoot.get(rootKey) || [];
+      rootList.push(task);
+      leafByRoot.set(rootKey, rootList);
+    });
+
+    const mainWindowByRoot = new Map<string, { start: Date | null; end: Date | null }>();
+    projectTasks.filter((task) => !task.parentId).forEach((root) => {
+      mainWindowByRoot.set(root.id, {
+        start: parseIsoDateSafe(root.startDate),
+        end: parseIsoDateSafe(root.endDate),
+      });
+    });
+
+    const getScheduledAnchor = (taskId: string): { start: Date; end: Date } | null => {
+      return assignmentById.get(taskId) || existingScheduleById.get(taskId) || null;
+    };
+
+    const getDependencyDrivenStart = (task: Task, durationDays: number): Date | null => {
+      if (!task.relatedTask) return null;
+      const predecessor = getScheduledAnchor(task.relatedTask);
+      if (!predecessor) return null;
+
+      const depType = String(task.relatedTaskType || 'FS').toUpperCase();
+      const lag = Math.trunc(Number(task.relatedTaskLagDays || 0));
+
+      if (depType === 'SS') {
+        return nextWorkingOnOrAfter(addWorkingDays(predecessor.start, lag));
+      }
+      if (depType === 'FF') {
+        const constrainedFinish = addWorkingDays(predecessor.end, lag);
+        return nextWorkingOnOrAfter(addWorkingDays(constrainedFinish, -(durationDays - 1)));
+      }
+      if (depType === 'SF') {
+        const constrainedFinish = addWorkingDays(predecessor.start, lag);
+        return nextWorkingOnOrAfter(addWorkingDays(constrainedFinish, -(durationDays - 1)));
+      }
+
+      return nextWorkingOnOrAfter(addWorkingDays(predecessor.end, 1 + lag));
+    };
+
+    let pending = [...leafTasks];
+    let passGuard = Math.max(1, leafTasks.length * 2);
+
+    while (pending.length && passGuard > 0) {
+      const nextPending: Task[] = [];
+      let progressed = false;
+
+      pending.forEach((task) => {
+        if (assignmentById.has(task.id)) {
+          progressed = true;
+          return;
+        }
+
+        const hasDependency = !!task.relatedTask;
+        const hasDependencyAnchor = !hasDependency || !!getScheduledAnchor(task.relatedTask);
+        if (hasDependency && !hasDependencyAnchor) {
+          nextPending.push(task);
+          return;
+        }
+
+        const durationDays = getDurationDays(task);
+        const dependencyStart = getDependencyDrivenStart(task, durationDays);
+        const relationDate = parseIsoDateSafe(task.startDate);
+        const rootId = getRootId(task.id);
+        const mainWindow = mainWindowByRoot.get(rootId) || { start: null, end: null };
+
+        const candidateStarts: Date[] = [];
+        if (dependencyStart) candidateStarts.push(dependencyStart);
+        if (relationDate) candidateStarts.push(nextWorkingOnOrAfter(relationDate));
+
+        if (!dependencyStart) {
+          if (mainWindow.start) candidateStarts.push(nextWorkingOnOrAfter(mainWindow.start));
+
+          const siblingLeafs = leafByParent.get(String(task.parentId || '')) || [];
+          const siblingIndex = siblingLeafs.findIndex((item) => item.id === task.id);
+          if (siblingIndex > 0) {
+            const prevSibling = assignmentById.get(siblingLeafs[siblingIndex - 1].id);
+            if (prevSibling) candidateStarts.push(nextWorkingOnOrAfter(addWorkingDays(prevSibling.end, 1)));
+          } else {
+            const rootLeafs = leafByRoot.get(rootId) || [];
+            const rootIndex = rootLeafs.findIndex((item) => item.id === task.id);
+            if (rootIndex > 0) {
+              const prevRootLeaf = assignmentById.get(rootLeafs[rootIndex - 1].id);
+              if (prevRootLeaf) candidateStarts.push(nextWorkingOnOrAfter(addWorkingDays(prevRootLeaf.end, 1)));
+            }
+          }
+        }
+
+        if (!candidateStarts.length) {
+          if (projectStartDate) candidateStarts.push(nextWorkingOnOrAfter(projectStartDate));
+          else candidateStarts.push(nextWorkingOnOrAfter(new Date()));
+        }
+
+        let suggestedStart = candidateStarts.reduce((max, cur) => (cur > max ? cur : max));
+
+        // For tasks without explicit predecessor, keep start within its main task window.
+        if (!dependencyStart && mainWindow.end) {
+          const windowEnd = prevWorkingOnOrBefore(mainWindow.end);
+          if (suggestedStart > windowEnd) {
+            suggestedStart = windowEnd;
+          }
+        }
+
+        const suggestedEnd = addWorkingDays(suggestedStart, durationDays - 1);
+        assignmentById.set(task.id, { start: suggestedStart, end: suggestedEnd });
+        assignments.push({
+          id: task.id,
+          taskName: task.taskName,
+          level: task.level ?? 0,
+          startDate: toIso(suggestedStart),
+          endDate: toIso(suggestedEnd),
+        });
+        progressed = true;
+      });
+
+      if (!progressed) break;
+      pending = nextPending;
+      passGuard -= 1;
+    }
+
+    // Fallback for cyclic/unresolved references: schedule by WBS sequence without predecessor anchors.
+    pending.forEach((task) => {
+      const durationDays = getDurationDays(task);
+      const relationDate = parseIsoDateSafe(task.startDate);
+      const rootId = getRootId(task.id);
+      const mainWindow = mainWindowByRoot.get(rootId) || { start: null, end: null };
+
+      const candidateStarts: Date[] = [];
+      if (relationDate) candidateStarts.push(nextWorkingOnOrAfter(relationDate));
+
+      if (mainWindow.start) candidateStarts.push(nextWorkingOnOrAfter(mainWindow.start));
+
+      const siblingLeafs = leafByParent.get(String(task.parentId || '')) || [];
+      const siblingIndex = siblingLeafs.findIndex((item) => item.id === task.id);
+      if (siblingIndex > 0) {
+        const prevSibling = assignmentById.get(siblingLeafs[siblingIndex - 1].id);
+        if (prevSibling) candidateStarts.push(nextWorkingOnOrAfter(addWorkingDays(prevSibling.end, 1)));
+      } else {
+        const rootLeafs = leafByRoot.get(rootId) || [];
+        const rootIndex = rootLeafs.findIndex((item) => item.id === task.id);
+        if (rootIndex > 0) {
+          const prevRootLeaf = assignmentById.get(rootLeafs[rootIndex - 1].id);
+          if (prevRootLeaf) candidateStarts.push(nextWorkingOnOrAfter(addWorkingDays(prevRootLeaf.end, 1)));
+        }
+      }
+
+      if (!candidateStarts.length) {
+        if (projectStartDate) candidateStarts.push(nextWorkingOnOrAfter(projectStartDate));
+        else candidateStarts.push(nextWorkingOnOrAfter(new Date()));
+      }
+
+      let suggestedStart = candidateStarts.reduce((max, cur) => (cur > max ? cur : max));
+
+      if (mainWindow.end) {
+        const windowEnd = prevWorkingOnOrBefore(mainWindow.end);
+        if (suggestedStart > windowEnd) {
+          suggestedStart = windowEnd;
+        }
+      }
+
+      const suggestedEnd = addWorkingDays(suggestedStart, durationDays - 1);
+      assignmentById.set(task.id, { start: suggestedStart, end: suggestedEnd });
+      assignments.push({
+        id: task.id,
+        taskName: task.taskName,
+        level: task.level ?? 0,
+        startDate: toIso(suggestedStart),
+        endDate: toIso(suggestedEnd),
+      });
+    });
 
     return {
       projectStart,
@@ -501,6 +736,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       projectDurationDays: getProjectDurationDays(projectStart, projectEnd),
       workingDayCount: workingDates.length,
       assignments,
+      unresolvedDependencyCount: pending.length,
     };
   }, [activeProject?.endDate, activeProject?.startDate, projectTasks]);
 
@@ -534,6 +770,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       percentComplete: 0,
       phase: anchor.phase || effectivePhaseOptions[0]?.value || '',
       level,
+      relatedTask: '',
+      relatedTaskType: 'FS',
+      relatedTaskLagDays: 0,
     });
     setContextMenu((prev) => ({ ...prev, visible: false }));
   };
@@ -801,6 +1040,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         resource: newTaskInsert.resource,
         phase: newTaskInsert.phase,
         percentComplete: newTaskInsert.percentComplete,
+        relatedTask: newTaskInsert.relatedTask,
+        relatedTaskType: newTaskInsert.relatedTaskType,
+        relatedTaskLagDays: newTaskInsert.relatedTaskLagDays,
       });
       toast.success('Task created');
       setNewTaskInsert(null);
@@ -1014,7 +1256,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const parseImportRows = (sheet: XLSX.WorkSheet): TaskImportRow[] => {
     const matrix = XLSX.utils.sheet_to_json<(string | number | Date)[]>(sheet, { header: 1, defval: '' });
     const headers = (matrix[0] || []).map((value) => String(value || '').trim());
-    const missingHeaders = TASK_IMPORT_HEADERS.filter((header) => !headers.includes(header));
+    const missingHeaders = TASK_IMPORT_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
     if (missingHeaders.length) {
       throw new Error(`Missing columns: ${missingHeaders.join(', ')}`);
     }
@@ -1055,6 +1297,17 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           throw new Error(`Row ${index + 2}: Effort Manday must be a non-negative number`);
         }
 
+        const predecessorTypeRaw = String(row['Predecessor Type'] || '').trim().toUpperCase();
+        const predecessorType = (TASK_DEPENDENCY_OPTIONS.includes(predecessorTypeRaw as 'FS' | 'SS' | 'FF' | 'SF')
+          ? predecessorTypeRaw
+          : 'FS') as 'FS' | 'SS' | 'FF' | 'SF';
+
+        const lagRaw = String(row['Predecessor Lag Days'] ?? '').trim();
+        const predecessorLagDays = lagRaw === '' ? 0 : Number(lagRaw);
+        if (!Number.isFinite(predecessorLagDays) || !Number.isInteger(predecessorLagDays)) {
+          throw new Error(`Row ${index + 2}: Predecessor Lag Days must be an integer`);
+        }
+
         return {
           wbs: String(row['WBS'] || '').trim(),
           taskName: String(row['Task Name'] || '').trim(),
@@ -1066,11 +1319,13 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           status,
           phase: String(row['Phase'] || '').trim(),
           predecessorWbs: String(row['Predecessor WBS'] || '').trim(),
+          predecessorType,
+          predecessorLagDays,
           resource: String(row['Owner'] || '').trim(),
           effortManday: effort,
         };
       })
-      .filter((row) => row.wbs || row.taskName || row.parentWbs || row.startDate || row.endDate || row.phase || row.resource);
+      .filter((row) => row.wbs || row.taskName || row.parentWbs || row.startDate || row.endDate || row.phase || row.predecessorWbs || row.resource);
 
     if (!importedRows.length) {
       throw new Error('No task rows found in the file');
@@ -1179,11 +1434,11 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const taskById = new Map(projectTasks.map((task) => [task.id, task]));
     const sortedTasks = [...projectTasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
     const exampleRows = [
-      ['1', 'Project Preparation', '', '2026-05-01', '2026-05-05', '', 100, 'Done', effectivePhaseOptions[0]?.value || 'Project Initiation', '', 'PM Team', 0],
-      ['1.1', 'Kickoff Meeting', '1', '2026-05-01', '2026-05-01', '2026-05-01', 100, 'Done', effectivePhaseOptions[0]?.value || 'Project Initiation', '', 'PM Team', 0.5],
-      ['1.2', 'Requirement Workshop', '1', '2026-05-02', '2026-05-05', '', 60, 'In Progress', effectivePhaseOptions[1]?.value || 'Requirement & Gap Analysis', '1.1', 'Business Analyst', 2],
-      ['2', 'Blueprint Phase', '', '2026-05-06', '2026-05-12', '', 0, 'Todo', effectivePhaseOptions[2]?.value || 'Business Blueprint', '1.2', 'Consulting Team', 0],
-      ['2.1', 'Design Approval', '2', '2026-05-10', '2026-05-12', '', 0, 'Todo', effectivePhaseOptions[2]?.value || 'Business Blueprint', '', 'Project Sponsor', 1],
+      ['1', 'Project Preparation', '', '2026-05-01', '2026-05-05', '', 100, 'Done', effectivePhaseOptions[0]?.value || 'Project Initiation', '', 'PM Team', 0, 'FS', 0],
+      ['1.1', 'Kickoff Meeting', '1', '2026-05-01', '2026-05-01', '2026-05-01', 100, 'Done', effectivePhaseOptions[0]?.value || 'Project Initiation', '', 'PM Team', 0.5, 'FS', 0],
+      ['1.2', 'Requirement Workshop', '1', '2026-05-02', '2026-05-05', '', 60, 'In Progress', effectivePhaseOptions[1]?.value || 'Requirement & Gap Analysis', '1.1', 'Business Analyst', 2, 'FS', 1],
+      ['2', 'Blueprint Phase', '', '2026-05-06', '2026-05-12', '', 0, 'Todo', effectivePhaseOptions[2]?.value || 'Business Blueprint', '1.2', 'Consulting Team', 0, 'SS', 0],
+      ['2.1', 'Design Approval', '2', '2026-05-10', '2026-05-12', '', 0, 'Todo', effectivePhaseOptions[2]?.value || 'Business Blueprint', '', 'Project Sponsor', 1, 'FS', 0],
     ];
     const exportRows = sortedTasks.length > 0
       ? sortedTasks.map((task) => [
@@ -1199,13 +1454,15 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           task.relatedTask ? (taskById.get(task.relatedTask)?.wbs || '') : '',
           task.resource || '',
           Number(task.effortManday || 0),
+          task.relatedTaskType || 'FS',
+          Number(task.relatedTaskLagDays || 0),
         ])
       : exampleRows;
     const ws = XLSX.utils.aoa_to_sheet([
       [...TASK_IMPORT_HEADERS],
       ...exportRows,
     ]);
-    ws['!cols'] = [{wch:10},{wch:38},{wch:14},{wch:14},{wch:14},{wch:14},{wch:12},{wch:16},{wch:26},{wch:18},{wch:24},{wch:14}];
+    ws['!cols'] = [{wch:10},{wch:38},{wch:14},{wch:14},{wch:14},{wch:14},{wch:12},{wch:16},{wch:26},{wch:18},{wch:24},{wch:14},{wch:18},{wch:20}];
 
     const referenceSheet = XLSX.utils.aoa_to_sheet([
       ['Field', 'Rule'],
@@ -1216,6 +1473,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       ['Status', TASK_STATUS_OPTIONS.join(', ')],
       ['Phase', effectivePhaseOptions.map((option) => option.value).join(', ') || 'Use existing project phase values'],
       ['Predecessor WBS', 'Leave blank or reference another WBS in this file'],
+      ['Predecessor Type', 'FS / SS / FF / SF (optional, default FS)'],
+      ['Predecessor Lag Days', 'Integer days, use negative for lead (optional, default 0)'],
       ['Owner', 'Mapped to Resource field in current system'],
       ['Overwrite Import', 'Import will delete all current tasks in this project and recreate from sheet'],
     ]);
@@ -2181,8 +2440,13 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                 </div>
               </div>
               <div style={{ fontSize: 12, color: C.text2, marginTop: 12 }}>
-                ระบบจะกระจายวันตามลำดับ task ภายในช่วงวันของโครงการ และข้ามวันเสาร์-อาทิตย์อัตโนมัติ โดยจะอัปเดตเฉพาะ leaf task แล้วให้ parent คำนวณวันตามลูกอีกที
+                ระบบจะคำนวณจาก Dependency (FS/SS/FF/SF), lag/lead, Duration และลำดับ WBS โดยข้ามวันเสาร์-อาทิตย์อัตโนมัติ จากนั้นอัปเดตเฉพาะ leaf task แล้วให้ parent คำนวณวันตามลูกอีกที
               </div>
+              {suggestionPreview.unresolvedDependencyCount > 0 && (
+                <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>
+                  พบ dependency ที่ resolve ไม่ได้ {suggestionPreview.unresolvedDependencyCount} task (เช่น วนลูปหรืออ้าง predecessor ที่ไม่มีวัน) ระบบใช้ fallback ตามลำดับ WBS ให้รายการเหล่านี้
+                </div>
+              )}
             </Card>
 
             <Card style={{ padding: '14px 16px' }}>
@@ -2259,6 +2523,8 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
     resource:'',
     parentId:'',
     relatedTask:'',
+    relatedTaskType: 'FS',
+    relatedTaskLagDays: 0,
     phase: selectedTask?.phase || phaseOptions[0]?.value,
   });
   const phaseDropdownOptions = form.phase && !phaseOptions.some((option) => option.value === String(form.phase))
@@ -2275,7 +2541,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
   }, [phaseOptions, selectedTask?.phase, form.phase]);
   const [insertType, setInsertType] = useState<'main' | 'sub'>(preset.mode);
   const [insertPosition, setInsertPosition] = useState<'before' | 'after' | 'append'>(preset.position);
-  const up = (k:string,v:string) => setForm(p=>({...p,[k]:v}));
+  const up = (k:string,v:string|number) => setForm(p=>({...p,[k]:v}));
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
   const dur = calcDuration(String(form.startDate || ''), String(form.endDate || ''));
   return (
@@ -2370,8 +2636,29 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
           <Select value={form.parentId??''} onChange={v=>up('parentId',v)} options={[{value:'',label:'— None —'},...sortedTasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
         </FormRow>
 
-        <FormRow label="Predecessor (FS)">
+        <FormRow label="Predecessor">
           <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)} options={[{value:'',label:'— None —'},...sortedTasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+        </FormRow>
+
+        <FormRow label="Dependency Type">
+          <Select
+            value={String(form.relatedTaskType || 'FS')}
+            onChange={v => up('relatedTaskType', v)}
+            disabled={!form.relatedTask}
+            options={TASK_DEPENDENCY_OPTIONS.map((type) => ({ value: type, label: type }))}
+          />
+        </FormRow>
+
+        <FormRow label="Lag / Lead (days)">
+          <input
+            type="number"
+            step={1}
+            value={Number(form.relatedTaskLagDays ?? 0)}
+            disabled={!form.relatedTask}
+            onChange={(e) => up('relatedTaskLagDays', Math.trunc(Number(e.target.value) || 0))}
+            placeholder="0"
+            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+          />
         </FormRow>
       </div>
       <div style={{ fontSize: 11, color: C.text3, marginTop: -4, marginBottom: 8 }}>
@@ -2423,6 +2710,8 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
             parentId,
             sortOrder,
             effortManday: insertType === 'main' ? 0 : roundEffortManday(Number(form.effortManday || 0)),
+            relatedTaskType: form.relatedTask ? String(form.relatedTaskType || 'FS').toUpperCase() : 'FS',
+            relatedTaskLagDays: form.relatedTask ? Math.trunc(Number(form.relatedTaskLagDays || 0)) : 0,
             startDate,
             endDate,
             duration: dur,
@@ -2448,6 +2737,8 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
     startDate: task.startDate ?? '',
     endDate: task.endDate ?? '',
     actualFinish: task.actualFinish ?? '',
+    relatedTaskType: task.relatedTaskType ?? 'FS',
+    relatedTaskLagDays: task.relatedTaskLagDays ?? 0,
     phase: task.phase ?? phaseOptions[0]?.value,
   });
   const phaseDropdownOptions = form.phase && !phaseOptions.some((option) => option.value === String(form.phase))
@@ -2529,9 +2820,30 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
             options={[{value:'',label:'— None (Root) —'},...sortedTasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
         </FormRow>
 
-        <FormRow label="Predecessor (FS)">
+        <FormRow label="Predecessor">
           <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)}
             options={[{value:'',label:'— None —'},...sortedTasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+        </FormRow>
+
+        <FormRow label="Dependency Type">
+          <Select
+            value={String(form.relatedTaskType || 'FS')}
+            onChange={v => up('relatedTaskType', v)}
+            disabled={!form.relatedTask}
+            options={TASK_DEPENDENCY_OPTIONS.map((type) => ({ value: type, label: type }))}
+          />
+        </FormRow>
+
+        <FormRow label="Lag / Lead (days)">
+          <input
+            type="number"
+            step={1}
+            value={Number(form.relatedTaskLagDays ?? 0)}
+            disabled={!form.relatedTask}
+            onChange={(e) => up('relatedTaskLagDays', Math.trunc(Number(e.target.value) || 0))}
+            placeholder="0"
+            style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+          />
         </FormRow>
       </div>
       <div style={{ fontSize: 11, color: C.text3, marginTop: -4, marginBottom: 8 }}>
@@ -2557,6 +2869,8 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
           onSave({
             ...form,
             effortManday: canEditEffort ? roundEffortManday(Number(form.effortManday || 0)) : Number(task.effortManday || 0),
+            relatedTaskType: form.relatedTask ? String(form.relatedTaskType || 'FS').toUpperCase() : 'FS',
+            relatedTaskLagDays: form.relatedTask ? Math.trunc(Number(form.relatedTaskLagDays || 0)) : 0,
             startDate: String(form.startDate || ''),
             endDate: String(form.endDate || ''),
             actualFinish: String(form.actualFinish || ''),

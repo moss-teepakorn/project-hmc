@@ -65,6 +65,8 @@ export interface Task {
   status: 'Todo' | 'In Progress' | 'Block/Delay' | 'Done';
   resource: string;
   relatedTask: string;
+  relatedTaskType: 'FS' | 'SS' | 'FF' | 'SF';
+  relatedTaskLagDays: number;
   parentId: string;
   level: number;
   sortOrder: number;

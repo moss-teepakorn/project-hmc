@@ -81,12 +81,25 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
       const predIdx = visibleTasks.findIndex(t => t.id === task.relatedTask);
       if (predIdx < 0) return [];
       const pred = visibleTasks[predIdx];
+      const dependencyType = String(task.relatedTaskType || 'FS').toUpperCase();
+      const lagDays = Number.isFinite(Number(task.relatedTaskLagDays)) ? Number(task.relatedTaskLagDays) : 0;
+
+      const predStartX = dayOffset(minDate, pred.startDate) * dayWidth;
+      const predEndX = dayOffset(minDate, pred.endDate) * dayWidth + dayWidth;
+      const taskStartX = dayOffset(minDate, task.startDate) * dayWidth;
+      const taskEndX = dayOffset(minDate, task.endDate) * dayWidth + dayWidth;
+      const lagX = lagDays * dayWidth;
+
+      const fromStart = dependencyType === 'SS' || dependencyType === 'SF';
+      const toEnd = dependencyType === 'FF' || dependencyType === 'SF';
+
       return [{
-        x1: dayOffset(minDate, pred.endDate)   * dayWidth + dayWidth,
+        x1: (fromStart ? predStartX : predEndX) + lagX,
         y1: predIdx * ROW_H + ROW_H / 2,
-        x2: dayOffset(minDate, task.startDate) * dayWidth,
+        x2: toEnd ? taskEndX : taskStartX,
         y2: ri      * ROW_H + ROW_H / 2,
         key: task.id,
+        label: lagDays !== 0 ? `${dependencyType}${lagDays > 0 ? '+' : ''}${lagDays}` : dependencyType,
       }];
     });
   }, [visibleTasks, minDate, dayWidth]);
@@ -177,6 +190,7 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
                 <path d={`M${a.x1},${a.y1} C${mx},${a.y1} ${mx},${a.y2} ${a.x2},${a.y2}`}
                   fill="none" stroke={C.primary} strokeWidth={1.5} opacity={0.35} />
                 <polygon points={`${a.x2},${a.y2} ${a.x2 - 5},${a.y2 - 3} ${a.x2 - 5},${a.y2 + 3}`} fill={C.primary} opacity={0.45} />
+                <text x={mx + 3} y={Math.min(a.y1, a.y2) - 4} fill={C.text3} fontSize={9} fontFamily="Poppins, sans-serif">{a.label}</text>
               </g>
             );
           })}

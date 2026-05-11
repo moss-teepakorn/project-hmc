@@ -148,6 +148,8 @@ create table if not exists public.tasks (
   status           text not null default 'Todo' check (status in ('Todo','In Progress','Block/Delay','Done')),
   resource         text not null default '',
   related_task     text not null default '',
+  related_task_type text not null default 'FS' check (related_task_type in ('FS','SS','FF','SF')),
+  related_task_lag_days integer not null default 0,
   parent_id        text not null default '',
   level            integer not null default 0,
   "order"          integer not null default 0,

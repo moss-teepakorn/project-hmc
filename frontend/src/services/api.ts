@@ -126,6 +126,8 @@ import { supabase } from './supabase';
 import { parseISO, isValid } from 'date-fns';
 import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem } from '../types';
 
+const TASK_DEPENDENCY_TYPES = new Set(['FS', 'SS', 'FF', 'SF']);
+
 // ── Snake ↔ Camel conversion helpers ────────────────────────────────────────
 
 function snakeToCamel(s: string): string {
@@ -375,9 +377,16 @@ export const taskApi = {
     const tasks = rowsToObjs<Task>(data || []);
     const normalized = tasks.map((task) => {
       const normalizedEffort = normalizeEffortManday((task as any).effortManday);
+      const normalizedDependencyType = normalizeDependencyType((task as any).relatedTaskType);
+      const normalizedDependencyLagDays = normalizeDependencyLagDays((task as any).relatedTaskLagDays);
       const withEffort = normalizedEffort !== Number((task as any).effortManday || 0)
-        ? { ...task, effortManday: normalizedEffort }
-        : { ...task, effortManday: Number((task as any).effortManday || 0) };
+        ? { ...task, effortManday: normalizedEffort, relatedTaskType: normalizedDependencyType, relatedTaskLagDays: normalizedDependencyLagDays }
+        : {
+          ...task,
+          effortManday: Number((task as any).effortManday || 0),
+          relatedTaskType: normalizedDependencyType,
+          relatedTaskLagDays: normalizedDependencyLagDays,
+        };
       if (!task.startDate || !task.endDate) return withEffort;
       const calculated = calcDurationFromDates(task);
       return withEffort.duration !== calculated ? { ...withEffort, duration: calculated } : withEffort;
@@ -395,6 +404,20 @@ export const taskApi = {
     const row = objToRow(t as Record<string, unknown>);
         if (row.effort_manday !== undefined) {
           row.effort_manday = normalizeEffortManday(row.effort_manday);
+        }
+        if (row.related_task_type !== undefined) {
+          row.related_task_type = normalizeDependencyType(row.related_task_type);
+        } else {
+          row.related_task_type = 'FS';
+        }
+        if (row.related_task_lag_days !== undefined) {
+          row.related_task_lag_days = normalizeDependencyLagDays(row.related_task_lag_days);
+        } else {
+          row.related_task_lag_days = 0;
+        }
+        if (!row.related_task) {
+          row.related_task_type = 'FS';
+          row.related_task_lag_days = 0;
         }
 
     delete row.id;
@@ -461,6 +484,16 @@ export const taskApi = {
     const row = objToRow(t as Record<string, unknown>);
         if (row.effort_manday !== undefined) {
           row.effort_manday = normalizeEffortManday(row.effort_manday);
+        }
+        if (row.related_task_type !== undefined) {
+          row.related_task_type = normalizeDependencyType(row.related_task_type);
+        }
+        if (row.related_task_lag_days !== undefined) {
+          row.related_task_lag_days = normalizeDependencyLagDays(row.related_task_lag_days);
+        }
+        if (row.related_task !== undefined && !row.related_task) {
+          if (row.related_task_type === undefined) row.related_task_type = 'FS';
+          if (row.related_task_lag_days === undefined) row.related_task_lag_days = 0;
         }
 
     delete row.id;
@@ -645,6 +678,8 @@ export const taskApi = {
         projectId: targetProjectId,
         parentId: srcTask.parentId ? (idMap.get(srcTask.parentId) || srcTask.parentId) : emptyRelationValue,
         relatedTask: emptyRelationValue,
+        relatedTaskType: srcTask.relatedTaskType || 'FS',
+        relatedTaskLagDays: normalizeDependencyLagDays(srcTask.relatedTaskLagDays),
       } as Record<string, unknown>);
       delete row.id;
       delete row.created_at;
@@ -669,7 +704,11 @@ export const taskApi = {
       if (!newTask || !mappedPred) continue;
       await supabase
         .from('tasks')
-        .update({ related_task: mappedPred })
+        .update({
+          related_task: mappedPred,
+          related_task_type: normalizeDependencyType(srcTask.relatedTaskType || 'FS'),
+          related_task_lag_days: normalizeDependencyLagDays(srcTask.relatedTaskLagDays || 0),
+        })
         .eq('id', newTask.id);
     }
 
@@ -695,7 +734,7 @@ export const taskApi = {
     return { data: copied.data };
   },
 
-  replaceByImport: async (projectId: string, importedTasks: Array<Partial<Task> & { parentWbs?: string; predecessorWbs?: string }>): Promise<{ data: Task[] }> => {
+  replaceByImport: async (projectId: string, importedTasks: Array<Partial<Task> & { parentWbs?: string; predecessorWbs?: string; predecessorType?: string; predecessorLagDays?: number }>): Promise<{ data: Task[] }> => {
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
     const okWrite = await checkProjectPermission(projectId, 'write');
     if (!okWrite) throw new Error('FORBIDDEN');
@@ -727,6 +766,8 @@ export const taskApi = {
       relatedTask: '',
       parentWbs: clean(item.parentWbs),
       predecessorWbs: clean(item.predecessorWbs),
+      predecessorType: normalizeDependencyType((item as any).predecessorType || item.relatedTaskType || 'FS'),
+      predecessorLagDays: normalizeDependencyLagDays((item as any).predecessorLagDays ?? item.relatedTaskLagDays ?? 0),
       orderHint: clean((item as any).order),
       levelHint: clean((item as any).level),
       effortManday: toEffort(item.effortManday),
@@ -759,6 +800,9 @@ export const taskApi = {
       if (row.predecessorWbs && !wbsSet.has(row.predecessorWbs)) {
         throw new Error(`Row ${row.sourceRow}: Predecessor WBS '${row.predecessorWbs}' not found`);
       }
+      if (row.predecessorType && !TASK_DEPENDENCY_TYPES.has(row.predecessorType)) {
+        throw new Error(`Row ${row.sourceRow}: Predecessor Type must be one of FS, SS, FF, SF`);
+      }
     }
 
     const sorted = [...rows].sort((a, b) => compareWbs(a.wbs, b.wbs));
@@ -788,6 +832,8 @@ export const taskApi = {
         status: row.status,
         resource: row.resource,
         relatedTask: '',
+        relatedTaskType: row.predecessorWbs ? row.predecessorType : 'FS',
+        relatedTaskLagDays: row.predecessorWbs ? row.predecessorLagDays : 0,
         parentId: parentTask?.id || '',
         level,
         order: runningOrder++,
@@ -807,7 +853,11 @@ export const taskApi = {
       if (!task || !predecessor) continue;
       const { error: relationErr } = await supabase
         .from('tasks')
-        .update({ related_task: predecessor.id })
+        .update({
+          related_task: predecessor.id,
+          related_task_type: row.predecessorType || 'FS',
+          related_task_lag_days: normalizeDependencyLagDays(row.predecessorLagDays || 0),
+        })
         .eq('id', task.id);
       if (relationErr) throw new Error(`Row ${row.sourceRow}: ${relationErr.message}`);
     }
@@ -980,6 +1030,8 @@ export const taskTemplateApi = {
         status: 'Todo',
         resource: '',
         relatedTask: '',
+        relatedTaskType: 'FS',
+        relatedTaskLagDays: 0,
         parentId: parentTask?.id || '',
         level: Number(item.level || 0),
         sortOrder: Number(item.sortOrder || 0),
@@ -1181,6 +1233,17 @@ function normalizeEffortManday(value: unknown): number {
   const step = 0.025;
   const rounded = Math.round(n / step) * step;
   return Number(rounded.toFixed(3));
+}
+
+function normalizeDependencyType(value: unknown): 'FS' | 'SS' | 'FF' | 'SF' {
+  const text = String(value || 'FS').trim().toUpperCase();
+  return TASK_DEPENDENCY_TYPES.has(text) ? (text as 'FS' | 'SS' | 'FF' | 'SF') : 'FS';
+}
+
+function normalizeDependencyLagDays(value: unknown): number {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) return 0;
+  return Math.trunc(n);
 }
 
 function calcDurationFromDates(task: Task): number {
