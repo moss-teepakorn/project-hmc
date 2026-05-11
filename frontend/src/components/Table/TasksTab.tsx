@@ -49,6 +49,13 @@ const PHASE_OPTIONS = [
 const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Block/Delay', 'Done'] as const;
 const TASK_DEPENDENCY_OPTIONS = ['FS', 'SS', 'FF', 'SF'] as const;
 
+function toDependencyType(value: unknown): 'FS' | 'SS' | 'FF' | 'SF' {
+  const normalized = String(value || 'FS').trim().toUpperCase();
+  return (TASK_DEPENDENCY_OPTIONS as readonly string[]).includes(normalized)
+    ? (normalized as 'FS' | 'SS' | 'FF' | 'SF')
+    : 'FS';
+}
+
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
 export type PhaseOption = { value: string; label: string };
 type TaskRow = Task | NewTaskInsert;
@@ -2710,7 +2717,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
             parentId,
             sortOrder,
             effortManday: insertType === 'main' ? 0 : roundEffortManday(Number(form.effortManday || 0)),
-            relatedTaskType: form.relatedTask ? String(form.relatedTaskType || 'FS').toUpperCase() : 'FS',
+            relatedTaskType: form.relatedTask ? toDependencyType(form.relatedTaskType) : 'FS',
             relatedTaskLagDays: form.relatedTask ? Math.trunc(Number(form.relatedTaskLagDays || 0)) : 0,
             startDate,
             endDate,
@@ -2869,7 +2876,7 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
           onSave({
             ...form,
             effortManday: canEditEffort ? roundEffortManday(Number(form.effortManday || 0)) : Number(task.effortManday || 0),
-            relatedTaskType: form.relatedTask ? String(form.relatedTaskType || 'FS').toUpperCase() : 'FS',
+            relatedTaskType: form.relatedTask ? toDependencyType(form.relatedTaskType) : 'FS',
             relatedTaskLagDays: form.relatedTask ? Math.trunc(Number(form.relatedTaskLagDays || 0)) : 0,
             startDate: String(form.startDate || ''),
             endDate: String(form.endDate || ''),
