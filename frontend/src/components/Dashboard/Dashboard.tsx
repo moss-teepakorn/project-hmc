@@ -810,8 +810,9 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, onViewMilestones, onOpen
 
 
 
-      {/* Row 1: Progress by Main Task */}
-      <Card style={{ padding: '16px 18px', marginBottom: 16 }}>
+  {/* Row 1: Progress by Main Task + Effort Summary (50/50) */}
+  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
+  <Card style={{ padding: '16px 18px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Progress by Main Task</div>
@@ -833,8 +834,7 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, onViewMilestones, onOpen
         </div>
       </Card>
 
-      {/* Row 2: Effort Summary */}
-      <Card style={{ padding: '16px 18px', marginBottom: 16 }}>
+      <Card style={{ padding: '16px 18px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Effort Summary</div>
@@ -872,8 +872,9 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, onViewMilestones, onOpen
           </>
         )}
       </Card>
+      </div>
 
-      {/* Row 3: Milestones */}
+      {/* Row 2: Milestones */}
       <Card style={{ padding: '16px 18px', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div>
