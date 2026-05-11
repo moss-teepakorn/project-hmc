@@ -199,8 +199,12 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
             if (!task.startDate || !task.endDate) return null;
             const isDrag  = drag?.taskId === task.id;
             const delta   = isDrag ? (drag?.deltaDays ?? 0) : 0;
-            const bx      = (dayOffset(minDate, task.startDate) + delta) * dayWidth;
-            const bw      = Math.max(task.duration * dayWidth, dayWidth);
+            const startOffset = dayOffset(minDate, task.startDate);
+            const endOffset = dayOffset(minDate, task.endDate);
+            const bx      = (startOffset + delta) * dayWidth;
+            // Use calendar-day span from start/end so bars end exactly at the same x for identical end dates.
+            const daySpan = Math.max(1, endOffset - startOffset + 1);
+            const bw      = Math.max(daySpan * dayWidth, dayWidth);
             const by      = ri * ROW_H + 7;
             const bh      = ROW_H - 14;
             const isParent = hasChildren(tasks, task.id);
