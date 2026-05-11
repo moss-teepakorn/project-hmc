@@ -600,7 +600,9 @@ export default function ExecutiveOnePage({ project }: Props) {
               <tbody>
                 {projectMilestones.map((m: Milestone, i) => {
                   const due = parseISO(m.dueDate || '');
-                  const isDelayed = isValid(due) && due < today && String(m.status).toLowerCase() !== 'paid';
+                  const milestoneStatus = String(m.status || '').toLowerCase();
+                  const isSettledBillingStatus = milestoneStatus === 'paid' || milestoneStatus === 'billing' || milestoneStatus === 'billed';
+                  const isDelayed = isValid(due) && due < today && !isSettledBillingStatus;
                   const msState = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
                   return (
                     <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
