@@ -2660,9 +2660,17 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
           <input
             type="number"
             step={1}
-            value={Number(form.relatedTaskLagDays ?? 0)}
+            value={String(form.relatedTaskLagDays ?? 0)}
             disabled={!form.relatedTask}
-            onChange={(e) => up('relatedTaskLagDays', Math.trunc(Number(e.target.value) || 0))}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === '' || raw === '-') {
+                up('relatedTaskLagDays', raw);
+                return;
+              }
+              const parsed = Number(raw);
+              up('relatedTaskLagDays', Number.isFinite(parsed) ? Math.trunc(parsed) : 0);
+            }}
             placeholder="0"
             style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
           />
@@ -2845,9 +2853,17 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
           <input
             type="number"
             step={1}
-            value={Number(form.relatedTaskLagDays ?? 0)}
+            value={String(form.relatedTaskLagDays ?? 0)}
             disabled={!form.relatedTask}
-            onChange={(e) => up('relatedTaskLagDays', Math.trunc(Number(e.target.value) || 0))}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === '' || raw === '-') {
+                up('relatedTaskLagDays', raw);
+                return;
+              }
+              const parsed = Number(raw);
+              up('relatedTaskLagDays', Number.isFinite(parsed) ? Math.trunc(parsed) : 0);
+            }}
             placeholder="0"
             style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
           />
