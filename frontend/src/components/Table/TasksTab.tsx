@@ -7,7 +7,6 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
-import { supabase } from '../../services/supabase';
 import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C } from '../Common';
 import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, PROCESS_STATUS_STYLE } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
@@ -256,6 +255,32 @@ function roundEffortManday(value: number): number {
   return Number((Math.round(value / EFFORT_STEP) * EFFORT_STEP).toFixed(3));
 }
 
+function getColumnPrefsUserKeyFromLocalStorage(): string {
+  if (typeof window === 'undefined') return 'anonymous';
+  try {
+    const keys = Object.keys(window.localStorage);
+    const authTokenKey = keys.find((key) => key.startsWith('sb-') && key.endsWith('-auth-token'));
+    if (!authTokenKey) return 'anonymous';
+    const raw = window.localStorage.getItem(authTokenKey);
+    if (!raw) return 'anonymous';
+    const parsed = JSON.parse(raw) as { user?: { id?: string } };
+    return parsed?.user?.id || 'anonymous';
+  } catch {
+    return 'anonymous';
+  }
+}
+
+function normalizeTaskDateRange(startDate?: string, endDate?: string): { startDate: string; endDate: string; swapped: boolean } {
+  const start = String(startDate || '').trim();
+  const end = String(endDate || '').trim();
+  const startParsed = parseIsoDateSafe(start);
+  const endParsed = parseIsoDateSafe(end);
+  if (!startParsed || !endParsed || startParsed <= endParsed) {
+    return { startDate: start, endDate: end, swapped: false };
+  }
+  return { startDate: end, endDate: start, swapped: true };
+}
+
 function makeColumnVisibilityStorageKey(projectId: string, userKey: string): string {
   return `tasks-column-visibility:v1:${projectId}:${userKey}`;
 }
@@ -398,19 +423,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-    supabase.auth.getUser()
-      .then(({ data }) => {
-        if (!mounted) return;
-        setColumnPrefsUserKey(data.user?.id || 'anonymous');
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setColumnPrefsUserKey('anonymous');
-      });
-    return () => {
-      mounted = false;
-    };
+    setColumnPrefsUserKey(getColumnPrefsUserKeyFromLocalStorage());
   }, []);
 
   const columnStorageKey = useMemo(() => makeColumnVisibilityStorageKey(projectId, columnPrefsUserKey), [projectId, columnPrefsUserKey]);
@@ -1114,6 +1127,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       toast.error('Task Name is required');
       return;
     }
+    const normalized = normalizeTaskDateRange(newTaskInsert.startDate, newTaskInsert.endDate);
     try {
       await createTask({
         projectId,
@@ -1121,10 +1135,10 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         sortOrder: newTaskInsert.sortOrder,
         taskName: newTaskInsert.taskName,
         effortManday: roundEffortManday(newTaskInsert.effortManday),
-        startDate: newTaskInsert.startDate,
-        endDate: newTaskInsert.endDate,
+        startDate: normalized.startDate,
+        endDate: normalized.endDate,
         actualFinish: newTaskInsert.actualFinish,
-        duration: calcDuration(newTaskInsert.startDate, newTaskInsert.endDate),
+        duration: calcDuration(normalized.startDate, normalized.endDate),
         resource: newTaskInsert.resource,
         phase: newTaskInsert.phase,
         percentComplete: newTaskInsert.percentComplete,
@@ -1132,6 +1146,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         relatedTaskType: newTaskInsert.relatedTaskType,
         relatedTaskLagDays: newTaskInsert.relatedTaskLagDays,
       });
+      if (normalized.swapped) {
+        toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+      }
       toast.success('Task created');
       setNewTaskInsert(null);
     } catch (e) {
@@ -1218,8 +1235,15 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
   const handleUpdateDate = useCallback(async (id: string, field: 'startDate' | 'endDate' | 'actualFinish', value: string) => {
     const raw = String(value || '').trim();
+    const currentTask = projectTasks.find((task) => task.id === id);
     if (!raw) {
-      try { await updateTask(id, { [field]: '' }); }
+      const updates: Partial<Task> = { [field]: '' };
+      if (currentTask && (field === 'startDate' || field === 'endDate')) {
+        const nextStart = field === 'startDate' ? '' : String(currentTask.startDate || '');
+        const nextEnd = field === 'endDate' ? '' : String(currentTask.endDate || '');
+        updates.duration = calcDuration(nextStart, nextEnd);
+      }
+      try { await updateTask(id, updates); }
       catch { toast.error('Failed to save'); }
       return;
     }
@@ -1228,9 +1252,21 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       toast.error('วันที่ต้องเป็นรูปแบบ DD/MM/YYYY');
       return;
     }
-    try { await updateTask(id, { [field]: iso }); }
+    const updates: Partial<Task> = { [field]: iso };
+    if (currentTask && (field === 'startDate' || field === 'endDate')) {
+      const nextStart = field === 'startDate' ? iso : String(currentTask.startDate || '');
+      const nextEnd = field === 'endDate' ? iso : String(currentTask.endDate || '');
+      const normalized = normalizeTaskDateRange(nextStart, nextEnd);
+      updates.startDate = normalized.startDate;
+      updates.endDate = normalized.endDate;
+      updates.duration = calcDuration(normalized.startDate, normalized.endDate);
+      if (normalized.swapped) {
+        toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+      }
+    }
+    try { await updateTask(id, updates); }
     catch { toast.error('Failed to save'); }
-  }, [updateTask]);
+  }, [projectTasks, updateTask]);
 
   const handlePct = useCallback(async (id: string, pct: number) => {
     try {
@@ -2001,7 +2037,14 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                           value={isNew ? newRow.startDate : isoToDmy(rowTask.startDate)}
                           placeholder="—"
                           onSave={(v) => {
-                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, startDate: v } : prev);
+                            if (isNew) setNewTaskInsert((prev) => {
+                              if (!prev) return prev;
+                              const normalized = normalizeTaskDateRange(v, prev.endDate);
+                              if (normalized.swapped) {
+                                toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+                              }
+                              return { ...prev, startDate: normalized.startDate, endDate: normalized.endDate };
+                            });
                             else handleUpdateDate(rowTask.id, 'startDate', v);
                           }}
                           alwaysSave
@@ -2016,7 +2059,14 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                           value={isNew ? newRow.endDate : isoToDmy(rowTask.endDate)}
                           placeholder="—"
                           onSave={(v) => {
-                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, endDate: v } : prev);
+                            if (isNew) setNewTaskInsert((prev) => {
+                              if (!prev) return prev;
+                              const normalized = normalizeTaskDateRange(prev.startDate, v);
+                              if (normalized.swapped) {
+                                toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+                              }
+                              return { ...prev, startDate: normalized.startDate, endDate: normalized.endDate };
+                            });
                             else handleUpdateDate(rowTask.id, 'endDate', v);
                           }}
                           alwaysSave
@@ -2867,6 +2917,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
             toast.error('Start/End Date ต้องเลือกวันที่');
             return;
           }
+          const normalized = normalizeTaskDateRange(startDate, endDate);
 
           let parentId = '';
           let sortOrder: number | undefined;
@@ -2904,9 +2955,9 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
             effortManday: insertType === 'main' ? 0 : roundEffortManday(Number(form.effortManday || 0)),
             relatedTaskType: form.relatedTask ? toDependencyType(form.relatedTaskType) : 'FS',
             relatedTaskLagDays: form.relatedTask ? Math.trunc(Number(form.relatedTaskLagDays || 0)) : 0,
-            startDate,
-            endDate,
-            duration: dur,
+            startDate: normalized.startDate,
+            endDate: normalized.endDate,
+            duration: calcDuration(normalized.startDate, normalized.endDate),
             phase: String(
               form.phase ||
               selectedParent?.phase ||
@@ -2914,6 +2965,9 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
               phaseOptions[0]?.value
             ),
           });
+          if (normalized.swapped) {
+            toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+          }
         }}>Create Task</Btn>
       </div>
     </Modal>
@@ -3066,16 +3120,20 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={()=>{
           if(!form.taskName?.trim()) return;
+          const normalized = normalizeTaskDateRange(String(form.startDate || ''), String(form.endDate || ''));
           onSave({
             ...form,
             effortManday: canEditEffort ? roundEffortManday(Number(form.effortManday || 0)) : Number(task.effortManday || 0),
             relatedTaskType: form.relatedTask ? toDependencyType(form.relatedTaskType) : 'FS',
             relatedTaskLagDays: form.relatedTask ? Math.trunc(Number(form.relatedTaskLagDays || 0)) : 0,
-            startDate: String(form.startDate || ''),
-            endDate: String(form.endDate || ''),
+            startDate: normalized.startDate,
+            endDate: normalized.endDate,
             actualFinish: String(form.actualFinish || ''),
-            duration: calcDuration(String(form.startDate || ''), String(form.endDate || '')),
+            duration: calcDuration(normalized.startDate, normalized.endDate),
           });
+          if (normalized.swapped) {
+            toast.success('สลับวันเริ่ม/วันสิ้นสุดให้อัตโนมัติแล้ว');
+          }
         }}>Save Changes</Btn>
       </div>
     </Modal>
