@@ -1,5 +1,5 @@
 import React from 'react';
-import { addMonths, differenceInCalendarDays, isValid, parseISO, startOfDay, startOfMonth } from 'date-fns';
+import { differenceInCalendarDays, differenceInCalendarMonths, endOfMonth, getDaysInMonth, isValid, parseISO, startOfDay, startOfMonth } from 'date-fns';
 import { C, Card, MILESTONE_STATUS } from '../Common';
 import { useStore } from '../../store';
 import { compareWbs, fmtDate } from '../../utils';
@@ -91,16 +91,14 @@ function clampDate(value: Date, minDate: Date, maxDate: Date): Date {
   return value;
 }
 
-function percentLeft(rangeStart: Date, rangeEnd: Date, date: Date): number {
-  const totalDays = Math.max(1, differenceInCalendarDays(rangeEnd, rangeStart) + 1);
-  const days = differenceInCalendarDays(date, rangeStart);
-  return Math.max(0, Math.min(100, (days / totalDays) * 100));
-}
-
-function percentRight(rangeStart: Date, rangeEnd: Date, date: Date): number {
-  const totalDays = Math.max(1, differenceInCalendarDays(rangeEnd, rangeStart) + 1);
-  const days = differenceInCalendarDays(date, rangeStart) + 1;
-  return Math.max(0, Math.min(100, (days / totalDays) * 100));
+function monthPercent(rangeStartMonth: Date, monthCount: number, date: Date, edge: 'start' | 'end'): number {
+  const safeMonthCount = Math.max(1, monthCount);
+  const monthStart = startOfMonth(date);
+  const monthIndex = Math.max(0, Math.min(safeMonthCount - 1, differenceInCalendarMonths(monthStart, rangeStartMonth)));
+  const daysInMonth = Math.max(1, getDaysInMonth(monthStart));
+  const day = Math.max(1, Math.min(daysInMonth, date.getDate()));
+  const dayFraction = edge === 'start' ? (day - 1) / daysInMonth : day / daysInMonth;
+  return ((monthIndex + dayFraction) / safeMonthCount) * 100;
 }
 
 function monthLabel(month: Date): string {
@@ -215,25 +213,27 @@ export default function ExecutiveOnePage({ project }: Props) {
 
   const rangeStartBase = toDate(project.startDate) || toDate(mainTasks[0]?.startDate) || today;
   const rangeEndFromProject = toDate(project.endDate) || toDate(mainTasks[mainTasks.length - 1]?.endDate) || today;
-  const rangeStart = startOfMonth(rangeStartBase);
-  const rangeEndBase = startOfMonth(addMonths(rangeEndFromProject, 1));
+  const rangeStartMonth = startOfMonth(rangeStartBase);
+  const rangeEndMonthBase = startOfMonth(rangeEndFromProject);
 
   const hasDelayTask = mainTasks.some((task) => {
     const actualState = getActualState(task, today);
     return actualState.key === 'delay';
   });
 
-  const rangeEnd = hasDelayTask && today > rangeEndBase ? startOfMonth(addMonths(today, 1)) : rangeEndBase;
+  const rangeEndMonth = hasDelayTask && today > rangeEndMonthBase ? startOfMonth(today) : rangeEndMonthBase;
+  const rangeStart = rangeStartMonth;
+  const rangeEnd = endOfMonth(rangeEndMonth);
 
   const months = React.useMemo(() => {
     const list: Date[] = [];
-    const cursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
-    while (cursor <= rangeEnd) {
+    const cursor = new Date(rangeStartMonth.getFullYear(), rangeStartMonth.getMonth(), 1);
+    while (cursor <= rangeEndMonth) {
       list.push(new Date(cursor));
       cursor.setMonth(cursor.getMonth() + 1);
     }
     return list;
-  }, [rangeStart, rangeEnd]);
+  }, [rangeStartMonth, rangeEndMonth]);
 
   const accomplishedTasks = React.useMemo(
     () => leafTasks.filter((t) => Number(t.percentComplete || 0) >= 100),
@@ -396,13 +396,13 @@ export default function ExecutiveOnePage({ project }: Props) {
             if (!planStart || !planEnd) return null;
 
             const actual = getActualState(task, today);
-            const planLeft = percentLeft(rangeStart, rangeEnd, clampDate(planStart, rangeStart, rangeEnd));
-            const planRight = percentRight(rangeStart, rangeEnd, clampDate(planEnd, rangeStart, rangeEnd));
+            const planLeft = monthPercent(rangeStartMonth, monthCount, clampDate(planStart, rangeStart, rangeEnd), 'start');
+            const planRight = monthPercent(rangeStartMonth, monthCount, clampDate(planEnd, rangeStart, rangeEnd), 'end');
             const planWidth = Math.max(0.6, planRight - planLeft);
 
             const actualBarEnd = clampDate(actual.barEnd, rangeStart, rangeEnd);
             const actualLeft = planLeft;
-            const actualRight = percentRight(rangeStart, rangeEnd, actualBarEnd);
+            const actualRight = monthPercent(rangeStartMonth, monthCount, actualBarEnd, 'end');
             const actualWidth = Math.max(0.6, actualRight - actualLeft);
 
             const state = ACTUAL_STATE[actual.key];
