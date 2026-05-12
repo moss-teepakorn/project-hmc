@@ -656,6 +656,18 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, onViewMilestones, onOpen
   const todayIso = currentDate.toISOString().slice(0, 10);
 
   const allMilestonesSorted = [...ms].sort((a, b) => Number(parseISO(a.dueDate || '')) - Number(parseISO(b.dueDate || '')));
+  const phaseBudgetByPhase = allMilestonesSorted.reduce((acc, m) => {
+    const phase = String(m.phase || '').trim() || 'Unspecified';
+    if (Number(m.phaseAmount || 0) > 0 && !acc[phase]) acc[phase] = Number(m.phaseAmount || 0);
+    return acc;
+  }, {} as Record<string, number>);
+  const groupedMilestonesByPhase = allMilestonesSorted.reduce((acc, m) => {
+    const phase = String(m.phase || '').trim() || 'Unspecified';
+    if (!acc[phase]) acc[phase] = [];
+    acc[phase].push(m);
+    return acc;
+  }, {} as Record<string, typeof allMilestonesSorted>);
+  const milestonePhases = Object.keys(groupedMilestonesByPhase);
 
   const todayBaseline = computeBaselineProgress(pt, [todayIso]);
   const plannedPercent = todayBaseline[0]?.baselinePercent ?? 0;
@@ -883,37 +895,60 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, onViewMilestones, onOpen
           </div>
           <button type="button" onClick={onViewMilestones} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Milestones Tab</button>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: C.bg }}>
-                {['Milestone', 'Due Date', 'Amount', 'Status'].map((h) => (
-                  <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', fontSize: 11 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {allMilestonesSorted.map((m, i) => {
-                const due = parseISO(m.dueDate || '');
-                const isDelayed = isValid(due) && due < currentDate && String(m.status).toLowerCase() !== 'paid';
-                const ss = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
-                return (
-                  <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
-                    <td style={{ padding: '9px 12px', color: C.text, fontWeight: 600 }}>{m.name}</td>
-                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: isDelayed ? C.red : C.text2, fontWeight: isDelayed ? 700 : 400 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
-                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: C.text, fontWeight: 600 }}>฿{fmtMoney(permissions.getMaskedAmount(m.amount || 0))}</td>
-                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 999, background: ss.bg, color: ss.color, fontSize: 11, fontWeight: 700 }}>{ss.label}</span>
-                      {isDelayed && <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: C.redBg, color: C.red, fontSize: 10, fontWeight: 700 }}>Delayed</span>}
-                    </td>
-                  </tr>
-                );
-              })}
-              {!allMilestonesSorted.length && (
-                <tr><td colSpan={4} style={{ padding: '20px 12px', color: C.text3, textAlign: 'center' }}>No milestones found.</td></tr>
-              )}
-            </tbody>
-          </table>
+        <div>
+          {milestonePhases.map((phase) => {
+            const phaseMilestones = groupedMilestonesByPhase[phase] || [];
+            const phaseTotal = phaseMilestones.reduce((sum, m) => sum + Number(m.amount || 0), 0);
+            return (
+              <div key={phase} style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{phase}</span>
+                  <div style={{ height: 1, flex: 1, background: C.border }} />
+                  <span style={{ fontSize: 11, color: C.text2 }}>Phase Budget ฿{fmtMoney(permissions.getMaskedAmount(phaseBudgetByPhase[phase] || 0))}</span>
+                  <span style={{ fontSize: 11, color: C.text2 }}>Milestone Total ฿{fmtMoney(permissions.getMaskedAmount(phaseTotal))}</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 11 }}>
+                    <colgroup>
+                      <col style={{ width: '26%' }} />
+                      <col style={{ width: '10%' }} />
+                      <col style={{ width: '16%' }} />
+                      <col style={{ width: '13%' }} />
+                      <col style={{ width: '13%' }} />
+                      <col style={{ width: '22%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{ background: C.bg }}>
+                        {['Milestone', '% Value', 'Amount', 'Due Date', 'Billing Date', 'Status'].map((h) => (
+                          <th key={h} style={{ padding: '7px 8px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', fontSize: 10 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {phaseMilestones.map((m, i) => {
+                        const ss = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
+                        return (
+                          <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
+                            <td style={{ padding: '7px 8px', color: C.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</td>
+                            <td style={{ padding: '7px 8px', color: C.primary, fontWeight: 700 }}>{Number(m.percent || 0)}%</td>
+                            <td style={{ padding: '7px 8px', whiteSpace: 'nowrap', color: C.text, fontWeight: 600 }}>฿{fmtMoney(permissions.getMaskedAmount(m.amount || 0))}</td>
+                            <td style={{ padding: '7px 8px', whiteSpace: 'nowrap', color: C.text2 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
+                            <td style={{ padding: '7px 8px', whiteSpace: 'nowrap', color: C.text2 }}>{m.billingDate ? fmtDate(m.billingDate) : '—'}</td>
+                            <td style={{ padding: '7px 8px', whiteSpace: 'nowrap' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 999, background: ss.bg, color: ss.color, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+          {!allMilestonesSorted.length && (
+            <div style={{ padding: '20px 12px', color: C.text3, textAlign: 'center', fontSize: 12 }}>No milestones found.</div>
+          )}
         </div>
       </Card>
 
