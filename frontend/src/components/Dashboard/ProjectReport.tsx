@@ -75,7 +75,20 @@ export default function ProjectReport({ project }: Props) {
   const [commitId] = useState(() => (import.meta as any).env?.VITE_COMMIT_ID ?? 'local');
 
   const pt  = tasks.filter(t => t.projectId === project.id);
-  const ms  = milestones.filter(m => m.projectId === project.id);
+  const ms  = milestones
+    .filter(m => m.projectId === project.id)
+    .sort((a, b) => {
+      const ad = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+      const bd = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+      return ad - bd;
+    });
+  const groupedMsByPhase = ms.reduce((acc, m) => {
+    const phase = (m.phase || '').trim() || 'Unspecified';
+    if (!acc[phase]) acc[phase] = [];
+    acc[phase].push(m);
+    return acc;
+  }, {} as Record<string, typeof ms>);
+  const msPhaseOrder = Object.keys(groupedMsByPhase);
   const ef  = efforts.filter(e => e.projectId === project.id);
   const mb  = members.filter(m => m.projectId === project.id);
   const crs = changeRequests.filter(c => c.projectId === project.id);
@@ -354,24 +367,28 @@ export default function ProjectReport({ project }: Props) {
           <div style={{ padding: '12px 16px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>PAYMENT MILESTONES ({ms.length})</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {ms.map(m => {
-                const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
-                return (
-                  <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '84px minmax(0,1fr) 124px', alignItems: 'center', columnGap: 8, padding: '7px 0', minHeight: 46, borderBottom: '1px solid #F8FAFC' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-                      <Pill label={m.phase || 'Phase'} bg={C.primaryBg} color={C.primary} />
-                    </div>
-                    <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <div style={{ fontSize: 8, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '12px' }}>{m.name}</div>
-                      <div style={{ fontSize: 8, color: '#94A3B8', lineHeight: '12px', marginTop: 2 }}>Due: {fmtDate(m.dueDate) || 'TBD'}</div>
-                    </div>
-                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', gap: 3 }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: '#0F172A', lineHeight: '12px' }}>{money(permissions.getMaskedAmount(m.amount))}</div>
-                      <Pill label={ss.label} bg={ss.bg} color={ss.color} />
-                    </div>
+              {msPhaseOrder.map(phase => (
+                <div key={phase}>
+                  <div style={{ padding: '6px 0', borderBottom: '1px solid #EEF2F7' }}>
+                    <div style={{ fontSize: 8, fontWeight: 800, color: '#475569', letterSpacing: 0.2 }}>{phase}</div>
                   </div>
-                );
-              })}
+                  {groupedMsByPhase[phase].map(m => {
+                    const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
+                    return (
+                      <div key={m.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 124px', alignItems: 'center', columnGap: 8, padding: '7px 0 7px 14px', minHeight: 42, borderBottom: '1px solid #F8FAFC' }}>
+                        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <div style={{ fontSize: 8, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '12px' }}>{m.name}</div>
+                          <div style={{ fontSize: 8, color: '#94A3B8', lineHeight: '12px', marginTop: 2 }}>Due: {fmtDate(m.dueDate) || 'TBD'}</div>
+                        </div>
+                        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', gap: 3 }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: '#0F172A', lineHeight: '12px' }}>{money(permissions.getMaskedAmount(m.amount))}</div>
+                          <Pill label={ss.label} bg={ss.bg} color={ss.color} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
               {ms.length === 0 && <div style={{ padding: 12, textAlign: 'center', color: '#CBD5E1', fontSize: 8 }}>No milestones</div>}
             </div>
           </div>

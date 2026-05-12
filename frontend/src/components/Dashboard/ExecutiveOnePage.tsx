@@ -652,9 +652,9 @@ export default function ExecutiveOnePage({ project }: Props) {
                       const msState = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
                       return (
                         <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
-                          <td style={{ padding: '9px 12px', color: C.text, fontWeight: 600 }}>{m.name}</td>
-                          <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: isDelayed ? C.red : C.text2, fontWeight: isDelayed ? 700 : 400 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
-                          <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '9px 12px 9px 28px', color: C.text, fontWeight: 600 }}>{m.name}</td>
+                          <td style={{ padding: '9px 12px 9px 20px', whiteSpace: 'nowrap', color: isDelayed ? C.red : C.text2, fontWeight: isDelayed ? 700 : 400 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
+                          <td style={{ padding: '9px 12px 9px 20px', whiteSpace: 'nowrap' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 999, background: msState.bg, color: msState.color, fontSize: 11, fontWeight: 700 }}>{msState.label}</span>
                             {isDelayed && <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: C.redBg, color: C.red, fontSize: 10, fontWeight: 700 }}>Delayed</span>}
                           </td>
