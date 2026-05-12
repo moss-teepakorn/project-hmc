@@ -1,11 +1,11 @@
 // ── User Role Management (Admin Only) ─────────────────────────────────────
 export async function updateUserRole(userId: string, newRole: 'admin' | 'member' | 'client'): Promise<void> {
   // Get current user profile for role
-  const { data: userData } = await supabase.auth.getUser();
+  const { data: sessionData } = await supabase.auth.getSession();
   let role = 'member';
   let myId = '';
-  if (userData?.user?.id) {
-    myId = userData.user.id;
+  if (sessionData?.session?.user?.id) {
+    myId = sessionData.session.user.id;
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', myId).single();
     if (profile?.role) role = profile.role;
   }
@@ -96,18 +96,19 @@ export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId:
   if (_authFetchPromise) return _authFetchPromise;
 
   _authFetchPromise = (async () => {
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: sessionData } = await supabase.auth.getSession();
     let role = 'member';
     let userId = '';
     let email: string | null = null;
-    if (userData?.user?.id) {
-      userId = userData.user.id;
+    const user = sessionData?.session?.user;
+    if (user?.id) {
+      userId = user.id;
       const { data: profile, error } = await supabase.from('profiles').select('role,email').eq('id', userId).maybeSingle();
       if (error) throw new Error(error.message);
       if ((profile as any)?.role) role = (profile as any).role;
       if ((profile as any)?.email) email = (profile as any).email;
-      if (!email && userData.user.email) {
-        email = userData.user.email;
+      if (!email && user.email) {
+        email = user.email;
       }
     }
     _authCache = { role, userId, email, expiresAt: Date.now() + AUTH_CACHE_TTL_MS };

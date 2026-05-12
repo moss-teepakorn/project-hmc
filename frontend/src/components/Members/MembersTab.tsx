@@ -78,10 +78,11 @@ export default function MembersTab({ projectId, extraActions }: Props) {
       const { data, error } = await supabase.from('profiles').select('*');
       if (!error) setProfiles(data || []);
       // Get current user role
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: sessionData } = await supabase.auth.getSession();
       let role: UserRole = 'member';
-      if (userData?.user?.id) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', userData.user.id).single();
+      const currentUser = sessionData?.session?.user;
+      if (currentUser?.id) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', currentUser.id).single();
         if (profile?.role) role = profile.role;
       }
       setCurrentUserRole(role);
