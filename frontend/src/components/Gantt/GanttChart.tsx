@@ -29,9 +29,10 @@ interface Props {
   onGanttScroll?: () => void;
   zoomIndex: number;
   onZoomChange: (idx: number) => void;
+  bottomSpacerRows?: number;
 }
 
-export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, onUpdate, ganttBodyRef, onGanttScroll, zoomIndex, onZoomChange }: Props) {
+export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, onUpdate, ganttBodyRef, onGanttScroll, zoomIndex, onZoomChange, bottomSpacerRows = 0 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [drag, setDrag]       = useState<{ taskId: string; startX: number; deltaDays: number } | null>(null);
@@ -44,6 +45,7 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
   const months    = useMemo(() => getMonths(minDate, maxDate), [minDate, maxDate]);
   const days      = useMemo(() => getDays(minDate, totalDays), [minDate, totalDays]);
   const totalW    = totalDays * dayWidth;
+  const contentHeight = Math.max(ROW_H, (visibleTasks.length + bottomSpacerRows) * ROW_H);
   const todayX    = dayOffset(minDate, format(new Date(), 'yyyy-MM-dd')) * dayWidth + dayWidth / 2;
 
   const barColor = (t: Task) =>
@@ -164,11 +166,11 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
         <svg
           ref={svgRef}
           width={totalW}
-          height={visibleTasks.length * ROW_H}
+          height={contentHeight}
           style={{ display: 'block' }}>
           {/* Weekend bg */}
           {days.map(({ i, isWeekend }) => isWeekend && (
-            <rect key={i} x={i * dayWidth} y={0} width={dayWidth} height={visibleTasks.length * ROW_H} fill={C.bg} opacity={0.8} />
+            <rect key={i} x={i * dayWidth} y={0} width={dayWidth} height={contentHeight} fill={C.bg} opacity={0.8} />
           ))}
           {/* Row stripes */}
           {visibleTasks.map((_, ri) => ri % 2 === 0 && (
@@ -180,7 +182,7 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
           ))}
           {/* Today vertical line */}
           {todayX > 0 && todayX < totalW && (
-            <line x1={todayX} y1={0} x2={todayX} y2={visibleTasks.length * ROW_H} stroke={C.red} strokeWidth={1.5} strokeDasharray="4,3" opacity={0.6} />
+            <line x1={todayX} y1={0} x2={todayX} y2={contentHeight} stroke={C.red} strokeWidth={1.5} strokeDasharray="4,3" opacity={0.6} />
           )}
           {/* Dependency arrows */}
           {arrows.map(a => {
