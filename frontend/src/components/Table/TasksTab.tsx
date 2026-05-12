@@ -1694,8 +1694,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     // ── Column widths (mm) ──
     const CW = { wbs: 12, name: 68, start: 20, end: 20, dur: 11, pct: 10, status: 18, owner: 24 };
     const tableW = Object.values(CW).reduce((s, v) => s + v, 0);
-    const gW = cW - tableW - 2;
-    const gX = PL + tableW + 2;
+    const gW = cW - tableW;
+    const gX = PL + tableW;
     const tHdrH = 8;
     const baseRowH = 6.2;
 
@@ -1759,29 +1759,22 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     if (curPage.length || !pages.length) pages.push(curPage);
     const totalPages = pages.length;
 
-    // ── Date range & months ──
+    // ── Date range & months (day-accurate scale like Tasks tab) ──
     const valid = all.filter(t => t.startDate && t.endDate);
     const allD = valid.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
     const minD = allD.length ? new Date(Math.min(...allD.map(d => d.getTime()))) : new Date();
     const maxD = allD.length ? new Date(Math.max(...allD.map(d => d.getTime()))) : new Date();
+    minD.setHours(0, 0, 0, 0);
+    maxD.setHours(0, 0, 0, 0);
     const months: Date[] = [];
     const mc = new Date(minD.getFullYear(), minD.getMonth(), 1);
     while (mc <= maxD) { months.push(new Date(mc)); mc.setMonth(mc.getMonth() + 1); }
     const mCnt = months.length;
-    const mW = gW / mCnt;
+    const MS_DAY = 86400000;
+    const totalDays = Math.max(1, Math.floor((maxD.getTime() - minD.getTime()) / MS_DAY) + 1);
+    const dayW = gW / totalDays;
     const mFontSz = mCnt <= 4 ? 6 : mCnt <= 8 ? 5.5 : mCnt <= 14 ? 5 : 4.5;
-
-    // ── Hatch pattern helper (45° diagonal lines, clipped to rect) ──
-    const drawHatch = (x: number, y: number, w: number, h: number, col: [number,number,number], sp = 2.5) => {
-      doc.setDrawColor(...col);
-      doc.setLineWidth(0.22);
-      for (let off = -h; off < w + h; off += sp) {
-        const t0 = Math.max(0, -off / h);
-        const t1 = Math.min(1, (w - off) / h);
-        if (t0 >= t1) continue;
-        doc.line(x + off + t0 * h, y + t0 * h, x + off + t1 * h, y + t1 * h);
-      }
-    };
+    const dayOffset = (d: Date) => Math.floor((d.getTime() - minD.getTime()) / MS_DAY);
 
     // ── Render pages ──
     for (let pg = 0; pg < totalPages; pg++) {
@@ -1839,14 +1832,17 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.rect(gX, cy, gW, tHdrH, 'F');
       doc.setDrawColor(...colGray); doc.rect(gX, cy, gW, tHdrH, 'S');
       months.forEach((mo, i) => {
-        const mx = gX + i * mW;
+        const segS = new Date(Math.max(new Date(mo.getFullYear(), mo.getMonth(), 1).getTime(), minD.getTime()));
+        const segE = new Date(Math.min(new Date(mo.getFullYear(), mo.getMonth() + 1, 0).getTime(), maxD.getTime()));
+        const mx = gX + dayOffset(segS) * dayW;
+        const mw = (dayOffset(segE) - dayOffset(segS) + 1) * dayW;
         const label = mo.toLocaleString('en', { month: 'short', year: '2-digit' }).toUpperCase();
         doc.setFontSize(mFontSz); setPdfFont('bold'); doc.setTextColor(70, 70, 70);
         const tw = doc.getTextWidth(label);
-        doc.text(label, mx + (mW - tw) / 2, cy + 5.3);
+        doc.text(label, mx + (mw - tw) / 2, cy + 5.3);
         if (i < months.length - 1) {
           doc.setDrawColor(...colGray); doc.setLineWidth(0.1);
-          doc.line(mx + mW, cy, mx + mW, cy + tHdrH);
+          doc.line(mx + mw, cy, mx + mw, cy + tHdrH);
         }
       });
       cy += tHdrH;
@@ -1920,10 +1916,13 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         if (task.startDate && task.endDate) {
           const s1 = new Date(task.startDate);
           const e1 = new Date(task.endDate);
-          const sMo = (s1.getFullYear() - minD.getFullYear()) * 12 + (s1.getMonth() - minD.getMonth());
-          const eMo = (e1.getFullYear() - minD.getFullYear()) * 12 + (e1.getMonth() - minD.getMonth());
-          const bx = gX + Math.max(0, sMo) * mW + 0.5;
-          const bw = Math.max(mW * (Math.min(eMo, mCnt - 1) - Math.max(0, sMo) + 1) - 1, 1);
+          s1.setHours(0, 0, 0, 0);
+          e1.setHours(0, 0, 0, 0);
+          const sOfs = Math.max(0, dayOffset(s1));
+          const eOfs = Math.min(totalDays - 1, dayOffset(e1));
+          const spanDays = Math.max(1, eOfs - sOfs + 1);
+          const bx = gX + sOfs * dayW + 0.15;
+          const bw = Math.max(spanDays * dayW - 0.3, 0.65);
           const barH = 1.35;
           const barY = ry + (rH - barH) / 2;
           const barR = 0.7;
@@ -1935,10 +1934,10 @@ export default function TasksTab({ projectId, extraActions }: Props) {
             doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.22);
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'S');
           } else if (isPar) {
-            // Parent-subtask: lighter gray, compact size.
-            doc.setFillColor(203, 213, 225);
+            // Parent-subtask: light green tone.
+            doc.setFillColor(209, 250, 229);
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'F');
-            doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2);
+            doc.setDrawColor(134, 239, 172); doc.setLineWidth(0.2);
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'S');
           } else {
             // Normal task: rounded gray outline only, compact size.
@@ -1948,10 +1947,12 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         }
 
         // Month dividers per row
-        months.forEach((_, i) => {
+        months.forEach((mo, i) => {
           if (i < months.length - 1) {
+            const nextMonthStart = new Date(mo.getFullYear(), mo.getMonth() + 1, 1);
+            const splitX = gX + dayOffset(nextMonthStart) * dayW;
             doc.setDrawColor(...colGray); doc.setLineWidth(0.1);
-            doc.line(gX + (i + 1) * mW, ry, gX + (i + 1) * mW, ry + rH);
+            doc.line(splitX, ry, splitX, ry + rH);
           }
         });
 
