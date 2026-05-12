@@ -631,7 +631,7 @@ export default function ExecutiveOnePage({ project }: Props) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: C.bg }}>
-                  {['Phase', 'Milestone', 'Due Date', 'Status'].map((h) => (
+                  {['Milestone', 'Due Date', 'Status'].map((h) => (
                     <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', fontSize: 11 }}>{h}</th>
                   ))}
                 </tr>
@@ -640,7 +640,7 @@ export default function ExecutiveOnePage({ project }: Props) {
                 {groupedMilestonesByPhase.map((group) => (
                   <React.Fragment key={group.phase}>
                     <tr style={{ background: C.bg }}>
-                      <td colSpan={4} style={{ padding: '8px 12px', color: C.text2, fontSize: 11, fontWeight: 800, borderBottom: `1px solid ${C.border}` }}>
+                      <td colSpan={3} style={{ padding: '8px 12px', color: C.text2, fontSize: 11, fontWeight: 800, borderBottom: `1px solid ${C.border}` }}>
                         {group.phase}
                       </td>
                     </tr>
@@ -652,7 +652,6 @@ export default function ExecutiveOnePage({ project }: Props) {
                       const msState = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
                       return (
                         <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
-                          <td style={{ padding: '9px 12px', color: C.text2, fontWeight: 600, whiteSpace: 'nowrap' }}>{String(m.phase || '').trim() || 'Unspecified'}</td>
                           <td style={{ padding: '9px 12px', color: C.text, fontWeight: 600 }}>{m.name}</td>
                           <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: isDelayed ? C.red : C.text2, fontWeight: isDelayed ? 700 : 400 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
                           <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
@@ -665,7 +664,7 @@ export default function ExecutiveOnePage({ project }: Props) {
                   </React.Fragment>
                 ))}
                 {!projectMilestones.length && (
-                  <tr><td colSpan={4} style={{ padding: '20px 12px', color: C.text3, textAlign: 'center' }}>No milestones found.</td></tr>
+                  <tr><td colSpan={3} style={{ padding: '20px 12px', color: C.text3, textAlign: 'center' }}>No milestones found.</td></tr>
                 )}
               </tbody>
             </table>
