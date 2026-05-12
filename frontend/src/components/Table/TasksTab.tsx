@@ -1697,7 +1697,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const gW = cW - tableW - 2;
     const gX = PL + tableW + 2;
     const tHdrH = 8;
-    const baseRowH = 7.2;
+    const baseRowH = 6.2;
 
     const u8ToBase64 = (bytes: Uint8Array): string => {
       let out = '';
@@ -1740,10 +1740,10 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
     // ── Helper: row height ──
     const getRowH = (task: Task): number => {
-      doc.setFontSize(8.2);
+      doc.setFontSize(5.8);
       const ind = task.level * 2;
       const lines = doc.splitTextToSize(task.taskName || '', Math.max(5, CW.name - ind - 2));
-      return Math.max(baseRowH, 2.8 + Math.min(3, Array.isArray(lines) ? lines.length : 1) * 2.3);
+      return Math.max(baseRowH, 2.2 + Math.min(3, Array.isArray(lines) ? lines.length : 1) * 1.9);
     };
 
     // ── Paginate ──
@@ -1826,7 +1826,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         { l:'Dur.', w: CW.dur }, { l:'%', w: CW.pct },
         { l:'Status', w: CW.status }, { l:'Owner', w: CW.owner },
       ];
-      doc.setFontSize(7.4); setPdfFont('bold'); doc.setTextColor(49, 46, 129);
+      doc.setFontSize(5.8); setPdfFont('bold'); doc.setTextColor(49, 46, 129);
       let hx = PL;
       hcols.forEach(c => {
         const tw = doc.getTextWidth(c.l);
@@ -1884,7 +1884,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         const ymid = ry + rH / 2 + 0.5;
 
         // WBS
-        doc.setFontSize(isMain ? 8.6 : 8.2);
+        doc.setFontSize(isMain ? 6 : 5.6);
         setPdfFont(isMain ? 'bold' : 'normal');
         doc.setTextColor(...colText);
         const wbsW = doc.getTextWidth(task.wbs || '');
@@ -1892,7 +1892,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
         // Task Name
         setPdfFont((isMain || isPar) ? 'bold' : 'normal');
-        doc.setFontSize(isMain ? 8.8 : isPar ? 8.4 : 8.2);
+        doc.setFontSize(isMain ? 6.1 : isPar ? 5.8 : 5.5);
         doc.setTextColor(...colText);
         const label = isMile ? `◆ ${task.taskName}` : task.taskName;
         const nLines = doc.splitTextToSize(label || '', Math.max(4, CW.name - indent - 1));
@@ -1900,18 +1900,18 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
         // Start / Finish / Duration
         const xD = PL + CW.wbs + CW.name;
-        setPdfFont('normal'); doc.setTextColor(...colMuted); doc.setFontSize(8.2);
+        setPdfFont('normal'); doc.setTextColor(...colMuted); doc.setFontSize(5.4);
         doc.text(task.startDate ? fmtDatePdf(task.startDate) : '', xD + 1, ymid);
         doc.text(task.endDate   ? fmtDatePdf(task.endDate)   : '', xD + CW.start + 1, ymid);
         doc.text(`${task.duration}d`, xD + CW.start + CW.end + 1, ymid);
 
         // %
         const xP = xD + CW.start + CW.end + CW.dur;
-        setPdfFont('bold'); doc.setTextColor(pcR, pcG, pcB); doc.setFontSize(8.3);
+        setPdfFont('bold'); doc.setTextColor(pcR, pcG, pcB); doc.setFontSize(5.5);
         doc.text(`${pct}%`, xP + CW.pct / 2, ymid, { align: 'center' });
 
         // Status / Owner
-        setPdfFont('normal'); doc.setTextColor(...colMuted); doc.setFontSize(8.2);
+        setPdfFont('normal'); doc.setTextColor(...colMuted); doc.setFontSize(5.4);
         doc.text(task.status || 'Todo', xP + CW.pct + 1, ymid);
         const ownerLines = doc.splitTextToSize(String(task.resource || '-'), CW.owner - 2);
         doc.text(ownerLines, xP + CW.pct + CW.status + 1, ymid);
@@ -1924,42 +1924,26 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           const eMo = (e1.getFullYear() - minD.getFullYear()) * 12 + (e1.getMonth() - minD.getMonth());
           const bx = gX + Math.max(0, sMo) * mW + 0.5;
           const bw = Math.max(mW * (Math.min(eMo, mCnt - 1) - Math.max(0, sMo) + 1) - 1, 1);
-          const pad = isMain ? 1.2 : isPar ? 1.2 : 1.8;
-          const by = ry + pad;
-          const bh = rH - pad * 2;
+          const barH = 1.35;
+          const barY = ry + (rH - barH) / 2;
+          const barR = 0.7;
 
           if (isMain) {
-            // Main Task: fixed-height hatch style (same height for all rows), aligned with one-page plan pattern.
-            const mainH = 1.9;
-            const mainY = ry + (rH - mainH) / 2;
-            doc.setFillColor(236, 240, 245);
-            doc.roundedRect(bx, mainY, bw, mainH, 0.9, 0.9, 'F');
-            drawHatch(bx, mainY, bw, mainH, [143, 154, 168], 1.15);
-            doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.28);
-            doc.roundedRect(bx, mainY, bw, mainH, 0.9, 0.9, 'S');
+            // Main task: solid gray, compact size.
+            doc.setFillColor(148, 163, 184);
+            doc.roundedRect(bx, barY, bw, barH, barR, barR, 'F');
+            doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.22);
+            doc.roundedRect(bx, barY, bw, barH, barR, barR, 'S');
           } else if (isPar) {
-            // Sub-parent: lighter hatch
-            doc.setFillColor(230, 237, 255);
-            doc.rect(bx, by, bw, bh, 'F');
-            drawHatch(bx, by, bw, bh, [148, 163, 184], 2.5);
-            if (pct > 0) {
-              const fw = bw * pct / 100;
-              doc.setFillColor(147, 197, 253);
-              doc.rect(bx, by, fw, bh, 'F');
-              drawHatch(bx, by, fw, bh, [255, 255, 255], 2.5);
-            }
-            doc.setDrawColor(147, 197, 253); doc.setLineWidth(0.3);
-            doc.rect(bx, by, bw, bh, 'S');
+            // Parent-subtask: lighter gray, compact size.
+            doc.setFillColor(203, 213, 225);
+            doc.roundedRect(bx, barY, bw, barH, barR, barR, 'F');
+            doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2);
+            doc.roundedRect(bx, barY, bw, barH, barR, barR, 'S');
           } else {
-            // Leaf task: solid rounded bar
-            doc.setFillColor(238, 242, 255);
-            doc.roundedRect(bx, by, bw, bh, 0.9, 0.9, 'F');
-            if (pct > 0) {
-              doc.setFillColor(pcR, pcG, pcB);
-              doc.roundedRect(bx, by, bw * pct / 100, bh, 0.9, 0.9, 'F');
-            }
-            doc.setDrawColor(pcR, pcG, pcB); doc.setLineWidth(0.3);
-            doc.roundedRect(bx, by, bw, bh, 0.9, 0.9, 'S');
+            // Normal task: rounded gray outline only, compact size.
+            doc.setDrawColor(180, 190, 202); doc.setLineWidth(0.2);
+            doc.roundedRect(bx, barY, bw, barH, barR, barR, 'S');
           }
         }
 
