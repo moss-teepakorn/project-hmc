@@ -569,7 +569,11 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           if (moveToSubModal.targetLevel === 1) return !t.parentId;
           return (t.level ?? 0) === 1;
         })
-        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+        .sort((a, b) => {
+          const byWbs = compareWbs(a.wbs || '', b.wbs || '');
+          if (byWbs !== 0) return byWbs;
+          return Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+        });
     })()
     : [];
 
