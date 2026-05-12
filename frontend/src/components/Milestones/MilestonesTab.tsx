@@ -17,6 +17,8 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
   const { milestones, fetchMilestones, createMilestone, updateMilestone, deleteMilestone } = useStore();
   const [modal, setModal]       = useState<Partial<Milestone> | null>(null);
   const [deleting, setDeleting] = useState<Milestone | null>(null);
+  const [editingPhaseBudget, setEditingPhaseBudget] = useState<string | null>(null);
+  const [phaseBudgetDraft, setPhaseBudgetDraft] = useState<string>('0');
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
 
@@ -54,6 +56,40 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
     try { await deleteMilestone(deleting.id); toast.success('Deleted'); }
     catch { toast.error('Failed to delete'); }
     setDeleting(null);
+  };
+
+  const startEditPhaseBudget = (phase: string, currentBudget: number) => {
+    setEditingPhaseBudget(phase);
+    setPhaseBudgetDraft(String(currentBudget || 0));
+  };
+
+  const cancelEditPhaseBudget = () => {
+    setEditingPhaseBudget(null);
+    setPhaseBudgetDraft('0');
+  };
+
+  const savePhaseBudget = async (phase: string, phaseMilestones: Milestone[]) => {
+    const nextBudget = Number(phaseBudgetDraft);
+    if (Number.isNaN(nextBudget) || nextBudget < 0) {
+      toast.error('Please enter a valid phase budget');
+      return;
+    }
+
+    try {
+      await Promise.all(
+        phaseMilestones.map((ms) =>
+          updateMilestone(ms.id, {
+            phaseAmount: nextBudget,
+            amount: Math.round((nextBudget * Number(ms.percent || 0)) / 100),
+          })
+        )
+      );
+      toast.success('Phase budget updated');
+      setEditingPhaseBudget(null);
+      setPhaseBudgetDraft('0');
+    } catch {
+      toast.error('Failed to update phase budget');
+    }
   };
 
   return (
@@ -112,7 +148,80 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{phase}</span>
               <div style={{ height: 1, flex: 1, background: C.border, minWidth: 80 }} />
-              <span style={{ fontSize: 12, color: C.text2 }}>Phase Budget ฿{fmtMoney(phaseBudget)}</span>
+              {editingPhaseBudget === phase ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: C.text2 }}>Phase Budget</span>
+                  <input
+                    type="number"
+                    value={phaseBudgetDraft}
+                    onChange={(e) => setPhaseBudgetDraft(e.target.value)}
+                    style={{
+                      width: 110,
+                      height: 28,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 6,
+                      padding: '0 8px',
+                      fontSize: 12,
+                      color: C.text,
+                      background: C.white,
+                    }}
+                  />
+                  <button
+                    onClick={() => savePhaseBudget(phase, pms)}
+                    style={{
+                      height: 28,
+                      padding: '0 8px',
+                      border: 'none',
+                      borderRadius: 6,
+                      background: C.primary,
+                      color: C.white,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={cancelEditPhaseBudget}
+                    style={{
+                      height: 28,
+                      padding: '0 8px',
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 6,
+                      background: C.white,
+                      color: C.text2,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: C.text2 }}>Phase Budget ฿{fmtMoney(phaseBudget)}</span>
+                  <button
+                    onClick={() => startEditPhaseBudget(phase, phaseBudget)}
+                    aria-label={`Edit ${phase} budget`}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: C.primaryBg,
+                      border: 'none',
+                      borderRadius: 6,
+                      color: C.primary,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </div>
+              )}
               <span style={{ fontSize: 12, color: C.text2 }}>Milestone Total ฿{fmtMoney(pTotal)}</span>
             </div>
             {isMobile ? (
