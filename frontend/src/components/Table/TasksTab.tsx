@@ -1973,11 +1973,11 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       // ── FOOTER ──
       doc.setDrawColor(...colGray); doc.setLineWidth(0.2);
       doc.line(PL, ftrLineY, W - PR, ftrLineY);
-      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted);
+      doc.setFontSize(7); setPdfFont('normal'); doc.setTextColor(...colMuted);
       doc.text('Prepared by Humanica Public Company Limited', PL, ftrTextY);
-      doc.setFont('helvetica', 'bold'); doc.setTextColor(...colText);
+      setPdfFont('bold'); doc.setTextColor(...colMuted);
       doc.text('Confidential', W / 2, ftrTextY, { align: 'center' });
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted);
+      setPdfFont('normal'); doc.setTextColor(...colMuted);
       doc.text(`Project ID: ${proj?.code || projectId} | Page ${pg + 1} of ${totalPages}`, W - PR, ftrTextY, { align: 'right' });
     }
 
