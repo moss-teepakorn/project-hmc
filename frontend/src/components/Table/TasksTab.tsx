@@ -1821,7 +1821,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       const hcols = [
         { l:'WBS', w: CW.wbs }, { l:'Task Name', w: CW.name },
         { l:'Start', w: CW.start }, { l:'Finish', w: CW.end },
-        { l:'Dur.', w: CW.dur }, { l:'%', w: CW.pct },
+        { l:'Days', w: CW.dur }, { l:'%', w: CW.pct },
         { l:'Status', w: CW.status }, { l:'Owner', w: CW.owner },
       ];
       doc.setFontSize(5.8); setPdfFont('bold'); doc.setTextColor(49, 46, 129);
@@ -1904,9 +1904,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         // Start / Finish / Duration
         const xD = PL + CW.wbs + CW.name;
         setPdfFont('normal'); doc.setTextColor(...colMuted); doc.setFontSize(5.4);
-        doc.text(task.startDate ? fmtDatePdf(task.startDate) : '', xD + 1, ymid);
-        doc.text(task.endDate   ? fmtDatePdf(task.endDate)   : '', xD + CW.start + 1, ymid);
-        doc.text(`${task.duration}d`, xD + CW.start + CW.end + 1, ymid);
+        doc.text(task.startDate ? fmtDatePdf(task.startDate) : '', xD + CW.start / 2, ymid, { align: 'center' });
+        doc.text(task.endDate   ? fmtDatePdf(task.endDate)   : '', xD + CW.start + CW.end / 2, ymid, { align: 'center' });
+        doc.text(`${task.duration}d`, xD + CW.start + CW.end + CW.dur / 2, ymid, { align: 'center' });
 
         // %
         const xP = xD + CW.start + CW.end + CW.dur;
@@ -1915,9 +1915,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
         // Status / Owner
         setPdfFont('normal'); doc.setTextColor(...colMuted); doc.setFontSize(5.4);
-        doc.text(task.status || 'Todo', xP + CW.pct + 1, ymid);
-        const ownerLines = doc.splitTextToSize(String(task.resource || '-'), CW.owner - 2);
-        doc.text(ownerLines, xP + CW.pct + CW.status + 1, ymid);
+        doc.text(task.status || 'Todo', xP + CW.pct + CW.status / 2, ymid, { align: 'center' });
+        doc.text(String(task.resource || '-'), xP + CW.pct + CW.status + CW.owner / 2, ymid, { align: 'center' });
 
         // ── GANTT BAR ──
         if (task.startDate && task.endDate) {
