@@ -107,6 +107,12 @@ function monthLabel(month: Date): string {
   return `${m}-${y}`;
 }
 
+function monthCompactLabel(month: Date): string {
+  const y = String(month.getFullYear()).slice(-2);
+  const m = String(month.getMonth() + 1).padStart(2, '0');
+  return `${m}/${y}`;
+}
+
 function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = React.useState(false);
 
@@ -316,14 +322,38 @@ export default function ExecutiveOnePage({ project }: Props) {
     };
   }, []);
 
-  const fixedColsWidth = 52 + 260 + 120 + 120 + 90 + 130;
   const monthCount = Math.max(1, months.length);
-  const availableTimelineWidth = Math.max(420, ganttWrapWidth - fixedColsWidth - 2);
-  const minMonthColWidth = 82;
-  const maxMonthColWidth = 180;
-  const monthColWidth = Math.max(minMonthColWidth, Math.min(maxMonthColWidth, Math.floor(availableTimelineWidth / monthCount) || minMonthColWidth));
-  const timelineWidth = months.length * monthColWidth;
-  const ganttGridTemplate = `52px 260px 120px 120px 90px 130px ${timelineWidth}px`;
+  const wrapWidth = Math.max(720, ganttWrapWidth || 0);
+  const fixedColumnWidths = (() => {
+    const base = { wbs: 52, task: 260, start: 120, end: 120, pic: 90, status: 130 };
+    const min = { wbs: 44, task: 180, start: 84, end: 84, pic: 68, status: 88 };
+    const baseFixed = base.wbs + base.task + base.start + base.end + base.pic + base.status;
+    const minFixed = min.wbs + min.task + min.start + min.end + min.pic + min.status;
+    const desiredMonthWidth = monthCount >= 10 ? 44 : monthCount >= 7 ? 54 : 68;
+    const widthAtBase = baseFixed + (desiredMonthWidth * monthCount);
+    if (wrapWidth >= widthAtBase) {
+      return { ...base, month: Math.floor((wrapWidth - baseFixed) / monthCount) };
+    }
+    const widthAtMin = minFixed + (desiredMonthWidth * monthCount);
+    if (wrapWidth >= widthAtMin) {
+      const extra = wrapWidth - widthAtMin;
+      return {
+        wbs: min.wbs,
+        task: min.task + Math.max(0, Math.floor(extra * 0.5)),
+        start: min.start + Math.max(0, Math.floor(extra * 0.16)),
+        end: min.end + Math.max(0, Math.floor(extra * 0.16)),
+        pic: min.pic + Math.max(0, Math.floor(extra * 0.08)),
+        status: min.status + Math.max(0, Math.floor(extra * 0.1)),
+        month: desiredMonthWidth,
+      };
+    }
+    const month = Math.max(26, Math.floor((wrapWidth - minFixed) / monthCount));
+    return { ...min, month };
+  })();
+  const monthColWidth = fixedColumnWidths.month;
+  const timelineWidth = Math.max(monthCount * monthColWidth, 0);
+  const ganttGridTemplate = `${fixedColumnWidths.wbs}px ${fixedColumnWidths.task}px ${fixedColumnWidths.start}px ${fixedColumnWidths.end}px ${fixedColumnWidths.pic}px ${fixedColumnWidths.status}px minmax(0, 1fr)`;
+  const compactMonthHeaders = monthColWidth < 48;
 
   return (
     <div style={{ minHeight: '100%', overflowY: 'auto', background: '#F3F6FB', padding: isMobile ? 14 : 18 }}>
@@ -362,8 +392,8 @@ export default function ExecutiveOnePage({ project }: Props) {
           </div>
         </div>
 
-        <div ref={ganttWrapRef} style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflowX: 'auto', overflowY: 'hidden' }}>
-          <div style={{ minWidth: fixedColsWidth + timelineWidth }}>
+        <div ref={ganttWrapRef} style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflowX: 'hidden', overflowY: 'hidden' }}>
+          <div style={{ width: '100%' }}>
             <div
               style={{
                 display: 'grid',
@@ -377,14 +407,14 @@ export default function ExecutiveOnePage({ project }: Props) {
             >
             <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)', textAlign: 'center' }}>WBS</div>
             <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Task</div>
-            <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Start Date</div>
-            <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>End Date</div>
-            <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>PIC</div>
-            <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Status</div>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${months.length}, ${monthColWidth}px)` }}>
+            <div style={{ padding: '9px 6px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Start Date</div>
+            <div style={{ padding: '9px 6px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>End Date</div>
+            <div style={{ padding: '9px 6px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>PIC</div>
+            <div style={{ padding: '9px 6px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Status</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }}>
               {months.map((month) => (
-                <div key={month.toISOString()} style={{ padding: '9px 8px', borderLeft: '1px solid rgba(255,255,255,0.3)', textAlign: 'center' }}>
-                  {monthLabel(month)}
+                <div key={month.toISOString()} style={{ padding: compactMonthHeaders ? '9px 2px' : '9px 6px', borderLeft: '1px solid rgba(255,255,255,0.3)', textAlign: 'center', fontSize: compactMonthHeaders ? 10 : 12, whiteSpace: 'nowrap' }}>
+                  {compactMonthHeaders ? monthCompactLabel(month) : monthLabel(month)}
                 </div>
               ))}
             </div>
@@ -422,12 +452,12 @@ export default function ExecutiveOnePage({ project }: Props) {
                 <div style={{ padding: '6px 8px', fontSize: 12, color: C.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>
                   {task.taskName}
                 </div>
-                <div style={{ padding: '6px 8px', fontSize: 12, color: C.text2 }}>{fmtDate(task.startDate)}</div>
-                <div style={{ padding: '6px 8px', fontSize: 12, color: C.text2 }}>{fmtDate(task.endDate)}</div>
-                <div style={{ padding: '6px 8px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
-                <div style={{ padding: '6px 8px', fontSize: 11, color: state.color, fontWeight: 800 }}>{state.label}</div>
+                <div style={{ padding: '6px 6px', fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtDate(task.startDate)}</div>
+                <div style={{ padding: '6px 6px', fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtDate(task.endDate)}</div>
+                <div style={{ padding: '6px 6px', fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
+                <div style={{ padding: '6px 6px', fontSize: 10, color: state.color, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{state.label}</div>
                 <div style={{ position: 'relative', minHeight: 36, borderLeft: `1px solid ${C.border}` }}>
-                  <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${months.length}, ${monthColWidth}px)` }}>
+                  <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }}>
                     {months.map((month) => (
                       <div key={`${task.id}-${month.toISOString()}`} style={{ borderLeft: `1px solid ${C.border}` }} />
                     ))}
