@@ -1667,7 +1667,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   };
 
   // ── PDF export: redesigned with Poppins-like styling ──────────────────────
-  const exportPDF = () => {
+  const exportPDF = async () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const W = doc.internal.pageSize.getWidth();
     const H = doc.internal.pageSize.getHeight();
@@ -1697,14 +1697,53 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const gW = cW - tableW - 2;
     const gX = PL + tableW + 2;
     const tHdrH = 8;
-    const baseRowH = 6.5;
+    const baseRowH = 7.2;
+
+    const u8ToBase64 = (bytes: Uint8Array): string => {
+      let out = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        out += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      return btoa(out);
+    };
+
+    const ensurePoppinsFont = async () => {
+      try {
+        const fl = (doc as any).getFontList?.();
+        if (fl?.Poppins || fl?.poppins) return;
+
+        const [regRes, boldRes] = await Promise.all([
+          fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf'),
+          fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf'),
+        ]);
+        if (!regRes.ok || !boldRes.ok) return;
+
+        const [regBuf, boldBuf] = await Promise.all([regRes.arrayBuffer(), boldRes.arrayBuffer()]);
+        doc.addFileToVFS('Poppins-Regular.ttf', u8ToBase64(new Uint8Array(regBuf)));
+        doc.addFileToVFS('Poppins-Bold.ttf', u8ToBase64(new Uint8Array(boldBuf)));
+        doc.addFont('Poppins-Regular.ttf', 'Poppins', 'normal');
+        doc.addFont('Poppins-Bold.ttf', 'Poppins', 'bold');
+      } catch {
+        // Keep default font fallback if external font loading fails.
+      }
+    };
+
+    await ensurePoppinsFont();
+
+    // jsPDF needs embedded TTF for true custom fonts; use Poppins name when available, fallback otherwise.
+    const setPdfFont = (style: 'normal' | 'bold' = 'normal') => {
+      const fl = (doc as any).getFontList?.();
+      const popName = fl?.Poppins ? 'Poppins' : (fl?.poppins ? 'poppins' : null);
+      doc.setFont(popName || 'helvetica', style);
+    };
 
     // ── Helper: row height ──
     const getRowH = (task: Task): number => {
-      doc.setFontSize(5.8);
+      doc.setFontSize(8.2);
       const ind = task.level * 2;
       const lines = doc.splitTextToSize(task.taskName || '', Math.max(5, CW.name - ind - 2));
-      return Math.max(baseRowH, 2.4 + Math.min(3, Array.isArray(lines) ? lines.length : 1) * 2.0);
+      return Math.max(baseRowH, 2.8 + Math.min(3, Array.isArray(lines) ? lines.length : 1) * 2.3);
     };
 
     // ── Paginate ──
@@ -1755,11 +1794,13 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.setLineWidth(0.3);
       doc.roundedRect(PL, 2, cW, hdrH, 3, 3, 'FD');
 
+      // Left: Client name
+      doc.setFontSize(9.5); setPdfFont('bold'); doc.setTextColor(...colText);
+      doc.text(proj?.client || proj?.name || 'Project', PL + 5.5, 10.8);
+
       // Center: Fixed title
-      doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(...colText);
-      doc.text('Project Implementation Schedule', W / 2, 9.5, { align: 'center' });
-      doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted);
-      doc.text(proj?.name || '', W / 2, 15, { align: 'center' });
+      doc.setFontSize(11.5); setPdfFont('bold'); doc.setTextColor(...colText);
+      doc.text('Project Implementation Schedule', W / 2, 10.6, { align: 'center' });
 
       // Right: REPORT DATE box (rounded, thin gray border)
       const dbW = 36, dbH = 12, dbX = W - PR - dbW - 2, dbY = 3.5;
@@ -1767,9 +1808,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.setDrawColor(...colGray);
       doc.setLineWidth(0.25);
       doc.roundedRect(dbX, dbY, dbW, dbH, 2, 2, 'FD');
-      doc.setFontSize(5.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...colMuted);
+      doc.setFontSize(5.5); setPdfFont('bold'); doc.setTextColor(...colMuted);
       doc.text('REPORT DATE', dbX + dbW / 2, dbY + 3.5, { align: 'center' });
-      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(...colText);
+      doc.setFontSize(7); setPdfFont('normal'); doc.setTextColor(...colText);
       doc.text(reportDateStr, dbX + dbW / 2, dbY + 9, { align: 'center' });
 
       // ── TABLE HEADER ──
@@ -1785,7 +1826,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         { l:'Dur.', w: CW.dur }, { l:'%', w: CW.pct },
         { l:'Status', w: CW.status }, { l:'Owner', w: CW.owner },
       ];
-      doc.setFontSize(6); doc.setFont('helvetica', 'bold'); doc.setTextColor(49, 46, 129);
+      doc.setFontSize(7.4); setPdfFont('bold'); doc.setTextColor(49, 46, 129);
       let hx = PL;
       hcols.forEach(c => {
         const tw = doc.getTextWidth(c.l);
@@ -1800,7 +1841,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       months.forEach((mo, i) => {
         const mx = gX + i * mW;
         const label = mo.toLocaleString('en', { month: 'short', year: '2-digit' }).toUpperCase();
-        doc.setFontSize(mFontSz); doc.setFont('helvetica', 'bold'); doc.setTextColor(70, 70, 70);
+        doc.setFontSize(mFontSz); setPdfFont('bold'); doc.setTextColor(70, 70, 70);
         const tw = doc.getTextWidth(label);
         doc.text(label, mx + (mW - tw) / 2, cy + 5.3);
         if (i < months.length - 1) {
@@ -1843,15 +1884,15 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         const ymid = ry + rH / 2 + 0.5;
 
         // WBS
-        doc.setFontSize(isMain ? 6 : 5.5);
-        doc.setFont('helvetica', isMain ? 'bold' : 'normal');
+        doc.setFontSize(isMain ? 8.6 : 8.2);
+        setPdfFont(isMain ? 'bold' : 'normal');
         doc.setTextColor(...colText);
         const wbsW = doc.getTextWidth(task.wbs || '');
         doc.text(task.wbs || '', PL + (CW.wbs - wbsW) / 2, ymid);
 
         // Task Name
-        doc.setFont('helvetica', (isMain || isPar) ? 'bold' : 'normal');
-        doc.setFontSize(isMain ? 6.5 : isPar ? 6 : 5.6);
+        setPdfFont((isMain || isPar) ? 'bold' : 'normal');
+        doc.setFontSize(isMain ? 8.8 : isPar ? 8.4 : 8.2);
         doc.setTextColor(...colText);
         const label = isMile ? `◆ ${task.taskName}` : task.taskName;
         const nLines = doc.splitTextToSize(label || '', Math.max(4, CW.name - indent - 1));
@@ -1859,18 +1900,18 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
         // Start / Finish / Duration
         const xD = PL + CW.wbs + CW.name;
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted); doc.setFontSize(5.2);
+        setPdfFont('normal'); doc.setTextColor(...colMuted); doc.setFontSize(8.2);
         doc.text(task.startDate ? fmtDatePdf(task.startDate) : '', xD + 1, ymid);
         doc.text(task.endDate   ? fmtDatePdf(task.endDate)   : '', xD + CW.start + 1, ymid);
         doc.text(`${task.duration}d`, xD + CW.start + CW.end + 1, ymid);
 
         // %
         const xP = xD + CW.start + CW.end + CW.dur;
-        doc.setFont('helvetica', 'bold'); doc.setTextColor(pcR, pcG, pcB); doc.setFontSize(5.4);
+        setPdfFont('bold'); doc.setTextColor(pcR, pcG, pcB); doc.setFontSize(8.3);
         doc.text(`${pct}%`, xP + CW.pct / 2, ymid, { align: 'center' });
 
         // Status / Owner
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted); doc.setFontSize(5.2);
+        setPdfFont('normal'); doc.setTextColor(...colMuted); doc.setFontSize(8.2);
         doc.text(task.status || 'Todo', xP + CW.pct + 1, ymid);
         const ownerLines = doc.splitTextToSize(String(task.resource || '-'), CW.owner - 2);
         doc.text(ownerLines, xP + CW.pct + CW.status + 1, ymid);
@@ -1883,24 +1924,19 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           const eMo = (e1.getFullYear() - minD.getFullYear()) * 12 + (e1.getMonth() - minD.getMonth());
           const bx = gX + Math.max(0, sMo) * mW + 0.5;
           const bw = Math.max(mW * (Math.min(eMo, mCnt - 1) - Math.max(0, sMo) + 1) - 1, 1);
-          const pad = isMain ? 2.3 : isPar ? 1.2 : 1.8;
+          const pad = isMain ? 1.2 : isPar ? 1.2 : 1.8;
           const by = ry + pad;
           const bh = rH - pad * 2;
 
           if (isMain) {
-            // Main Task: hatch pattern (plan bar)
-            doc.setFillColor(214, 224, 255);
-            doc.rect(bx, by, bw, bh, 'F');
-            drawHatch(bx, by, bw, bh, [99, 102, 241], 2.5);
-            // Progress overlay (solid fill on top of hatch)
-            if (pct > 0) {
-              const fw = bw * pct / 100;
-              doc.setFillColor(99, 102, 241);
-              doc.rect(bx, by, fw, bh, 'F');
-              drawHatch(bx, by, fw, bh, [255, 255, 255], 2.5);
-            }
-            doc.setDrawColor(79, 70, 229); doc.setLineWidth(0.55);
-            doc.rect(bx, by, bw, bh, 'S');
+            // Main Task: fixed-height hatch style (same height for all rows), aligned with one-page plan pattern.
+            const mainH = 1.9;
+            const mainY = ry + (rH - mainH) / 2;
+            doc.setFillColor(236, 240, 245);
+            doc.roundedRect(bx, mainY, bw, mainH, 0.9, 0.9, 'F');
+            drawHatch(bx, mainY, bw, mainH, [143, 154, 168], 1.15);
+            doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.28);
+            doc.roundedRect(bx, mainY, bw, mainH, 0.9, 0.9, 'S');
           } else if (isPar) {
             // Sub-parent: lighter hatch
             doc.setFillColor(230, 237, 255);
