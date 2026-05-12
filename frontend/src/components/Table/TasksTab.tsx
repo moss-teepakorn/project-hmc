@@ -1666,14 +1666,302 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     }
   };
 
-  // ── PDF export: Header + Detail Table + Gantt + Footer ──────────────────────
+  // ── PDF export: redesigned with Poppins-like styling ──────────────────────
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const W = doc.internal.pageSize.getWidth();
     const H = doc.internal.pageSize.getHeight();
     const proj = useStore.getState().activeProject;
     const today = new Date();
-    const reportDate = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+    const reportDateStr = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    // ── Colors ──
+    const colText:    [number,number,number] = [30,  30,  30 ];
+    const colMuted:   [number,number,number] = [100, 116, 139];
+    const colGray:    [number,number,number] = [203, 213, 225];
+    const colRowMain: [number,number,number] = [219, 234, 254]; // indigo-100
+    const colRowSub:  [number,number,number] = [241, 245, 249]; // slate-100
+
+    // ── Layout ──
+    const PL = 8, PR = 8;
+    const hdrH = 26;
+    const ftrH = 10;
+    const cW = W - PL - PR;
+    const startY = hdrH + 5;
+    const ftrLineY = H - ftrH;
+    const ftrTextY = H - ftrH + 5;
+
+    // ── Column widths (mm) ──
+    const CW = { wbs: 12, name: 68, start: 20, end: 20, dur: 11, pct: 10, status: 18, owner: 24 };
+    const tableW = Object.values(CW).reduce((s, v) => s + v, 0);
+    const gW = cW - tableW - 2;
+    const gX = PL + tableW + 2;
+    const tHdrH = 8;
+    const baseRowH = 6.5;
+
+    // ── Helper: row height ──
+    const getRowH = (task: Task): number => {
+      doc.setFontSize(5.8);
+      const ind = task.level * 2;
+      const lines = doc.splitTextToSize(task.taskName || '', Math.max(5, CW.name - ind - 2));
+      return Math.max(baseRowH, 2.4 + Math.min(3, Array.isArray(lines) ? lines.length : 1) * 2.0);
+    };
+
+    // ── Paginate ──
+    const all = [...projectTasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
+    const maxBody = H - startY - tHdrH - ftrH - 4;
+    const pages: Task[][] = [];
+    let curPage: Task[] = [], curH = 0;
+    all.forEach(t => {
+      const h = getRowH(t);
+      if (curPage.length && curH + h > maxBody) { pages.push(curPage); curPage = [t]; curH = h; }
+      else { curPage.push(t); curH += h; }
+    });
+    if (curPage.length || !pages.length) pages.push(curPage);
+    const totalPages = pages.length;
+
+    // ── Date range & months ──
+    const valid = all.filter(t => t.startDate && t.endDate);
+    const allD = valid.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
+    const minD = allD.length ? new Date(Math.min(...allD.map(d => d.getTime()))) : new Date();
+    const maxD = allD.length ? new Date(Math.max(...allD.map(d => d.getTime()))) : new Date();
+    const months: Date[] = [];
+    const mc = new Date(minD.getFullYear(), minD.getMonth(), 1);
+    while (mc <= maxD) { months.push(new Date(mc)); mc.setMonth(mc.getMonth() + 1); }
+    const mCnt = months.length;
+    const mW = gW / mCnt;
+    const mFontSz = mCnt <= 4 ? 6 : mCnt <= 8 ? 5.5 : mCnt <= 14 ? 5 : 4.5;
+
+    // ── Hatch pattern helper (45° diagonal lines, clipped to rect) ──
+    const drawHatch = (x: number, y: number, w: number, h: number, col: [number,number,number], sp = 2.5) => {
+      doc.setDrawColor(...col);
+      doc.setLineWidth(0.22);
+      for (let off = -h; off < w + h; off += sp) {
+        const t0 = Math.max(0, -off / h);
+        const t1 = Math.min(1, (w - off) / h);
+        if (t0 >= t1) continue;
+        doc.line(x + off + t0 * h, y + t0 * h, x + off + t1 * h, y + t1 * h);
+      }
+    };
+
+    // ── Render pages ──
+    for (let pg = 0; pg < totalPages; pg++) {
+      if (pg > 0) doc.addPage('a4', 'landscape');
+      const rows = pages[pg] || [];
+
+      // ── HEADER: white rounded rect, thin gray border ──
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(...colGray);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(PL, 2, cW, hdrH, 3, 3, 'FD');
+
+      // Left: Client name
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(...colText);
+      doc.text(proj?.client || proj?.name || 'Project', PL + 6, 11);
+
+      // Center: Fixed title
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(...colText);
+      doc.text('Project Implementation Schedule', W / 2, 11, { align: 'center' });
+      doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted);
+      doc.text(proj?.name || '', W / 2, 20, { align: 'center' });
+
+      // Right: REPORT DATE box (rounded, thin gray border)
+      const dbW = 42, dbH = 16, dbX = W - PR - dbW - 2, dbY = 5;
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(...colGray);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(dbX, dbY, dbW, dbH, 2, 2, 'FD');
+      doc.setFontSize(6); doc.setFont('helvetica', 'bold'); doc.setTextColor(...colMuted);
+      doc.text('REPORT DATE', dbX + dbW / 2, dbY + 5.5, { align: 'center' });
+      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(...colText);
+      doc.text(reportDateStr, dbX + dbW / 2, dbY + 12, { align: 'center' });
+
+      // ── TABLE HEADER ──
+      let cy = startY;
+      doc.setFillColor(239, 246, 255);
+      doc.rect(PL, cy, cW, tHdrH, 'F');
+      doc.setDrawColor(...colGray); doc.setLineWidth(0.2);
+      doc.rect(PL, cy, cW, tHdrH, 'S');
+
+      const hcols = [
+        { l:'WBS', w: CW.wbs }, { l:'Task Name', w: CW.name },
+        { l:'Start', w: CW.start }, { l:'Finish', w: CW.end },
+        { l:'Dur.', w: CW.dur }, { l:'%', w: CW.pct },
+        { l:'Status', w: CW.status }, { l:'Owner', w: CW.owner },
+      ];
+      doc.setFontSize(5.8); doc.setFont('helvetica', 'bold'); doc.setTextColor(49, 46, 129);
+      let hx = PL;
+      hcols.forEach(c => {
+        const tw = doc.getTextWidth(c.l);
+        doc.text(c.l, hx + (c.w - tw) / 2, cy + 5.3);
+        hx += c.w;
+      });
+
+      // Month headers
+      doc.setFillColor(249, 250, 251);
+      doc.rect(gX, cy, gW, tHdrH, 'F');
+      doc.setDrawColor(...colGray); doc.rect(gX, cy, gW, tHdrH, 'S');
+      months.forEach((mo, i) => {
+        const mx = gX + i * mW;
+        const label = mo.toLocaleString('en', { month: 'short', year: '2-digit' }).toUpperCase();
+        doc.setFontSize(mFontSz); doc.setFont('helvetica', 'bold'); doc.setTextColor(70, 70, 70);
+        const tw = doc.getTextWidth(label);
+        doc.text(label, mx + (mW - tw) / 2, cy + 5.3);
+        if (i < months.length - 1) {
+          doc.setDrawColor(...colGray); doc.setLineWidth(0.1);
+          doc.line(mx + mW, cy, mx + mW, cy + tHdrH);
+        }
+      });
+      cy += tHdrH;
+
+      // ── TASK ROWS ──
+      rows.forEach(task => {
+        const rH = getRowH(task);
+        const ry = cy;
+        const isMain = task.level === 0;
+        const isPar = hasChildren(projectTasks, task.id);
+        const indent = task.level * 2.5;
+        const isMile = task.duration === 0;
+        const pct = task.percentComplete;
+        const pcArr: [number,number,number] = pct >= 100 ? [16,185,129] : pct >= 60 ? [59,130,246] : [99,102,241];
+        const [pcR, pcG, pcB] = pcArr;
+
+        // Row background by level
+        if (isMain)       { doc.setFillColor(...colRowMain); }
+        else if (isPar)   { doc.setFillColor(...colRowSub);  }
+        else              { doc.setFillColor(255, 255, 255); }
+        doc.rect(PL, ry, cW, rH, 'F');
+
+        // Row border
+        doc.setDrawColor(...colGray); doc.setLineWidth(0.15);
+        doc.rect(PL, ry, cW, rH, 'S');
+
+        // Column separators
+        let sx = PL;
+        Object.values(CW).forEach(w => {
+          doc.setDrawColor(...colGray); doc.setLineWidth(0.1);
+          doc.line(sx + w, ry, sx + w, ry + rH);
+          sx += w;
+        });
+
+        const ymid = ry + rH / 2 + 0.5;
+
+        // WBS
+        doc.setFontSize(isMain ? 5.8 : 5.3);
+        doc.setFont('helvetica', isMain ? 'bold' : 'normal');
+        doc.setTextColor(...colText);
+        const wbsW = doc.getTextWidth(task.wbs || '');
+        doc.text(task.wbs || '', PL + (CW.wbs - wbsW) / 2, ymid);
+
+        // Task Name
+        doc.setFont('helvetica', (isMain || isPar) ? 'bold' : 'normal');
+        doc.setFontSize(isMain ? 6.2 : isPar ? 5.8 : 5.4);
+        doc.setTextColor(...colText);
+        const label = isMile ? `◆ ${task.taskName}` : task.taskName;
+        const nLines = doc.splitTextToSize(label || '', Math.max(4, CW.name - indent - 1));
+        doc.text(nLines, PL + CW.wbs + indent + 1, ymid - (Math.min(nLines.length, 2) - 1) * 1.1);
+
+        // Start / Finish / Duration
+        const xD = PL + CW.wbs + CW.name;
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted); doc.setFontSize(5);
+        doc.text(task.startDate ? fmtDatePdf(task.startDate) : '', xD + 1, ymid);
+        doc.text(task.endDate   ? fmtDatePdf(task.endDate)   : '', xD + CW.start + 1, ymid);
+        doc.text(`${task.duration}d`, xD + CW.start + CW.end + 1, ymid);
+
+        // %
+        const xP = xD + CW.start + CW.end + CW.dur;
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(pcR, pcG, pcB); doc.setFontSize(5.2);
+        doc.text(`${pct}%`, xP + CW.pct / 2, ymid, { align: 'center' });
+
+        // Status / Owner
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted); doc.setFontSize(5);
+        doc.text(task.status || 'Todo', xP + CW.pct + 1, ymid);
+        const ownerLines = doc.splitTextToSize(String(task.resource || '-'), CW.owner - 2);
+        doc.text(ownerLines, xP + CW.pct + CW.status + 1, ymid);
+
+        // ── GANTT BAR ──
+        if (task.startDate && task.endDate) {
+          const s1 = new Date(task.startDate);
+          const e1 = new Date(task.endDate);
+          const sMo = (s1.getFullYear() - minD.getFullYear()) * 12 + (s1.getMonth() - minD.getMonth());
+          const eMo = (e1.getFullYear() - minD.getFullYear()) * 12 + (e1.getMonth() - minD.getMonth());
+          const bx = gX + Math.max(0, sMo) * mW + 0.5;
+          const bw = Math.max(mW * (Math.min(eMo, mCnt - 1) - Math.max(0, sMo) + 1) - 1, 1);
+          const pad = isMain ? 0.8 : isPar ? 1.2 : 1.8;
+          const by = ry + pad;
+          const bh = rH - pad * 2;
+
+          if (isMain) {
+            // Main Task: hatch pattern (plan bar)
+            doc.setFillColor(214, 224, 255);
+            doc.rect(bx, by, bw, bh, 'F');
+            drawHatch(bx, by, bw, bh, [99, 102, 241], 2.5);
+            // Progress overlay (solid fill on top of hatch)
+            if (pct > 0) {
+              const fw = bw * pct / 100;
+              doc.setFillColor(99, 102, 241);
+              doc.rect(bx, by, fw, bh, 'F');
+              drawHatch(bx, by, fw, bh, [255, 255, 255], 2.5);
+            }
+            doc.setDrawColor(79, 70, 229); doc.setLineWidth(0.55);
+            doc.rect(bx, by, bw, bh, 'S');
+          } else if (isPar) {
+            // Sub-parent: lighter hatch
+            doc.setFillColor(230, 237, 255);
+            doc.rect(bx, by, bw, bh, 'F');
+            drawHatch(bx, by, bw, bh, [148, 163, 184], 2.5);
+            if (pct > 0) {
+              const fw = bw * pct / 100;
+              doc.setFillColor(147, 197, 253);
+              doc.rect(bx, by, fw, bh, 'F');
+              drawHatch(bx, by, fw, bh, [255, 255, 255], 2.5);
+            }
+            doc.setDrawColor(147, 197, 253); doc.setLineWidth(0.3);
+            doc.rect(bx, by, bw, bh, 'S');
+          } else {
+            // Leaf task: solid rounded bar
+            doc.setFillColor(238, 242, 255);
+            doc.roundedRect(bx, by, bw, bh, 0.9, 0.9, 'F');
+            if (pct > 0) {
+              doc.setFillColor(pcR, pcG, pcB);
+              doc.roundedRect(bx, by, bw * pct / 100, bh, 0.9, 0.9, 'F');
+            }
+            doc.setDrawColor(pcR, pcG, pcB); doc.setLineWidth(0.3);
+            doc.roundedRect(bx, by, bw, bh, 0.9, 0.9, 'S');
+          }
+        }
+
+        // Month dividers per row
+        months.forEach((_, i) => {
+          if (i < months.length - 1) {
+            doc.setDrawColor(...colGray); doc.setLineWidth(0.1);
+            doc.line(gX + (i + 1) * mW, ry, gX + (i + 1) * mW, ry + rH);
+          }
+        });
+
+        cy += rH;
+      });
+
+      // Gantt left-border separator
+      doc.setDrawColor(...colGray); doc.setLineWidth(0.15);
+      doc.line(gX - 1, startY, gX - 1, cy);
+
+      // ── FOOTER ──
+      doc.setDrawColor(...colGray); doc.setLineWidth(0.2);
+      doc.line(PL, ftrLineY, W - PR, ftrLineY);
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted);
+      doc.text('Prepared by Humanico Public Company Limited', PL, ftrTextY);
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(...colText);
+      doc.text('Confidential', W / 2, ftrTextY, { align: 'center' });
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted);
+      doc.text(`Project ID: ${proj?.code || projectId} | Page ${pg + 1} of ${totalPages}`, W - PR, ftrTextY, { align: 'right' });
+    }
+
+    doc.save(`tasks-gantt-${projectId}.pdf`);
+    toast.success('Exported PDF');
+    setShowExport(false);
+  };
+
 
     // Color scheme
     const headerText: [number, number, number] = [30, 30, 30];
