@@ -6,7 +6,19 @@ import { Card, Btn, Badge, Modal, FormRow, Input, Select, Textarea, ConfirmModal
 import { fmtDate, fmtMoney, isoToDmy, dmyToIso } from '../../utils';
 import type { Milestone } from '../../types';
 
-const PHASES = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
+const PHASES = [
+  'Phase 1',
+  'Phase 2',
+  'Phase 3',
+  'Phase 4',
+  'Phase 5',
+  'Phase Customize 1',
+  'Phase Customize 2',
+  'Phase Customize 3',
+  'Phase Subscription 1',
+  'Phase Subscription 2',
+  'Phase Subscription 3',
+];
 
 interface Props {
   projectId: string;
