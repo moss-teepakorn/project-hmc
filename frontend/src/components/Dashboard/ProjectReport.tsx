@@ -89,6 +89,11 @@ export default function ProjectReport({ project }: Props) {
     return acc;
   }, {} as Record<string, typeof ms>);
   const msPhaseOrder = Object.keys(groupedMsByPhase);
+  const phaseBudgetByPhase = ms.reduce((acc, m) => {
+    const phase = (m.phase || '').trim() || 'Unspecified';
+    if (m.phaseAmount > 0 && !acc[phase]) acc[phase] = m.phaseAmount;
+    return acc;
+  }, {} as Record<string, number>);
   const ef  = efforts.filter(e => e.projectId === project.id);
   const mb  = members.filter(m => m.projectId === project.id);
   const crs = changeRequests.filter(c => c.projectId === project.id);
@@ -368,25 +373,48 @@ export default function ProjectReport({ project }: Props) {
             <div style={{ fontSize: 10, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>PAYMENT MILESTONES ({ms.length})</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {msPhaseOrder.map(phase => (
-                <div key={phase}>
-                  <div style={{ padding: '6px 0', borderBottom: '1px solid #EEF2F7' }}>
-                    <div style={{ fontSize: 8, fontWeight: 800, color: '#475569', letterSpacing: 0.2 }}>{phase}</div>
+                <div key={phase} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, paddingBottom: 4, borderBottom: '1px solid #EEF2F7' }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: '#0F172A' }}>{phase}</span>
+                    <div style={{ flex: 1, height: 1, background: '#E2E8F0' }} />
+                    <span style={{ fontSize: 8, color: '#64748B' }}>Phase Budget {money(permissions.getMaskedAmount(phaseBudgetByPhase[phase] || 0))}</span>
+                    <span style={{ fontSize: 8, color: '#64748B' }}>Milestone Total {money(permissions.getMaskedAmount(groupedMsByPhase[phase].reduce((s, m) => s + m.amount, 0)))}</span>
                   </div>
-                  {groupedMsByPhase[phase].map(m => {
-                    const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
-                    return (
-                      <div key={m.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 124px', alignItems: 'center', columnGap: 8, padding: '7px 0 7px 14px', minHeight: 42, borderBottom: '1px solid #F8FAFC' }}>
-                        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                          <div style={{ fontSize: 8, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '12px' }}>{m.name}</div>
-                          <div style={{ fontSize: 8, color: '#94A3B8', lineHeight: '12px', marginTop: 2 }}>Due: {fmtDate(m.dueDate) || 'TBD'}</div>
-                        </div>
-                        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', gap: 3 }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, color: '#0F172A', lineHeight: '12px' }}>{money(permissions.getMaskedAmount(m.amount))}</div>
-                          <Pill label={ss.label} bg={ss.bg} color={ss.color} />
-                        </div>
-                      </div>
-                    );
-                  })}
+
+                  <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 8, lineHeight: 1.3 }}>
+                    <colgroup>
+                      <col style={{ width: '26%' }} />
+                      <col style={{ width: '10%' }} />
+                      <col style={{ width: '16%' }} />
+                      <col style={{ width: '13%' }} />
+                      <col style={{ width: '13%' }} />
+                      <col style={{ width: '22%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{ background: '#F8FAFC' }}>
+                        {['Milestone', '% Value', 'Amount', 'Due Date', 'Billing', 'Status'].map(h => (
+                          <th key={h} style={{ padding: '6px 6px', textAlign: 'left', fontWeight: 700, color: '#64748B', borderBottom: '1px solid #EEF2F7' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupedMsByPhase[phase].map((m, i) => {
+                        const ss = MILESTONE_STATUS[m.status] ?? MILESTONE_STATUS.pending;
+                        return (
+                          <tr key={m.id} style={{ borderBottom: '1px solid #F8FAFC', background: i % 2 === 0 ? '#FFFFFF' : '#FAFCFE' }}>
+                            <td style={{ padding: '6px 6px', color: '#0F172A', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</td>
+                            <td style={{ padding: '6px 6px', color: '#4F46E5', fontWeight: 700 }}>{Number(m.percent || 0)}%</td>
+                            <td style={{ padding: '6px 6px', color: '#0F172A', fontWeight: 600 }}>{money(permissions.getMaskedAmount(m.amount))}</td>
+                            <td style={{ padding: '6px 6px', color: '#64748B', whiteSpace: 'nowrap' }}>{m.dueDate ? fmtDate(m.dueDate) : '-'}</td>
+                            <td style={{ padding: '6px 6px', color: '#64748B', whiteSpace: 'nowrap' }}>{m.billingDate ? fmtDate(m.billingDate) : '-'}</td>
+                            <td style={{ padding: '6px 6px', whiteSpace: 'nowrap' }}>
+                              <Pill label={ss.label} bg={ss.bg} color={ss.color} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               ))}
               {ms.length === 0 && <div style={{ padding: 12, textAlign: 'center', color: '#CBD5E1', fontSize: 8 }}>No milestones</div>}
