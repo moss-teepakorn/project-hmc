@@ -1762,8 +1762,13 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     // ── Date range & months (day-accurate scale like Tasks tab) ──
     const valid = all.filter(t => t.startDate && t.endDate);
     const allD = valid.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
-    const minD = allD.length ? new Date(Math.min(...allD.map(d => d.getTime()))) : new Date();
-    const maxD = allD.length ? new Date(Math.max(...allD.map(d => d.getTime()))) : new Date();
+    const rawMinD = allD.length ? new Date(Math.min(...allD.map(d => d.getTime()))) : new Date();
+    const rawMaxD = allD.length ? new Date(Math.max(...allD.map(d => d.getTime()))) : new Date();
+    rawMinD.setHours(0, 0, 0, 0);
+    rawMaxD.setHours(0, 0, 0, 0);
+    // Expand to full months so month headers auto-fit evenly and avoid cramped first/last segments.
+    const minD = new Date(rawMinD.getFullYear(), rawMinD.getMonth(), 1);
+    const maxD = new Date(rawMaxD.getFullYear(), rawMaxD.getMonth() + 1, 0);
     minD.setHours(0, 0, 0, 0);
     maxD.setHours(0, 0, 0, 0);
     const months: Date[] = [];
@@ -1853,6 +1858,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         const ry = cy;
         const isMain = task.level === 0;
         const isPar = hasChildren(projectTasks, task.id);
+        const isSubTask = task.level > 0;
         const indent = task.level * 2.5;
         const isMile = task.duration === 0;
         const pct = task.percentComplete;
@@ -1923,18 +1929,18 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           const spanDays = Math.max(1, eOfs - sOfs + 1);
           const bx = gX + sOfs * dayW + 0.15;
           const bw = Math.max(spanDays * dayW - 0.3, 0.65);
-          const barH = 1.35;
+          const barH = 2.05;
           const barY = ry + (rH - barH) / 2;
           const barR = 0.7;
 
           if (isMain) {
-            // Main task: solid gray, compact size.
+            // Main task: solid gray.
             doc.setFillColor(148, 163, 184);
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'F');
             doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.22);
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'S');
-          } else if (isPar) {
-            // Parent-subtask: light green tone.
+          } else if (isSubTask) {
+            // All subtasks: light green tone.
             doc.setFillColor(209, 250, 229);
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'F');
             doc.setDrawColor(134, 239, 172); doc.setLineWidth(0.2);
@@ -1959,9 +1965,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         cy += rH;
       });
 
-      // Gantt left-border separator
-      doc.setDrawColor(...colGray); doc.setLineWidth(0.15);
-      doc.line(gX - 1, startY, gX - 1, cy);
+      // Keep single seam line from table column border; avoid duplicated separator here.
 
       // ── FOOTER ──
       doc.setDrawColor(...colGray); doc.setLineWidth(0.2);
