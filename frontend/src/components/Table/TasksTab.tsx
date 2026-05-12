@@ -1858,7 +1858,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         const ry = cy;
         const isMain = task.level === 0;
         const isPar = hasChildren(projectTasks, task.id);
-        const isSubTask = task.level > 0;
+        const isSubParent = !isMain && isPar;
+        const isLeafSubTask = !isMain && !isPar;
         const indent = task.level * 2.5;
         const isMile = task.duration === 0;
         const pct = task.percentComplete;
@@ -1939,15 +1940,17 @@ export default function TasksTab({ projectId, extraActions }: Props) {
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'F');
             doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.22);
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'S');
-          } else if (isSubTask) {
-            // All subtasks: light green tone.
-            doc.setFillColor(209, 250, 229);
+          } else if (isSubParent) {
+            // Subtask with children: lighter gray.
+            doc.setFillColor(203, 213, 225);
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'F');
-            doc.setDrawColor(134, 239, 172); doc.setLineWidth(0.2);
+            doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2);
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'S');
-          } else {
-            // Normal task: rounded gray outline only, compact size.
-            doc.setDrawColor(180, 190, 202); doc.setLineWidth(0.2);
+          } else if (isLeafSubTask) {
+            // Leaf subtask: cyan fill.
+            doc.setFillColor(109, 192, 222);
+            doc.roundedRect(bx, barY, bw, barH, barR, barR, 'F');
+            doc.setDrawColor(88, 164, 194); doc.setLineWidth(0.2);
             doc.roundedRect(bx, barY, bw, barH, barR, barR, 'S');
           }
         }
@@ -1971,7 +1974,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.setDrawColor(...colGray); doc.setLineWidth(0.2);
       doc.line(PL, ftrLineY, W - PR, ftrLineY);
       doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted);
-      doc.text('Prepared by Humanico Public Company Limited', PL, ftrTextY);
+      doc.text('Prepared by Humanica Public Company Limited', PL, ftrTextY);
       doc.setFont('helvetica', 'bold'); doc.setTextColor(...colText);
       doc.text('Confidential', W / 2, ftrTextY, { align: 'center' });
       doc.setFont('helvetica', 'normal'); doc.setTextColor(...colMuted);
