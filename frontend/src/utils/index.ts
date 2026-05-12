@@ -35,6 +35,13 @@ export const toInput = (str: string): string => {
   return isValid(d) ? format(d, 'yyyy-MM-dd') : '';
 };
 
+/** Display: 15-May-26 (for PDF export) */
+export const fmtDatePdf = (str: string): string => {
+  if (!str) return '—';
+  const d = parseISO(str);
+  return isValid(d) ? format(d, 'dd-MMM-yy') : str;
+};
+
 /** Month label: Mar 25 */
 export const fmtMonth = (str: string): string => {
   if (!str || str.length < 7) return str;

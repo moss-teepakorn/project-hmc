@@ -8,7 +8,7 @@ import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
 import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C } from '../Common';
-import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, PROCESS_STATUS_STYLE } from '../../utils';
+import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, PROCESS_STATUS_STYLE } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import type { Task, ViewMode } from '../../types';
 
@@ -1666,45 +1666,62 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     }
   };
 
-  // ── PDF export: left=table, right=Gantt, 1 task per line ─────────────────
+  // ── PDF export: Header + Detail Table + Gantt + Footer ──────────────────────
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const W = doc.internal.pageSize.getWidth();
     const H = doc.internal.pageSize.getHeight();
     const proj = useStore.getState().activeProject;
-    const pastelPrimary: [number, number, number] = [219, 234, 254];
-    const pastelPrimaryText: [number, number, number] = [49, 46, 129];
-    const pastelGrid: [number, number, number] = [191, 219, 254];
+    const today = new Date();
+    const reportDate = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    // Header band
-    doc.setFillColor(...pastelPrimary); doc.rect(0,0,W,18,'F');
-    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(...pastelPrimaryText);
-    doc.text(`${proj?.name ?? projectId} - Task Plan + Gantt`, 10, 11);
-    doc.setFontSize(7); doc.setFont('helvetica','normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, W-10, 11, { align:'right' });
-    doc.setTextColor(0);
+    // Color scheme
+    const headerBg: [number, number, number] = [15, 48, 111]; // Dark blue
+    const headerText: [number, number, number] = [255, 255, 255]; // White
+    const detailBg: [number, number, number] = [238, 242, 255]; // Light blue
+    const detailBorder: [number, number, number] = [191, 219, 254]; // Border blue
+    const gridText: [number, number, number] = [80, 80, 80]; // Dark gray
 
-    const startY = 22;
-    const tableW = 180; // include effort + resource columns
-    const ganttX = tableW + 12; // start of gantt area
-    const ganttW = W - ganttX - 6;
-    const baseRowH = 5.2; // mm per row (minimum)
-    const headerH = 7;
-    const taskTextX = 20;
-    const taskTextW = 78;
+    // Layout constants
+    const marginL = 8;
+    const marginR = 8;
+    const marginT = 30; // For header
+    const marginB = 15; // For footer
+    const contentW = W - marginL - marginR;
+    const contentH = H - marginT - marginB;
 
-    // Flatten all tasks for display (with indentation in name)
+    // Column widths for table (in mm)
+    const colWbs = 12;
+    const colTaskName = 60;
+    const colStart = 22;
+    const colFinish = 22;
+    const colDur = 14;
+    const colPct = 14;
+    const colStatus = 20;
+    const colOwner = 28;
+    const tableColsW = colWbs + colTaskName + colStart + colFinish + colDur + colPct + colStatus + colOwner;
+    const ganttW = contentW - tableColsW - 4; // Gantt width (remaining space)
+
+    // Row sizing
+    const baseRowH = 5.5;
+    const tableHeaderH = 7;
+    const footerH = 12;
+
+    // Get all tasks
     const allVisible = [...projectTasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
+
+    // Calculate row height for task
     const getRowHeight = (task: Task): number => {
-      const indent = task.level * 2.5;
+      const indent = task.level * 1.5;
       doc.setFont('helvetica', hasChildren(projectTasks, task.id) ? 'bold' : 'normal');
-      doc.setFontSize(5.4);
-      const lines = doc.splitTextToSize(task.taskName || '', Math.max(8, taskTextW - indent));
+      doc.setFontSize(4.8);
+      const lines = doc.splitTextToSize(task.taskName || '', Math.max(5, colTaskName - indent));
       const lineCount = Math.max(1, (Array.isArray(lines) ? lines.length : 1));
-      return Math.max(baseRowH, 2.6 + Math.min(4, lineCount) * 2.0);
+      return Math.max(baseRowH, 2.2 + Math.min(3, lineCount) * 1.8);
     };
 
-    const maxBodyH = H - startY - headerH - 10;
+    // Pagination: split tasks into pages
+    const maxBodyH = contentH - tableHeaderH - footerH - 5;
     const pageTaskRows: Task[][] = [];
     let currentPageRows: Task[] = [];
     let usedHeight = 0;
@@ -1722,140 +1739,250 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     if (currentPageRows.length > 0 || pageTaskRows.length === 0) pageTaskRows.push(currentPageRows);
     const totalPages = pageTaskRows.length;
 
+    // Calculate date range and months
     const validTasks = allVisible.filter(t => t.startDate && t.endDate);
     const allDates = validTasks.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
     const minD = allDates.length ? new Date(Math.min(...allDates.map(d => d.getTime()))) : new Date();
     const maxD = allDates.length ? new Date(Math.max(...allDates.map(d => d.getTime()))) : new Date();
-    const totalDays = Math.max(1, Math.round((maxD.getTime() - minD.getTime()) / 86400000));
-    const dayPx = ganttW / totalDays;
 
+    // Get all months
+    const months: Date[] = [];
+    const cur = new Date(minD.getFullYear(), minD.getMonth(), 1);
+    while (cur <= maxD) {
+      months.push(new Date(cur));
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    const monthCount = months.length;
+
+    // Adaptive font size for months based on count
+    const monthFontSize = monthCount <= 3 ? 5.5 : monthCount <= 6 ? 5 : monthCount <= 12 ? 4.5 : 4;
+    const monthW = ganttW / monthCount; // Width per month
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Render each page
     for (let page = 0; page < totalPages; page += 1) {
       if (page > 0) doc.addPage('a4', 'landscape');
 
       const pageRows = pageTaskRows[page] || [];
 
-      doc.setFillColor(...pastelPrimary);
-      doc.rect(6, startY, tableW, headerH, 'F');
-      doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(...pastelPrimaryText);
-      const cols = [
-        { label: 'WBS',   x: 8 },
-        { label: 'Task',  x: taskTextX },
-        { label: 'Start', x: 102 },
-        { label: 'Finish',x: 117 },
-        { label: 'Days',  x: 132 },
-        { label: '%',     x: 141 },
-        { label: 'Eff',   x: 149 },
-        { label: 'Resource', x: 158 },
+      // ──────── HEADER ────────
+      doc.setFillColor(...headerBg);
+      doc.rect(0, 0, W, marginT, 'F');
+
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...headerText);
+      doc.text(`Project Implementation Schedule`, marginL, 10);
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...headerText);
+      doc.text(`${proj?.name ?? proj?.client ?? 'Project'}`, marginL, 18);
+
+      doc.setFontSize(9);
+      doc.setTextColor(...headerText);
+      doc.text(`REPORT DATE`, W - 50, 8);
+      doc.text(reportDate, W - 50, 14);
+
+      doc.setTextColor(...headerText);
+      doc.setFontSize(9);
+      doc.text(`PAGE`, W - 15, 8);
+      doc.text(`${page + 1} of ${totalPages}`, W - 15, 14);
+
+      // ──────── TABLE CONTENT ────────
+      let contentY = marginT + 2;
+
+      // Table header row
+      doc.setFillColor(...detailBg);
+      doc.rect(marginL, contentY, contentW, tableHeaderH, 'F');
+      doc.setDrawColor(...detailBorder);
+      doc.setLineWidth(0.2);
+      doc.rect(marginL, contentY, contentW, tableHeaderH, 'S');
+
+      doc.setFontSize(5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+
+      let colX = marginL;
+      const headerCols = [
+        { label: 'WBS', w: colWbs },
+        { label: 'Task Name', w: colTaskName },
+        { label: 'Start', w: colStart },
+        { label: 'Finish', w: colFinish },
+        { label: 'Dur.', w: colDur },
+        { label: '%', w: colPct },
+        { label: 'Status', w: colStatus },
+        { label: 'Owner', w: colOwner },
       ];
-      cols.forEach(c => doc.text(c.label, c.x, startY + 5));
+      headerCols.forEach((col) => {
+        doc.text(col.label, colX + 1, contentY + 4.5);
+        colX += col.w;
+      });
 
-      // Gantt header
-      doc.setFillColor(245,247,250);
-      doc.rect(ganttX, startY, ganttW, headerH, 'F');
-      doc.setDrawColor(...pastelGrid); doc.setLineWidth(0.3);
-      doc.rect(ganttX, startY, ganttW, headerH, 'S');
-      doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.setTextColor(...pastelPrimaryText);
+      // Gantt header (months)
+      doc.setFillColor(245, 247, 250);
+      doc.rect(colX, contentY, ganttW, tableHeaderH, 'F');
+      doc.setDrawColor(...detailBorder);
+      doc.rect(colX, contentY, ganttW, tableHeaderH, 'S');
 
-      const cur = new Date(minD.getFullYear(), minD.getMonth(), 1);
-      while (cur <= maxD) {
-        const offD = Math.round((cur.getTime() - minD.getTime()) / 86400000);
-        if (offD >= 0) {
-          const lx = ganttX + offD * dayPx;
-          doc.setDrawColor(200,210,230); doc.setLineWidth(0.1);
-          doc.line(lx, startY, lx, startY + headerH);
-          const monthLabel = cur.toLocaleString('en', { month: 'short', year: '2-digit' });
-          if (lx + 12 < ganttX + ganttW) doc.text(monthLabel, lx + 1, startY + 5);
+      months.forEach((mo, i) => {
+        const monthX = colX + i * monthW;
+        const monthLabel = mo.toLocaleString('en', { month: 'short', year: '2-digit' }).toUpperCase();
+        doc.setFontSize(monthFontSize);
+        doc.setTextColor(30, 30, 30);
+        const textW = doc.getTextWidth(monthLabel);
+        doc.text(monthLabel, monthX + (monthW - textW) / 2, contentY + 4.5);
+        if (i < months.length - 1) {
+          doc.setDrawColor(...detailBorder);
+          doc.setLineWidth(0.15);
+          doc.line(monthX + monthW, contentY, monthX + monthW, contentY + tableHeaderH);
         }
-        cur.setMonth(cur.getMonth() + 1);
-      }
+      });
 
-      const todayOff = Math.round((new Date().getTime() - minD.getTime()) / 86400000);
-      const todayX = ganttX + todayOff * dayPx;
+      contentY += tableHeaderH;
 
-      doc.setFont('helvetica','normal');
-      let yCursor = startY + headerH;
+      // Task rows
+      doc.setFont('helvetica', 'normal');
       pageRows.forEach((task, i) => {
-        const ry = yCursor;
         const rowH = getRowHeight(task);
+        const ry = contentY;
 
-        if (i % 2 === 0) { doc.setFillColor(248,250,252); doc.rect(6, ry, tableW, rowH, 'F'); }
-        doc.setDrawColor(226,232,240); doc.setLineWidth(0.15);
-        doc.line(6, ry + rowH, 6 + tableW, ry + rowH);
+        // Row background
+        if (i % 2 === 0) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(marginL, ry, contentW, rowH, 'F');
+        }
+
+        // Row border
+        doc.setDrawColor(...detailBorder);
+        doc.setLineWidth(0.15);
+        doc.line(marginL, ry + rowH, marginL + contentW, ry + rowH);
 
         const isPar = hasChildren(projectTasks, task.id);
-        const indent = task.level * 2.5;
+        const indent = task.level * 1.5;
+        const isMilestone = task.duration === 0;
+        const taskNameWithMarker = isMilestone ? `* ${task.taskName}` : task.taskName;
 
-        doc.setFontSize(5.8); doc.setTextColor(90);
-        doc.text(task.wbs || '', 8, ry + Math.min(rowH - 1.2, 4.6));
+        // Draw vertical column separators
+        let cx = marginL;
+        const colWidths = [colWbs, colTaskName, colStart, colFinish, colDur, colPct, colStatus, colOwner];
+        colWidths.forEach((w, idx) => {
+          if (idx > 0) {
+            doc.setDrawColor(...detailBorder);
+            doc.setLineWidth(0.1);
+            doc.line(cx, ry, cx, ry + rowH);
+          }
+          cx += w;
+        });
 
+        const ymid = ry + rowH / 2 + 0.4;
+
+        // WBS
+        doc.setFontSize(4.8);
+        doc.setTextColor(90, 90, 90);
+        doc.text(task.wbs || '', marginL + 1, ymid);
+
+        // Task Name
         doc.setFont('helvetica', isPar ? 'bold' : 'normal');
-        doc.setTextColor(isPar ? 65 : 30, isPar ? 65 : 30, isPar ? 155 : 30);
-        doc.setFontSize(5.4);
-        const nameLines = doc.splitTextToSize(task.taskName || '', Math.max(8, taskTextW - indent));
-        doc.text(nameLines, taskTextX + indent, ry + 2.9, { maxWidth: Math.max(8, taskTextW - indent) });
+        doc.setTextColor(isPar ? 20 : 40, isPar ? 20 : 40, isPar ? 60 : 40);
+        doc.setFontSize(4.6);
+        const nameLines = doc.splitTextToSize(taskNameWithMarker || '', Math.max(4, colTaskName - indent - 1));
+        doc.text(nameLines, marginL + colWbs + indent + 1, ymid - (Math.min(nameLines.length, 2) - 1) * 0.9, { maxWidth: Math.max(4, colTaskName - indent - 1) });
 
-        doc.setFont('helvetica','normal'); doc.setTextColor(80); doc.setFontSize(5.1);
-        const ym = ry + rowH / 2 + 0.6;
-        doc.text(task.startDate ? fmtDate(task.startDate) : '', 102, ym);
-        doc.text(task.endDate ? fmtDate(task.endDate) : '', 117, ym);
+        // Start date
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...gridText);
+        doc.setFontSize(4.5);
+        const startDateStr = task.startDate ? fmtDatePdf(task.startDate) : '';
+        doc.text(startDateStr, marginL + colWbs + colTaskName + 1, ymid);
 
-        doc.setFont('helvetica','normal'); doc.setTextColor(80);
-        doc.text(`${task.duration}d`, 132, ym);
+        // Finish date
+        const finishDateStr = task.endDate ? fmtDatePdf(task.endDate) : '';
+        doc.text(finishDateStr, marginL + colWbs + colTaskName + colStart + 1, ymid);
 
+        // Duration
+        doc.setFontSize(4.5);
+        doc.text(`${task.duration}d`, marginL + colWbs + colTaskName + colStart + colFinish + 1, ymid);
+
+        // Percentage
         const pct = task.percentComplete;
-        const [pr,pg,pb] = pct >= 100 ? [16,185,129] : pct >= 60 ? [59,130,246] : [79,70,229];
-        doc.setFont('helvetica','bold'); doc.setTextColor(pr,pg,pb); doc.setFontSize(5.2);
-        doc.text(`${pct}%`, 141, ym);
+        const [pr, pg, pb] = pct >= 100 ? [16, 185, 129] : pct >= 60 ? [59, 130, 246] : [79, 70, 229];
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(pr, pg, pb);
+        doc.setFontSize(4.6);
+        doc.text(`${pct}%`, marginL + colWbs + colTaskName + colStart + colFinish + colDur + 1, ymid);
 
-        doc.setFont('helvetica','normal'); doc.setTextColor(80); doc.setFontSize(5.0);
-        doc.text(`${Number(task.effortManday || 0).toFixed(3)}`, 149, ym);
+        // Status
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...gridText);
+        doc.setFontSize(4.3);
+        const statusText = task.status || 'Todo';
+        doc.text(statusText, marginL + colWbs + colTaskName + colStart + colFinish + colDur + colPct + 1, ymid);
 
-        doc.setFont('helvetica','normal'); doc.setTextColor(80); doc.setFontSize(5.0);
-        const resourceText = String(task.resource || '-');
-        const resourceOneLine = doc.splitTextToSize(resourceText, 13)[0] || '-';
-        doc.text(resourceOneLine, 158, ym);
+        // Owner
+        doc.setFontSize(4.3);
+        const ownerText = String(task.resource || '-');
+        const ownerLines = doc.splitTextToSize(ownerText, colOwner - 2);
+        doc.text(ownerLines, marginL + colWbs + colTaskName + colStart + colFinish + colDur + colPct + colStatus + 1, ymid);
 
         // Gantt bar
-        doc.setDrawColor(226,232,240); doc.setLineWidth(0.1);
-        doc.line(ganttX, ry + rowH, ganttX + ganttW, ry + rowH);
         if (task.startDate && task.endDate) {
-          const s2 = Math.round((new Date(task.startDate).getTime() - minD.getTime()) / 86400000);
-          const e2 = Math.round((new Date(task.endDate).getTime() - minD.getTime()) / 86400000);
-          const bx = ganttX + s2 * dayPx;
-          const bw = Math.max((e2 - s2) * dayPx, 1);
+          const s1 = new Date(task.startDate);
+          const e1 = new Date(task.endDate);
+          const startMonth = (s1.getFullYear() - minD.getFullYear()) * 12 + (s1.getMonth() - minD.getMonth());
+          const endMonth = (e1.getFullYear() - minD.getFullYear()) * 12 + (e1.getMonth() - minD.getMonth());
+
+          const bx = colX + Math.max(0, startMonth) * monthW + 1;
+          const bw = Math.max(monthW * (Math.min(endMonth, monthCount - 1) - Math.max(0, startMonth) + 1) - 2, 1);
           const by = ry + 1;
           const bh = rowH - 2;
-          const fw = bw * (task.percentComplete / 100);
 
-          doc.setFillColor(238,242,255); doc.setDrawColor(79,70,229); doc.setLineWidth(0.12);
-          doc.roundedRect(bx, by, bw, bh, 0.4, 0.4, 'FD');
-          if (fw > 0.3) {
-            const [r,g,b] = task.percentComplete >= 100 ? [16,185,129] : task.percentComplete >= 60 ? [59,130,246] : [79,70,229];
-            doc.setFillColor(r,g,b);
-            doc.roundedRect(bx, by, fw, bh, 0.4, 0.4, 'F');
+          // Background bar
+          doc.setFillColor(238, 242, 255);
+          doc.setDrawColor(79, 70, 229);
+          doc.setLineWidth(0.1);
+          doc.rect(bx, by, bw, bh, 'FD');
+
+          // Progress bar
+          if (pct > 0) {
+            const fw = bw * (pct / 100);
+            doc.setFillColor(pr, pg, pb);
+            doc.rect(bx, by, fw, bh, 'F');
           }
         }
 
-        yCursor += rowH;
+        // Gantt column dividers
+        months.forEach((_, i) => {
+          if (i < months.length - 1) {
+            doc.setDrawColor(...detailBorder);
+            doc.setLineWidth(0.1);
+            doc.line(colX + (i + 1) * monthW, ry, colX + (i + 1) * monthW, ry + rowH);
+          }
+        });
+
+        contentY += rowH;
       });
 
-      if (todayOff >= 0 && todayOff <= totalDays) {
-        doc.setDrawColor(239,68,68); doc.setLineWidth(0.3);
-        doc.line(todayX, startY + headerH, todayX, yCursor);
-      }
+      // Gantt border
+      doc.setDrawColor(...detailBorder);
+      doc.setLineWidth(0.2);
+      doc.line(colX - 0.5, marginT + 2, colX - 0.5, contentY);
 
-      doc.setDrawColor(...pastelGrid); doc.setLineWidth(0.3);
-      doc.line(ganttX - 3, startY, ganttX - 3, yCursor);
+      // ──────── FOOTER ────────
+      const footerY = H - marginB + 2;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
 
-      doc.setFontSize(5.5); doc.setTextColor(150);
-      doc.text(`Project ID: ${proj?.code || projectId} | Client: ${proj?.client || '-'}`, 10, H - 7);
-      doc.setFontSize(6); doc.setTextColor(160);
-      doc.text('ProjectMS - Task Plan + Gantt', 10, H - 4);
-      doc.text(`Page ${page + 1} of ${totalPages}`, W - 10, H - 4, { align: 'right' });
+      doc.text('Prepared by Humanico Public Company Limited', marginL, footerY);
+      doc.text('Confidential', W / 2 - 10, footerY);
+      doc.text(`Project ID: ${proj?.code || projectId}`, W - marginR - 50, footerY);
+      doc.text(`Page ${page + 1} of ${totalPages}`, W - marginR - 15, footerY);
     }
 
     doc.save(`tasks-gantt-${projectId}.pdf`);
-    toast.success('Exported PDF'); setShowExport(false);
+    toast.success('Exported PDF');
+    setShowExport(false);
   };
 
   // ── Table content ─────────────────────────────────────────────────────────
