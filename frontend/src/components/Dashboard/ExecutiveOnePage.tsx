@@ -2,7 +2,7 @@ import React from 'react';
 import { differenceInCalendarDays, differenceInCalendarMonths, endOfMonth, getDaysInMonth, isValid, parseISO, startOfDay, startOfMonth } from 'date-fns';
 import { C, Card, MILESTONE_STATUS } from '../Common';
 import { useStore } from '../../store';
-import { compareWbs, fmtDate } from '../../utils';
+import { compareWbs, computeBaselineProgress, fmtDate } from '../../utils';
 import type { ChangeRequest, Effort, Issue, Milestone, Project, Task } from '../../types';
 
 interface Props {
@@ -113,6 +113,14 @@ function monthCompactLabel(month: Date): string {
   return `${m}/${y}`;
 }
 
+function pct(used: number, total: number): number {
+  return total > 0 ? Math.round((used / total) * 100) : 0;
+}
+
+function money(value: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
 function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = React.useState(false);
 
@@ -190,7 +198,7 @@ function EffortRows({ efforts }: { efforts: Effort[] }) {
 
 export default function ExecutiveOnePage({ project }: Props) {
   const isMobile = useIsMobile();
-  const { tasks, milestones, issues, efforts, changeRequests } = useStore();
+  const { tasks, milestones, issues, efforts, changeRequests, members, risks } = useStore();
   const [showActivitiesModal, setShowActivitiesModal] = React.useState<null | 'inProgress' | 'upcoming' | 'overdue'>(null);
   const ganttWrapRef = React.useRef<HTMLDivElement | null>(null);
   const [ganttWrapWidth, setGanttWrapWidth] = React.useState(0);
@@ -214,6 +222,14 @@ export default function ExecutiveOnePage({ project }: Props) {
   const projectIssues = React.useMemo(
     () => issues.filter((i) => i.projectId === project.id),
     [issues, project.id],
+  );
+  const projectMembers = React.useMemo(
+    () => members.filter((m) => m.projectId === project.id),
+    [members, project.id],
+  );
+  const projectRisks = React.useMemo(
+    () => risks.filter((r) => r.projectId === project.id),
+    [risks, project.id],
   );
   const projectEfforts = React.useMemo(
     () => efforts.filter((e) => e.projectId === project.id),
@@ -282,6 +298,56 @@ export default function ExecutiveOnePage({ project }: Props) {
   const openIssues = React.useMemo(
     () => projectIssues.filter((issue) => issue.status === 'Open' || issue.status === 'In Progress'),
     [projectIssues],
+  );
+  const rootTasks = React.useMemo(
+    () => projectTasks.filter((t) => !t.parentId),
+    [projectTasks],
+  );
+  const overallProgress = React.useMemo(
+    () => (rootTasks.length ? Math.round(rootTasks.reduce((sum, t) => sum + Number(t.percentComplete || 0), 0) / rootTasks.length) : 0),
+    [rootTasks],
+  );
+  const doneRootTasks = React.useMemo(
+    () => rootTasks.filter((t) => Number(t.percentComplete || 0) === 100).length,
+    [rootTasks],
+  );
+  const inProgressRootTasks = React.useMemo(
+    () => rootTasks.filter((t) => Number(t.percentComplete || 0) > 0 && Number(t.percentComplete || 0) < 100).length,
+    [rootTasks],
+  );
+  const todayIso = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const baselineToday = React.useMemo(
+    () => computeBaselineProgress(projectTasks, [todayIso]),
+    [projectTasks, todayIso],
+  );
+  const plannedPercent = baselineToday[0]?.baselinePercent ?? 0;
+
+  const totalContract = React.useMemo(
+    () => projectMilestones.reduce((sum, m) => sum + Number(m.amount || 0), 0),
+    [projectMilestones],
+  );
+  const collectedAmount = React.useMemo(
+    () => projectMilestones.filter((m) => String(m.status || '').toLowerCase() === 'paid').reduce((sum, m) => sum + Number(m.amount || 0), 0),
+    [projectMilestones],
+  );
+  const paymentPct = pct(collectedAmount, totalContract);
+
+  const totalMandayBudget = React.useMemo(
+    () => projectEfforts.reduce((sum, e) => sum + Number(e.budgetManday || 0), 0),
+    [projectEfforts],
+  );
+  const totalMandayUsed = React.useMemo(
+    () => projectEfforts.reduce((sum, e) => sum + Object.values(e.monthly || {}).reduce((acc, value) => acc + Number(value || 0), 0), 0),
+    [projectEfforts],
+  );
+  const mandayPct = pct(totalMandayUsed, totalMandayBudget);
+  const openRiskCount = React.useMemo(
+    () => projectRisks.filter((r) => r.status === 'Monitoring' || r.status === 'Mitigating').length,
+    [projectRisks],
+  );
+  const activeInternalMembers = React.useMemo(
+    () => projectMembers.filter((m) => String(m.type || '').toLowerCase() === 'internal').length,
+    [projectMembers],
   );
 
   const openTab = React.useCallback((tab: string) => {
@@ -385,6 +451,55 @@ export default function ExecutiveOnePage({ project }: Props) {
           </div>
         </div>
       </div>
+
+      <Card style={{ padding: 0, marginBottom: 14, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ padding: '12px 16px', borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none' }}>
+            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Overall Progress</div>
+            <div style={{ fontSize: 28, lineHeight: 1.1, fontWeight: 900, color: C.primary, marginTop: 4 }}>{overallProgress}%</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 3 }}>{doneRootTasks} done / {inProgressRootTasks} in progress</div>
+            <div style={{ marginTop: 6, height: 6, background: C.bg2, borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(overallProgress, 100)}%`, height: '100%', background: C.primary }} />
+            </div>
+            <div style={{ fontSize: 11, marginTop: 5, fontWeight: 600, color: overallProgress >= plannedPercent ? C.green : C.red }}>
+              {overallProgress >= plannedPercent ? `Ahead of target (${overallProgress - plannedPercent}%)` : `Behind target (${plannedPercent - overallProgress}%)`}
+            </div>
+          </div>
+
+          <div style={{ padding: '12px 16px', borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none' }}>
+            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Payment</div>
+            <div style={{ fontSize: 28, lineHeight: 1.1, fontWeight: 900, color: C.green, marginTop: 4 }}>{paymentPct}%</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 3 }}>{money(collectedAmount)} THB collected / {projectMilestones.length} milestones</div>
+            <div style={{ marginTop: 6, height: 6, background: C.bg2, borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(paymentPct, 100)}%`, height: '100%', background: C.green }} />
+            </div>
+          </div>
+
+          <div style={{ padding: '12px 16px', borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none' }}>
+            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Manday Used</div>
+            <div style={{ fontSize: 28, lineHeight: 1.1, fontWeight: 900, color: mandayPct > 90 ? C.red : C.amber, marginTop: 4 }}>
+              {totalMandayUsed.toFixed(1)}
+              <span style={{ fontSize: 13, color: C.text3, fontWeight: 700 }}>/{totalMandayBudget.toFixed(1)}</span>
+            </div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 3 }}>{mandayPct}% utilized / {activeInternalMembers} members</div>
+            <div style={{ marginTop: 6, height: 6, background: C.bg2, borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(mandayPct, 100)}%`, height: '100%', background: mandayPct > 90 ? C.red : C.amber }} />
+            </div>
+          </div>
+
+          <div style={{ padding: '12px 16px' }}>
+            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Issues / Risks</div>
+            <div style={{ fontSize: 28, lineHeight: 1.1, fontWeight: 900, color: openIssues.length > 0 ? C.red : C.green, marginTop: 4 }}>
+              {openIssues.length}
+              <span style={{ fontSize: 13, color: C.text3, fontWeight: 700 }}> issues</span>
+            </div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 3 }}>{openRiskCount} risks / {openRiskCount > 0 ? 'monitoring' : 'under control'}</div>
+            <div style={{ marginTop: 6, height: 6, background: C.bg2, borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ width: `${openIssues.length > 0 ? 100 : 0}%`, height: '100%', background: C.red }} />
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card style={{ padding: isMobile ? 12 : 14, marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>

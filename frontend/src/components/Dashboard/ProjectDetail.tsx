@@ -13,7 +13,6 @@ import ChangeRequestTab  from '../ChangeRequest/ChangeRequestTab';
 import IssuesTab         from '../Issues/IssuesTab';
 import RiskRegisterTab   from '../RiskRegister/RiskRegisterTab';
 import ProjectEnvironmentTab from './ProjectEnvironmentTab';
-import ProjectReport     from './ProjectReport';
 import ExecutiveOnePage  from './ExecutiveOnePage';
 import { useStore }      from '../../store';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
@@ -201,7 +200,6 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'risks',    label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
     { id: 'env',      label: 'Program URL', icon: '🌐', count: projectEnvironments.filter((e) => e.projectId === project.id).length },
     { id: 'onepage',  label: 'One Page',   icon: '🧭' },
-    { id: 'report',   label: 'Report',     icon: '📊' },
   ];
 
   // Filter tabs based on role permissions
@@ -295,11 +293,7 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
         {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} extraActions={copyButton('risks')} /></div>}
         {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
-        {/* Old Section
-        {activeTab === 'report'  && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectReport project={project} /></div>}
-        */}
         {activeTab === 'onepage' && <div style={{ height: '100%', overflowY: 'auto' }}><ExecutiveOnePage project={project} /></div>}
-        {activeTab === 'report'  && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectReport project={project} /></div>}
       </div>
 
       {copyModalOpen && copyScope && (
