@@ -1676,12 +1676,11 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const reportDate = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
 
     // Color scheme
-    const headerBg: [number, number, number] = [219, 234, 254]; // Light blue
-    const headerText: [number, number, number] = [30, 30, 30]; // Dark text
-    const detailBg: [number, number, number] = [238, 242, 255]; // Light blue
-    const detailBorder: [number, number, number] = [191, 219, 254]; // Border blue
-    const gridText: [number, number, number] = [80, 80, 80]; // Dark gray
-    const boxBorder: [number, number, number] = [49, 46, 129]; // Box border
+    const headerText: [number, number, number] = [30, 30, 30];
+    const headerBorder: [number, number, number] = [203, 213, 225]; // Thin gray borders
+    const detailBg: [number, number, number] = [248, 250, 252];
+    const detailBorder: [number, number, number] = [226, 232, 240];
+    const gridText: [number, number, number] = [80, 80, 80];
 
     // Layout constants
     const marginL = 8;
@@ -1767,12 +1766,12 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       const pageRows = pageTaskRows[page] || [];
 
       // ──────── HEADER ────────
-      doc.setFillColor(...headerBg);
+      doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, W, marginT, 'F');
 
-      // Header border
-      doc.setDrawColor(...boxBorder);
-      doc.setLineWidth(0.5);
+      // Header border (thin gray)
+      doc.setDrawColor(...headerBorder);
+      doc.setLineWidth(0.2);
       doc.rect(0, 0, W, marginT, 'S');
 
       doc.setFontSize(16);
@@ -1788,12 +1787,12 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       // REPORT DATE box
       const dateBoxX = W - 58;
       const dateBoxY = 2;
-      doc.setDrawColor(...boxBorder);
-      doc.setLineWidth(0.5);
+      doc.setDrawColor(...headerBorder);
+      doc.setLineWidth(0.2);
       doc.rect(dateBoxX, dateBoxY, 25, 11, 'S');
       doc.setFontSize(7);
       doc.setFont('arial', 'bold');
-      doc.setTextColor(...boxBorder);
+      doc.setTextColor(100, 116, 139);
       doc.text(`REPORT DATE`, dateBoxX + 1.5, dateBoxY + 4);
       doc.setFontSize(8);
       doc.setFont('arial', 'normal');
@@ -1803,12 +1802,12 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       // PAGE box
       const pageBoxX = W - 28;
       const pageBoxY = 2;
-      doc.setDrawColor(...boxBorder);
-      doc.setLineWidth(0.5);
+      doc.setDrawColor(...headerBorder);
+      doc.setLineWidth(0.2);
       doc.rect(pageBoxX, pageBoxY, 23, 11, 'S');
       doc.setFontSize(7);
       doc.setFont('arial', 'bold');
-      doc.setTextColor(...boxBorder);
+      doc.setTextColor(100, 116, 139);
       doc.text(`PAGE`, pageBoxX + 1, pageBoxY + 4);
       doc.setFontSize(8);
       doc.setFont('arial', 'normal');
@@ -1977,14 +1976,17 @@ export default function TasksTab({ projectId, extraActions }: Props) {
             doc.rect(bx, by, fw, bh, 'F');
           }
 
-          // Parent task markers (diamonds at edges)
+          // Parent task markers (chevron edges)
           if (isPar) {
-            const diamondSize = 1.2;
-            // Left diamond
-            doc.setFillColor(isPar ? 49 : 79, isPar ? 46 : 70, isPar ? 129 : 229);
-            doc.polygon([[bx + 0.6, by + bh / 2], [bx + diamondSize + 0.2, by], [bx + diamondSize + 0.2, by + bh], [bx + 0.6, by + bh / 2]]);
-            // Right diamond
-            doc.polygon([[bx + bw - 0.6, by + bh / 2], [bx + bw - diamondSize - 0.2, by], [bx + bw - diamondSize - 0.2, by + bh], [bx + bw - 0.6, by + bh / 2]]);
+            const markerSize = Math.min(1.3, Math.max(0.8, bh / 2));
+            doc.setDrawColor(49, 46, 129);
+            doc.setLineWidth(0.6);
+            // Left chevron
+            doc.line(bx + markerSize, by, bx + 0.4, by + bh / 2);
+            doc.line(bx + 0.4, by + bh / 2, bx + markerSize, by + bh);
+            // Right chevron
+            doc.line(bx + bw - markerSize, by, bx + bw - 0.4, by + bh / 2);
+            doc.line(bx + bw - 0.4, by + bh / 2, bx + bw - markerSize, by + bh);
           }
         }
 
