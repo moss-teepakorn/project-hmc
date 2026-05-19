@@ -1821,10 +1821,11 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.text('Project Implementation Schedule', W / 2, 10.6, { align: 'center' });
 
       // Right: Status boxes (Project Status, Overall %) stacked vertically + Print Date text
-      const boxW = 30, boxH = 4.8, boxGap = 0.8;
+      const boxW = 30;
+      const boxH = 4.8;
+      const boxGap = 1.2;
       const boxX = W - PR - boxW - 4;
       const boxY = 4.8;
-      const boxGap = 1.2;
       const overallBoxY = boxY + boxH + boxGap;
 
       // Project Status box (top)
