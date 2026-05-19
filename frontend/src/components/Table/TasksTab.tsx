@@ -1820,33 +1820,34 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.setFontSize(11.5); setPdfFont('bold'); doc.setTextColor(...colText);
       doc.text('Project Implementation Schedule', W / 2, 10.6, { align: 'center' });
 
-      // Right: Status boxes (Project Status, Overall %) side-by-side + Report Date text below
-      const boxW = 28, boxH = 5, boxGap = 1.2;
-      const statusBoxX = W - PR - boxW - boxGap - boxW - 2;
-      const overallBoxX = statusBoxX + boxW + boxGap;
-      const boxY = 3.5;
+      // Center: Status boxes (Project Status, Overall %) stacked vertically + Print Date below
+      const boxW = 32, boxH = 4.8, boxGap = 0.8;
+      const stackCenterX = W / 2;
+      const statusBoxX = stackCenterX - boxW / 2;
+      const boxY = 3.2;
+      const overallBoxY = boxY + boxH + boxGap;
       
-      // Project Status box (left)
+      // Project Status box (top, centered)
       doc.setFillColor(255, 255, 255);
       doc.setDrawColor(...scheduleColor);
       doc.setLineWidth(0.35);
       doc.roundedRect(statusBoxX, boxY, boxW, boxH, 1.2, 1.2, 'FD');
       doc.setFontSize(5.2); setPdfFont('bold'); doc.setTextColor(...scheduleColor);
-      doc.text(scheduleStatus, statusBoxX + boxW / 2, boxY + 3, { align: 'center' });
+      doc.text(scheduleStatus, stackCenterX, boxY + 2.8, { align: 'center' });
 
-      // Overall Progress box (right)
+      // Overall Progress box (middle, centered)
       doc.setFillColor(255, 255, 255);
       doc.setDrawColor(...colText);
       doc.setLineWidth(0.3);
-      doc.roundedRect(overallBoxX, boxY, boxW, boxH, 1.2, 1.2, 'FD');
-      doc.setFontSize(5); setPdfFont('bold'); doc.setTextColor(...colText);
-      doc.text('Overall', overallBoxX + boxW / 2, boxY + 1.7, { align: 'center' });
+      doc.roundedRect(statusBoxX, overallBoxY, boxW, boxH, 1.2, 1.2, 'FD');
+      doc.setFontSize(4.8); setPdfFont('bold'); doc.setTextColor(...colText);
+      doc.text('Overall', stackCenterX, overallBoxY + 1.6, { align: 'center' });
       doc.setFontSize(6.5); setPdfFont('bold'); doc.setTextColor(...colText);
-      doc.text(`${overallProgress}%`, overallBoxX + boxW / 2, boxY + 3.8, { align: 'center' });
+      doc.text(`${overallProgress}%`, stackCenterX, overallBoxY + 3.6, { align: 'center' });
 
-      // Report Date text (below, no box)
-      doc.setFontSize(5.5); setPdfFont('normal'); doc.setTextColor(...colText);
-      doc.text(`Print Date : ${reportDateStr}`, W - PR, boxY + 6.5, { align: 'right' });
+      // Report Date text (below, centered with spacing from edges)
+      doc.setFontSize(5); setPdfFont('normal'); doc.setTextColor(...colText);
+      doc.text(`Print Date : ${reportDateStr}`, stackCenterX, overallBoxY + boxH + 2.5, { align: 'center' });
 
       // ── TABLE HEADER ──
       let cy = startY;
