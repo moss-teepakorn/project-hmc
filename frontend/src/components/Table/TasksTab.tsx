@@ -1823,7 +1823,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       // Right: Status boxes (Project Status, Overall %) stacked vertically + Print Date text
       const boxW = 30, boxH = 4.8, boxGap = 0.8;
       const boxX = W - PR - boxW - 4;
-      const boxY = 3.2;
+      const boxY = 4.8;
+      const boxGap = 1.2;
       const overallBoxY = boxY + boxH + boxGap;
 
       // Project Status box (top)
@@ -1846,7 +1847,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
       // Report Date text (below boxes, centered under boxes)
       doc.setFontSize(5); setPdfFont('normal'); doc.setTextColor(...colText);
-      doc.text(`Print Date : ${reportDateStr}`, boxX + boxW / 2, overallBoxY + boxH + 2.2, { align: 'center' });
+      doc.text(`Print Date : ${reportDateStr}`, boxX + boxW / 2, overallBoxY + boxH + 3.0, { align: 'center' });
 
       // ── TABLE HEADER ──
       let cy = startY;
