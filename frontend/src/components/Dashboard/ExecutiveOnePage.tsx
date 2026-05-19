@@ -200,6 +200,7 @@ export default function ExecutiveOnePage({ project }: Props) {
   const isMobile = useIsMobile();
   const { tasks, milestones, issues, efforts, changeRequests, members, risks } = useStore();
   const [showActivitiesModal, setShowActivitiesModal] = React.useState<null | 'inProgress' | 'upcoming' | 'overdue'>(null);
+  const [showTodayLine, setShowTodayLine] = React.useState(false);
   const ganttWrapRef = React.useRef<HTMLDivElement | null>(null);
   const [ganttWrapWidth, setGanttWrapWidth] = React.useState(0);
 
@@ -381,6 +382,18 @@ export default function ExecutiveOnePage({ project }: Props) {
   const activityModalRows = showActivitiesModal ? activityTaskRows[showActivitiesModal] : [];
 
   React.useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
+  React.useEffect(() => {
     const node = ganttWrapRef.current;
     if (!node) return;
 
@@ -504,15 +517,33 @@ export default function ExecutiveOnePage({ project }: Props) {
       <Card style={{ padding: isMobile ? 12 : 14, marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>Project Plan (Plan vs Actual)</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: '#64748B' }}>Plan</span>
-            <span style={{ width: 16, height: 8, borderRadius: 99, background: PLAN_PATTERN, display: 'inline-block' }} />
-            {Object.entries(ACTUAL_STATE).map(([key, state]) => (
-              <React.Fragment key={key}>
-                <span style={{ fontSize: 11, color: '#64748B' }}>{state.label}</span>
-                <span style={{ width: 16, height: 8, borderRadius: 99, background: state.color, display: 'inline-block' }} />
-              </React.Fragment>
-            ))}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              onClick={() => setShowTodayLine(!showTodayLine)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 6,
+                border: showTodayLine ? `2px solid ${C.red}` : `1px solid ${C.border}`,
+                background: showTodayLine ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
+                color: showTodayLine ? C.red : C.text2,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              {showTodayLine ? '✓ Today Line' : '○ Today Line'}
+            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: '#64748B' }}>Plan</span>
+              <span style={{ width: 16, height: 8, borderRadius: 99, background: PLAN_PATTERN, display: 'inline-block' }} />
+              {Object.entries(ACTUAL_STATE).map(([key, state]) => (
+                <React.Fragment key={key}>
+                  <span style={{ fontSize: 11, color: '#64748B' }}>{state.label}</span>
+                  <span style={{ width: 16, height: 8, borderRadius: 99, background: state.color, display: 'inline-block' }} />
+                </React.Fragment>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -610,6 +641,20 @@ export default function ExecutiveOnePage({ project }: Props) {
                         background: actual.key === 'notStart' ? '#9AA6B2' : state.color,
                       }}
                     />
+                    {showTodayLine && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: `${monthPercent(rangeStartMonth, monthCount, clampDate(today, rangeStart, rangeEnd), 'start')}%`,
+                          width: 2,
+                          height: 36,
+                          background: C.red,
+                          animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                          boxShadow: `0 0 8px ${C.red}`,
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
