@@ -8,7 +8,7 @@ import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
 import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C } from '../Common';
-import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, PROCESS_STATUS_STYLE } from '../../utils';
+import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, PROCESS_STATUS_STYLE, computeBaselineProgress } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import type { Task, ViewMode } from '../../types';
 
@@ -1781,6 +1781,26 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const mFontSz = mCnt <= 4 ? 6 : mCnt <= 8 ? 5.5 : mCnt <= 14 ? 5 : 4.5;
     const dayOffset = (d: Date) => Math.floor((d.getTime() - minD.getTime()) / MS_DAY);
 
+    // ── Calculate Project Status & Overall Progress ──
+    const rootTasks = all.filter(t => !t.parentId);
+    const overallProgress = rootTasks.length ? Math.round(rootTasks.reduce((sum, t) => sum + Number(t.percentComplete || 0), 0) / rootTasks.length) : 0;
+    const todayIso = today.toISOString().slice(0, 10);
+    const todayBaseline = computeBaselineProgress(all, [todayIso]);
+    const plannedPercent = todayBaseline[0]?.baselinePercent ?? 0;
+    const scheduleGap = plannedPercent - overallProgress;
+    const scheduleStatus = !todayBaseline.length ? 'Plan N/A'
+      : scheduleGap > 20 ? 'Block'
+      : scheduleGap > 3 ? 'Delay'
+      : 'On Track';
+    const scheduleColor = scheduleStatus === 'Block' ? [239, 68, 68] as [number, number, number]
+      : scheduleStatus === 'Delay' ? [245, 158, 11] as [number, number, number]
+      : scheduleStatus === 'Plan N/A' ? colMuted
+      : [16, 185, 129] as [number, number, number];
+    const scheduleBg = scheduleStatus === 'Block' ? [254, 242, 242] as [number, number, number]
+      : scheduleStatus === 'Delay' ? [254, 252, 232] as [number, number, number]
+      : scheduleStatus === 'Plan N/A' ? [241, 245, 249] as [number, number, number]
+      : [240, 253, 250] as [number, number, number];
+
     // ── Render pages ──
     for (let pg = 0; pg < totalPages; pg++) {
       if (pg > 0) doc.addPage('a4', 'landscape');
@@ -1800,16 +1820,40 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.setFontSize(11.5); setPdfFont('bold'); doc.setTextColor(...colText);
       doc.text('Project Implementation Schedule', W / 2, 10.6, { align: 'center' });
 
-      // Right: REPORT DATE box (rounded, thin gray border)
-      const dbW = 36, dbH = 12, dbX = W - PR - dbW - 2, dbY = 3.5;
+      // Right: Status boxes (Project Status, Overall %, Report Date) stacked vertically
+      const boxW = 32, boxH = 5.2, boxGap = 0.8;
+      const boxX = W - PR - boxW - 2;
+      
+      // Project Status box (top)
+      const statusBoxY = 3.5;
+      doc.setFillColor(...scheduleBg);
+      doc.setDrawColor(...scheduleColor);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(boxX, statusBoxY, boxW, boxH, 1.5, 1.5, 'FD');
+      doc.setFontSize(5); setPdfFont('bold'); doc.setTextColor(...scheduleColor);
+      doc.text(scheduleStatus, boxX + boxW / 2, statusBoxY + 3, { align: 'center' });
+
+      // Overall Progress box (middle)
+      const overallBoxY = statusBoxY + boxH + boxGap;
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(...colGray);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(boxX, overallBoxY, boxW, boxH, 1.5, 1.5, 'FD');
+      doc.setFontSize(5); setPdfFont('bold'); doc.setTextColor(...colMuted);
+      doc.text('Overall', boxX + boxW / 2, overallBoxY + 1.8, { align: 'center' });
+      doc.setFontSize(6.5); setPdfFont('bold'); doc.setTextColor(59, 130, 246);
+      doc.text(`${overallProgress}%`, boxX + boxW / 2, overallBoxY + 3.8, { align: 'center' });
+
+      // Report Date box (bottom)
+      const reportBoxY = overallBoxY + boxH + boxGap;
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(...colGray);
       doc.setLineWidth(0.25);
-      doc.roundedRect(dbX, dbY, dbW, dbH, 2, 2, 'FD');
-      doc.setFontSize(5.5); setPdfFont('bold'); doc.setTextColor(...colMuted);
-      doc.text('REPORT DATE', dbX + dbW / 2, dbY + 3.5, { align: 'center' });
-      doc.setFontSize(7); setPdfFont('normal'); doc.setTextColor(...colText);
-      doc.text(reportDateStr, dbX + dbW / 2, dbY + 9, { align: 'center' });
+      doc.roundedRect(boxX, reportBoxY, boxW, boxH, 1.5, 1.5, 'FD');
+      doc.setFontSize(5); setPdfFont('bold'); doc.setTextColor(...colMuted);
+      doc.text('REPORT DATE', boxX + boxW / 2, reportBoxY + 1.8, { align: 'center' });
+      doc.setFontSize(5.2); setPdfFont('normal'); doc.setTextColor(...colText);
+      doc.text(reportDateStr, boxX + boxW / 2, reportBoxY + 3.8, { align: 'center' });
 
       // ── TABLE HEADER ──
       let cy = startY;
