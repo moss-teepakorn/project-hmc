@@ -1844,9 +1844,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.setFontSize(6.5); setPdfFont('bold'); doc.setTextColor(...colText);
       doc.text(`${overallProgress}%`, boxX + boxW / 2, overallBoxY + 3.6, { align: 'center' });
 
-      // Report Date text (below boxes, right-aligned)
+      // Report Date text (below boxes, centered under boxes)
       doc.setFontSize(5); setPdfFont('normal'); doc.setTextColor(...colText);
-      doc.text(`Print Date : ${reportDateStr}`, boxX + boxW, overallBoxY + boxH + 2.2, { align: 'right' });
+      doc.text(`Print Date : ${reportDateStr}`, boxX + boxW / 2, overallBoxY + boxH + 2.2, { align: 'center' });
 
       // ── TABLE HEADER ──
       let cy = startY;
