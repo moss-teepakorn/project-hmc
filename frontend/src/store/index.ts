@@ -312,16 +312,9 @@ export const useStore = create<Store>((set, get) => ({
     }
   },
   updateEffortMonthly: async (id, month, manday) => {
-    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
-    try {
-      set(s => ({ efforts: s.efforts.map(e => e.id === id ? { ...e, monthly: { ...e.monthly, [month]: manday } } : e) }));
-      await effortApi.updateMonthly(id, month, manday);
-    } finally {
-      set((s: any) => {
-        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
-        return { _pendingMutationCount: next, dataLoading: next > 0 };
-      });
-    }
+    // Keep monthly typing smooth: optimistic update without global loading overlay.
+    set(s => ({ efforts: s.efforts.map(e => e.id === id ? { ...e, monthly: { ...e.monthly, [month]: manday } } : e) }));
+    await effortApi.updateMonthly(id, month, manday);
   },
   deleteEffort: async (id)  => {
     set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
