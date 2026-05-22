@@ -56,6 +56,8 @@ export interface Task {
   wbs: string;
   taskName: string;
   effortManday: number;
+  baselineStartDate?: string;
+  baselineEndDate?: string;
   startDate: string;
   endDate: string;
   actualFinish: string;   // ← new: actual finish date

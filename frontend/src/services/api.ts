@@ -401,6 +401,34 @@ export const taskApi = {
     return { data: normalized };
   },
 
+  saveBaselineOnce: async (projectId: string): Promise<{ data: Task[] }> => {
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const canWrite = await checkProjectPermission(projectId, 'write');
+    if (!canWrite) throw new Error('FORBIDDEN');
+
+    const { data: existingRows, error: existingErr } = await supabase
+      .from('tasks')
+      .select('id, start_date, end_date, baseline_start_date, baseline_end_date')
+      .eq('project_id', projectId);
+    if (existingErr) throw new Error(existingErr.message);
+
+    const rows = existingRows || [];
+    const alreadySaved = rows.some((row: any) => row.baseline_start_date || row.baseline_end_date);
+    if (alreadySaved) throw new Error('BASELINE_ALREADY_SAVED');
+
+    const writes = rows.map((row: any) =>
+      supabase
+        .from('tasks')
+        .update({ baseline_start_date: row.start_date || null, baseline_end_date: row.end_date || null })
+        .eq('id', row.id)
+    );
+    const results = await Promise.all(writes);
+    const writeErr = results.find((result) => result.error);
+    if (writeErr?.error) throw new Error(writeErr.error.message);
+
+    return taskApi.getByProject(projectId);
+  },
+
   create: async (t: Partial<Task>): Promise<{ data: Task; allTasks: Task[] }> => {
     const row = objToRow(t as Record<string, unknown>);
         if (row.effort_manday !== undefined) {

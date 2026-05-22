@@ -357,6 +357,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const [loading, setLoading]   = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [savingBaseline, setSavingBaseline] = useState(false);
   const [importPreview, setImportPreview] = useState<TaskImportPreview | null>(null);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const isMobile = windowWidth < 768;
@@ -464,6 +465,10 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   }, [columnStorageKey, columnPrefsLoaded, columnVisibility]);
 
   const projectTasks = tasks.filter(t => t.projectId === projectId);
+  const hasSavedBaseline = useMemo(
+    () => projectTasks.some((task) => Boolean((task as any).baselineStartDate || (task as any).baselineEndDate)),
+    [projectTasks],
+  );
   const phaseOptions = masterCodes
     .filter((code) => code.codeType === 'task_phase' && code.active)
     .sort((a, b) =>
@@ -1548,6 +1553,25 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     requestAnimationFrame(() => { syncing.current = false; });
   }, []);
 
+  const handleSaveBaseline = async () => {
+    if (savingBaseline || hasSavedBaseline) return;
+    try {
+      setSavingBaseline(true);
+      const result = await taskApi.saveBaselineOnce(projectId);
+      useStore.setState({ tasks: result.data });
+      toast.success('Saved baseline plan');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'BASELINE_ALREADY_SAVED') {
+        toast.error('Baseline already saved for this project');
+      } else {
+        toast.error(message || 'Failed to save baseline');
+      }
+    } finally {
+      setSavingBaseline(false);
+    }
+  };
+
   // Resize handlers
   const onResizeStart = (e: React.MouseEvent) => {
     dragRef.current    = true;
@@ -1670,7 +1694,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   };
 
   // ── PDF export: redesigned with Poppins-like styling ──────────────────────
-  const exportPDF = async () => {
+  const exportPDF = async (opts?: { includeBaselineColumns?: boolean; fileName?: string; successMessage?: string }) => {
+    const includeBaselineColumns = opts?.includeBaselineColumns === true;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const W = doc.internal.pageSize.getWidth();
     const H = doc.internal.pageSize.getHeight();
@@ -1695,7 +1720,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const ftrTextY = H - ftrH + 5;
 
     // ── Column widths (mm) ──
-    const CW = { wbs: 12, name: 68, start: 20, end: 20, dur: 11, pct: 10, status: 18, owner: 24 };
+    const CW = includeBaselineColumns
+      ? { wbs: 12, name: 56, baselineStart: 18, baselineEnd: 18, start: 18, end: 18, dur: 11, pct: 10, status: 16, owner: 16 }
+      : { wbs: 12, name: 68, start: 20, end: 20, dur: 11, pct: 10, status: 18, owner: 24 };
     const tableW = Object.values(CW).reduce((s, v) => s + v, 0);
     const gW = cW - tableW;
     const gX = PL + tableW;
@@ -1862,6 +1889,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
       const hcols = [
         { l:'WBS', w: CW.wbs }, { l:'Task Name', w: CW.name },
+        ...(includeBaselineColumns
+          ? [{ l:'Baseline Start', w: (CW as any).baselineStart }, { l:'Baseline Finish', w: (CW as any).baselineEnd }]
+          : []),
         { l:'Start', w: CW.start }, { l:'Finish', w: CW.end },
         { l:'Days', w: CW.dur }, { l:'%', w: CW.pct },
         { l:'Status', w: CW.status }, { l:'Owner', w: CW.owner },
@@ -1943,15 +1973,23 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         const nLines = doc.splitTextToSize(label || '', Math.max(4, CW.name - indent - 1));
         doc.text(nLines, PL + CW.wbs + indent + 1, ymid - (Math.min(nLines.length, 2) - 1) * 1.1);
 
-        // Start / Finish / Duration
+        // Baseline / Start / Finish / Duration
         const xD = PL + CW.wbs + CW.name;
         setPdfFont('normal'); doc.setTextColor(...colMuted); doc.setFontSize(5.4);
-        doc.text(task.startDate ? fmtDatePdf(task.startDate) : '', xD + CW.start / 2, ymid, { align: 'center' });
-        doc.text(task.endDate   ? fmtDatePdf(task.endDate)   : '', xD + CW.start + CW.end / 2, ymid, { align: 'center' });
-        doc.text(`${task.duration}d`, xD + CW.start + CW.end + CW.dur / 2, ymid, { align: 'center' });
+        let dateOffset = 0;
+        if (includeBaselineColumns) {
+          const baselineStart = (task as any).baselineStartDate;
+          const baselineEnd = (task as any).baselineEndDate;
+          doc.text(baselineStart ? fmtDatePdf(baselineStart) : '', xD + (CW as any).baselineStart / 2, ymid, { align: 'center' });
+          doc.text(baselineEnd ? fmtDatePdf(baselineEnd) : '', xD + (CW as any).baselineStart + (CW as any).baselineEnd / 2, ymid, { align: 'center' });
+          dateOffset = (CW as any).baselineStart + (CW as any).baselineEnd;
+        }
+        doc.text(task.startDate ? fmtDatePdf(task.startDate) : '', xD + dateOffset + CW.start / 2, ymid, { align: 'center' });
+        doc.text(task.endDate   ? fmtDatePdf(task.endDate)   : '', xD + dateOffset + CW.start + CW.end / 2, ymid, { align: 'center' });
+        doc.text(`${task.duration}d`, xD + dateOffset + CW.start + CW.end + CW.dur / 2, ymid, { align: 'center' });
 
         // %
-        const xP = xD + CW.start + CW.end + CW.dur;
+        const xP = xD + dateOffset + CW.start + CW.end + CW.dur;
         setPdfFont('bold'); doc.setTextColor(pcR, pcG, pcB); doc.setFontSize(5.5);
         doc.text(`${pct}%`, xP + CW.pct / 2, ymid, { align: 'center' });
 
@@ -2022,8 +2060,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.text(`Project ID: ${proj?.code || projectId} | Page ${pg + 1} of ${totalPages}`, W - PR, ftrTextY, { align: 'right' });
     }
 
-    doc.save(`tasks-gantt-${projectId}.pdf`);
-    toast.success('Exported PDF');
+    doc.save(opts?.fileName || `tasks-gantt-${projectId}.pdf`);
+    toast.success(opts?.successMessage || 'Exported PDF');
     setShowExport(false);
   };
 
@@ -2512,13 +2550,27 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         <div style={{ display:'flex', gap:8, position:'relative' }}>
           {extraActions}
           <input ref={importInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImportFileChange} />
+          <Btn
+            small
+            variant="ghost"
+            onClick={handleSaveBaseline}
+            disabled={savingBaseline || hasSavedBaseline || projectTasks.length === 0}
+            title={hasSavedBaseline ? 'Baseline already saved' : 'Save baseline once'}
+          >
+            {savingBaseline ? 'Saving…' : 'Save Baseline'}
+          </Btn>
           <div style={{ position:'relative' }}>
             <Btn variant="ghost" small onClick={()=>setShowExport(v=>!v)} title="Export">
               <Download size={13} /> <ChevronDown size={11} />
             </Btn>
             {showExport && (
               <div style={{ position:'absolute', right:0, top:'110%', background:C.white, border:`1px solid ${C.border}`, borderRadius:10, boxShadow:C.shadow2, zIndex:50, minWidth:160, overflow:'hidden' }}>
-                {[['📊 Excel Template (.xlsx)', exportXLSX],['📄 PDF + Gantt', exportPDF],['📥 Import Overwrite (.xlsx)', openImportDialog]].map(([label, fn]) => (
+                {[
+                  ['📊 Excel Template (.xlsx)', exportXLSX],
+                  ['📄 PDF + Gantt', exportPDF],
+                  ['📄 Export Plan vs Baseline', () => exportPDF({ includeBaselineColumns: true, fileName: `tasks-plan-vs-baseline-${projectId}.pdf`, successMessage: 'Exported Plan vs Baseline PDF' })],
+                  ['📥 Import Overwrite (.xlsx)', openImportDialog],
+                ].map(([label, fn]) => (
                   <button key={label as string} onClick={fn as ()=>void}
                     style={{ display:'block', width:'100%', padding:'10px 16px', textAlign:'left', border:'none', background:'none', cursor:'pointer', fontSize:13, color:C.text, fontFamily:'Poppins, sans-serif' }}
                     onMouseEnter={e=>e.currentTarget.style.background=C.bg}
