@@ -1656,6 +1656,50 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     toast.success(sortedTasks.length > 0 ? 'Exported XLSX' : 'Exported XLSX with example rows'); setShowExport(false);
   };
 
+  const exportPlanVsBaselineXLSX = () => {
+    const sortedTasks = [...projectTasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
+    if (!sortedTasks.length) {
+      toast.error('No tasks to export');
+      return;
+    }
+
+    const rows = sortedTasks.map((task) => [
+      task.wbs || '',
+      task.taskName || '',
+      task.baselineStartDate || '',
+      task.baselineEndDate || '',
+      task.startDate || '',
+      task.endDate || '',
+      task.duration ?? 0,
+      Number(task.percentComplete || 0),
+      getTaskStatus(task),
+      task.resource || '',
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['WBS', 'Task Name', 'Baseline Start', 'Baseline Finish', 'Start Date', 'End Date', 'Days', '% Complete', 'Status', 'Owner'],
+      ...rows,
+    ]);
+    ws['!cols'] = [
+      { wch: 10 },
+      { wch: 42 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 8 },
+      { wch: 12 },
+      { wch: 16 },
+      { wch: 24 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Plan vs Baseline');
+    XLSX.writeFile(wb, `tasks-plan-vs-baseline-${projectId}.xlsx`);
+    toast.success('Exported Plan vs Baseline XLSX');
+    setShowExport(false);
+  };
+
   const openImportDialog = () => {
     setShowExport(false);
     importInputRef.current?.click();
@@ -2569,6 +2613,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                   ['📊 Excel Template (.xlsx)', exportXLSX],
                   ['📄 PDF + Gantt', exportPDF],
                   ['📄 Export Plan vs Baseline', () => exportPDF({ includeBaselineColumns: true, fileName: `tasks-plan-vs-baseline-${projectId}.pdf`, successMessage: 'Exported Plan vs Baseline PDF' })],
+                  ['📗 Export Plan vs Baseline (.xlsx)', exportPlanVsBaselineXLSX],
                   ['📥 Import Overwrite (.xlsx)', openImportDialog],
                 ].map(([label, fn]) => (
                   <button key={label as string} onClick={fn as ()=>void}
