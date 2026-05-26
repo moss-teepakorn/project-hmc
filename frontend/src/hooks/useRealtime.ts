@@ -15,6 +15,7 @@ export function useRealtimeSubscription(projectId: string | undefined) {
     fetchCRs,
     fetchIssues,
     fetchRisks,
+    fetchActivities,
     fetchProjects,
   } = useStore();
 
@@ -58,12 +59,17 @@ export function useRealtimeSubscription(projectId: string | undefined) {
         { event: '*', schema: 'public', table: 'risks', filter: `project_id=eq.${projectId}` },
         () => { fetchRisks(projectId); }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'activities', filter: `project_id=eq.${projectId}` },
+        () => { fetchActivities(projectId); }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [projectId, fetchTasks, fetchMembers, fetchMilestones, fetchEfforts, fetchCRs, fetchIssues, fetchRisks]);
+  }, [projectId, fetchTasks, fetchMembers, fetchMilestones, fetchEfforts, fetchCRs, fetchIssues, fetchRisks, fetchActivities]);
 
   // Also subscribe to project-level changes (dashboard refresh)
   useEffect(() => {

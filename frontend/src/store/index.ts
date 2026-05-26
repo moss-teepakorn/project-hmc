@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode } from '../types';
-import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi, projectProgressApi, masterCodeApi } from '../services/api';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, Activity } from '../types';
+import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi, projectProgressApi, masterCodeApi, activityApi } from '../services/api';
 
 interface Store {
   _pendingMutationCount: number;
@@ -14,6 +14,7 @@ interface Store {
   changeRequests: (ChangeRequest & { items: CRItem[] })[];
   issues: Issue[];
   risks: Risk[];
+  activities: Activity[];
   projectEnvironments: ProjectEnvironment[];
   projectProgressSnapshots: ProjectProgressSnapshot[];
   masterCodes: MasterCode[];
@@ -67,6 +68,11 @@ interface Store {
   updateRisk:      (id: string, r: Partial<Risk>) => Promise<void>;
   deleteRisk:      (id: string) => Promise<void>;
 
+  fetchActivities: (pid: string) => Promise<void>;
+  createActivity:  (a: Partial<Activity>) => Promise<void>;
+  updateActivity:  (id: string, a: Partial<Activity>) => Promise<void>;
+  deleteActivity:  (id: string) => Promise<void>;
+
   fetchProjectEnvironments: (pid: string) => Promise<void>;
   createProjectEnvironment: (env: Partial<ProjectEnvironment>) => Promise<void>;
   updateProjectEnvironment: (id: string, env: Partial<ProjectEnvironment>) => Promise<void>;
@@ -82,7 +88,7 @@ export const useStore = create<Store>((set, get) => ({
   _pendingMutationCount: 0,
   projects: [], projectsLoading: false, activeProject: null,
   tasks: [], members: [], milestones: [], efforts: [],
-  changeRequests: [], issues: [], risks: [], projectEnvironments: [], projectProgressSnapshots: [], masterCodes: [],
+  changeRequests: [], issues: [], risks: [], activities: [], projectEnvironments: [], projectProgressSnapshots: [], masterCodes: [],
   dataLoading: false, error: null,
 
   // ── Projects ───────────────────────────────────────────────────────────────
@@ -151,7 +157,7 @@ export const useStore = create<Store>((set, get) => ({
       });
     }
   },
-  setActiveProject: (p) => set({ activeProject: p, tasks: [], members: [], milestones: [], efforts: [], changeRequests: [], issues: [], risks: [], projectEnvironments: [] }),
+  setActiveProject: (p) => set({ activeProject: p, tasks: [], members: [], milestones: [], efforts: [], changeRequests: [], issues: [], risks: [], activities: [], projectEnvironments: [] }),
 
   // ── Tasks ──────────────────────────────────────────────────────────────────
   fetchTasks: async (pid?: string) => {
@@ -438,6 +444,45 @@ export const useStore = create<Store>((set, get) => ({
     try {
       await riskApi.remove(id);
       set(s => ({ risks: s.risks.filter(r => r.id !== id) }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+
+  // ── Activities ─────────────────────────────────────────────────────────────
+  fetchActivities: async (pid?: string) => { set({ activities: (await activityApi.getByProject(pid)).data }); },
+  createActivity: async (a) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      const res = await activityApi.create(a);
+      set((s) => ({ activities: [res.data, ...s.activities] }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  updateActivity: async (id, a) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      const res = await activityApi.update(id, a);
+      set((s) => ({ activities: s.activities.map((x) => (x.id === id ? res.data : x)) }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  deleteActivity: async (id) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      await activityApi.remove(id);
+      set((s) => ({ activities: s.activities.filter((x) => x.id !== id) }));
     } finally {
       set((s: any) => {
         const next = Math.max(0, (s._pendingMutationCount || 1) - 1);

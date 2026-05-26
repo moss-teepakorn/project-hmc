@@ -3,7 +3,7 @@
  * Centralized configuration for controlling visibility and access by user role
  */
 
-export type UserRole = 'admin' | 'member' | 'client';
+export type UserRole = 'admin' | 'pm' | 'member' | 'client';
 
 export interface RolePermissions {
   /** Tab IDs that this role can see in ProjectDetail */
@@ -18,18 +18,23 @@ export interface RolePermissions {
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'cr', 'issues', 'risks', 'env', 'onepage', 'report'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
     maskFinancialAmounts: false,
     canViewPortfolioOverview: true,
   },
+  pm: {
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
+    maskFinancialAmounts: true,
+    canViewPortfolioOverview: true,
+  },
   member: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'cr', 'issues', 'risks', 'env', 'onepage', 'report'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
     // Note: 'ms' (Milestone) is excluded
     maskFinancialAmounts: true,
     canViewPortfolioOverview: true,
   },
   client: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'cr', 'issues', 'risks', 'env'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'cr', 'issues', 'risks', 'activities', 'env'],
     // Note: 'ms' (Milestone), 'effort', 'report' are excluded
     maskFinancialAmounts: true,
     canViewPortfolioOverview: false,

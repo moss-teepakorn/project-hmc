@@ -8,6 +8,7 @@ import type { MasterCode } from '../../types';
 const TYPE_LABELS: Record<string, string> = {
   project_status: 'Project Status',
   task_phase: 'Task Phase',
+  activity_type: 'Activity Type',
 };
 
 export default function SetupModal({ onClose }: { onClose: () => void }) {
@@ -52,6 +53,7 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
     const types = Array.from(new Set(masterCodes.map((code) => code.codeType)));
     if (!types.includes('project_status')) types.unshift('project_status');
     if (!types.includes('task_phase')) types.unshift('task_phase');
+    if (!types.includes('activity_type')) types.unshift('activity_type');
     return types;
   }, [masterCodes]);
 

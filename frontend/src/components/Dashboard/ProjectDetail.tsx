@@ -12,6 +12,7 @@ import EffortTab         from '../Effort/EffortTab';
 import ChangeRequestTab  from '../ChangeRequest/ChangeRequestTab';
 import IssuesTab         from '../Issues/IssuesTab';
 import RiskRegisterTab   from '../RiskRegister/RiskRegisterTab';
+import ActivitiesTab     from '../Activities/ActivitiesTab';
 import ProjectEnvironmentTab from './ProjectEnvironmentTab';
 import ExecutiveOnePage  from './ExecutiveOnePage';
 import { useStore }      from '../../store';
@@ -46,6 +47,7 @@ export default function ProjectDetail({ project }: Props) {
     changeRequests,
     issues,
     risks,
+    activities,
     projectEnvironments,
     fetchProjects,
     fetchTasks,
@@ -56,6 +58,7 @@ export default function ProjectDetail({ project }: Props) {
     fetchCRs,
     fetchIssues,
     fetchRisks,
+    fetchActivities,
     fetchProjectEnvironments,
   } = useStore();
 
@@ -198,6 +201,7 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'cr',       label: 'Change Req', icon: '📝', count: changeRequests.length },
     { id: 'issues',   label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
     { id: 'risks',    label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
+    { id: 'activities', label: 'Activities', icon: '🗓️', count: activities.filter((a) => a.projectId === project.id).length },
     { id: 'env',      label: 'Program URL', icon: '🌐', count: projectEnvironments.filter((e) => e.projectId === project.id).length },
     { id: 'onepage',  label: 'One Page',   icon: '🧭' },
   ];
@@ -240,6 +244,7 @@ export default function ProjectDetail({ project }: Props) {
       fetchCRs(project.id),
       fetchIssues(project.id),
       fetchRisks(project.id),
+      fetchActivities(project.id),
       fetchProjectEnvironments(project.id),
     ]);
   }, [
@@ -252,6 +257,7 @@ export default function ProjectDetail({ project }: Props) {
     fetchCRs,
     fetchIssues,
     fetchRisks,
+    fetchActivities,
     fetchProjectEnvironments,
   ]);
 
@@ -292,6 +298,7 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'cr'      && <div style={{ height: '100%', overflowY: 'auto' }}><ChangeRequestTab  projectId={project.id} /></div>}
         {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
         {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} extraActions={copyButton('risks')} /></div>}
+        {activeTab === 'activities' && <div style={{ height: '100%', overflowY: 'auto' }}><ActivitiesTab projectId={project.id} /></div>}
         {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
         {activeTab === 'onepage' && <div style={{ height: '100%', overflowY: 'auto' }}><ExecutiveOnePage project={project} /></div>}
       </div>

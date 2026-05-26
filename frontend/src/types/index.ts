@@ -186,6 +186,16 @@ export interface Risk {
   status: 'Monitoring' | 'Mitigating' | 'Closed';
 }
 
+export interface Activity {
+  id: string;
+  projectId: string;
+  activityDate: string;
+  activityType: string;
+  channel: 'Online' | 'Onsite' | 'Email' | 'MS Teams' | 'Line' | 'Other';
+  title: string;
+  description: string;
+}
+
 export type ViewMode = 'table' | 'split' | 'gantt' | 'kanban';
 export type ProjectStatus = Project['status'];
 
