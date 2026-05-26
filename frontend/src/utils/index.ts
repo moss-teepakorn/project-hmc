@@ -35,11 +35,11 @@ export const toInput = (str: string): string => {
   return isValid(d) ? format(d, 'yyyy-MM-dd') : '';
 };
 
-/** Display: 15-May-26 (for PDF export) */
+/** Display: 15-05-2026 (for PDF export) */
 export const fmtDatePdf = (str: string): string => {
   if (!str) return '—';
   const d = parseISO(str);
-  return isValid(d) ? format(d, 'dd-MMM-yy') : str;
+  return isValid(d) ? format(d, 'dd-MM-yyyy') : str;
 };
 
 /** Month label: Mar 25 */

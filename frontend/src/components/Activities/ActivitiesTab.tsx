@@ -28,6 +28,15 @@ const DEFAULT_ACTIVITY_TYPES = [
   { value: 'Training', label: 'Training' },
 ];
 
+function formatDateDMYDash(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(date.getFullYear());
+  return `${dd}-${mm}-${yyyy}`;
+}
+
 export default function ActivitiesTab({ projectId }: Props) {
   const {
     activities,
@@ -99,7 +108,7 @@ export default function ActivitiesTab({ projectId }: Props) {
     setDeleting(null);
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     const rows = [...shown].sort((a, b) => {
       const ta = a.activityDate ? new Date(a.activityDate).getTime() : 0;
       const tb = b.activityDate ? new Date(b.activityDate).getTime() : 0;
@@ -111,19 +120,57 @@ export default function ActivitiesTab({ projectId }: Props) {
     }
 
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const reportDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const reportDate = formatDateDMYDash(new Date());
+
+    const u8ToBase64 = (bytes: Uint8Array): string => {
+      let out = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        out += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      return btoa(out);
+    };
+
+    const ensurePoppinsFont = async () => {
+      try {
+        const fl = (doc as any).getFontList?.();
+        if (fl?.Poppins || fl?.poppins) return;
+
+        const [regRes, boldRes] = await Promise.all([
+          fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf'),
+          fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf'),
+        ]);
+        if (!regRes.ok || !boldRes.ok) return;
+
+        const [regBuf, boldBuf] = await Promise.all([regRes.arrayBuffer(), boldRes.arrayBuffer()]);
+        doc.addFileToVFS('Poppins-Regular.ttf', u8ToBase64(new Uint8Array(regBuf)));
+        doc.addFileToVFS('Poppins-Bold.ttf', u8ToBase64(new Uint8Array(boldBuf)));
+        doc.addFont('Poppins-Regular.ttf', 'Poppins', 'normal');
+        doc.addFont('Poppins-Bold.ttf', 'Poppins', 'bold');
+      } catch {
+        // Fallback to built-in font if external font loading fails.
+      }
+    };
+
+    const setPdfFont = (style: 'normal' | 'bold' = 'normal') => {
+      const fl = (doc as any).getFontList?.();
+      const popName = fl?.Poppins ? 'Poppins' : (fl?.poppins ? 'poppins' : null);
+      doc.setFont(popName || 'helvetica', style);
+    };
+
+    await ensurePoppinsFont();
 
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(203, 213, 225);
     doc.setLineWidth(0.35);
     doc.roundedRect(10, 6, 277, 22, 3, 3, 'FD');
 
-    doc.setFont('helvetica', 'bold');
+    setPdfFont('bold');
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(15);
-    doc.text('Project Activities Report', 148.5, 15, { align: 'center' });
+    doc.text('Project Activities Report', 14, 15);
 
-    doc.setFont('helvetica', 'normal');
+    setPdfFont('normal');
     doc.setTextColor(71, 85, 105);
     doc.setFontSize(10);
     doc.text(`Project: ${activeProject?.code || projectId} - ${activeProject?.name || ''}`, 14, 22);
@@ -133,14 +180,14 @@ export default function ActivitiesTab({ projectId }: Props) {
       startY: 34,
       head: [['Date', 'Type', 'Channel', 'Title', 'Description']],
       body: rows.map((row) => [
-        row.activityDate ? fmtDate(row.activityDate) : '-',
+        row.activityDate ? formatDateDMYDash(row.activityDate) : '-',
         row.activityType || '-',
         row.channel || '-',
         row.title || '-',
         row.description || '-',
       ]),
       theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 2.5, textColor: [30, 41, 59], lineColor: [226, 232, 240] },
+      styles: { font: 'Poppins', fontSize: 9, cellPadding: 2.5, textColor: [30, 41, 59], lineColor: [226, 232, 240] },
       headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold' },
       columnStyles: {
         0: { cellWidth: 26 },

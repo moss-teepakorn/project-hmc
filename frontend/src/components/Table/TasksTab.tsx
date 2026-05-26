@@ -1745,7 +1745,11 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const H = doc.internal.pageSize.getHeight();
     const proj = useStore.getState().activeProject;
     const today = new Date();
-    const reportDateStr = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    const reportDateStr = [
+      String(today.getDate()).padStart(2, '0'),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getFullYear()),
+    ].join('-');
 
     // ── Colors ──
     const colText:    [number,number,number] = [30,  30,  30 ];
@@ -1890,9 +1894,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.setFontSize(9.5); setPdfFont('bold'); doc.setTextColor(...colText);
       doc.text(proj?.client || proj?.name || 'Project', PL + 5.5, 10.8);
 
-      // Center: Fixed title
+      // Left: Fixed title
       doc.setFontSize(11.5); setPdfFont('bold'); doc.setTextColor(...colText);
-      doc.text('Project Implementation Schedule', W / 2, 10.6, { align: 'center' });
+      doc.text('Project Implementation Schedule', PL + 5.5, 16.2);
 
       // Right: Status boxes (Project Status, Overall %) stacked vertically + Print Date text
       const boxW = 30;
