@@ -125,7 +125,7 @@ import { compareWbs } from '../utils';
 
 import { supabase } from './supabase';
 import { parseISO, isValid } from 'date-fns';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem, Activity } from '../types';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem, Activity, Note } from '../types';
 
 const TASK_DEPENDENCY_TYPES = new Set(['FS', 'SS', 'FF', 'SF']);
 
@@ -361,6 +361,52 @@ export const masterCodeApi = {
     const user = await getCurrentUserRoleAndId();
     if (user.role !== 'admin') throw new Error('FORBIDDEN');
     const { error } = await supabase.from('masters_code').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+};
+
+// ── Notes ───────────────────────────────────────────────────────────────────
+
+export const noteApi = {
+  getAll: async (): Promise<{ data: Note[] }> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+    const { data, error } = await supabase
+      .from('notes')
+      .select('*')
+      .order('id', { ascending: true });
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<Note>(data || []) };
+  },
+
+  create: async (note: Partial<Note>): Promise<{ data: Note }> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+    const row = objToRow(note as Record<string, unknown>);
+    delete row.id;
+    delete row.created_at;
+    delete row.updated_at;
+    const { data, error } = await supabase.from('notes').insert(row).select().single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<Note>(data) };
+  },
+
+  update: async (id: string, note: Partial<Note>): Promise<{ data: Note }> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+    const row = objToRow(note as Record<string, unknown>);
+    delete row.id;
+    delete row.created_at;
+    delete row.updated_at;
+    const { data, error } = await supabase.from('notes').update(row).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<Note>(data) };
+  },
+
+  remove: async (id: string): Promise<void> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+    const { error } = await supabase.from('notes').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 };

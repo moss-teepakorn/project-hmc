@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, Activity } from '../types';
-import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi, projectProgressApi, masterCodeApi, activityApi } from '../services/api';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, Activity, Note } from '../types';
+import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi, projectProgressApi, masterCodeApi, activityApi, noteApi } from '../services/api';
 
 interface Store {
   _pendingMutationCount: number;
@@ -15,6 +15,7 @@ interface Store {
   issues: Issue[];
   risks: Risk[];
   activities: Activity[];
+  notes: Note[];
   projectEnvironments: ProjectEnvironment[];
   projectProgressSnapshots: ProjectProgressSnapshot[];
   masterCodes: MasterCode[];
@@ -73,6 +74,11 @@ interface Store {
   updateActivity:  (id: string, a: Partial<Activity>) => Promise<void>;
   deleteActivity:  (id: string) => Promise<void>;
 
+  fetchNotes: () => Promise<void>;
+  createNote: (note: Partial<Note>) => Promise<Note>;
+  updateNote: (id: string, note: Partial<Note>) => Promise<Note>;
+  deleteNote: (id: string) => Promise<void>;
+
   fetchProjectEnvironments: (pid: string) => Promise<void>;
   createProjectEnvironment: (env: Partial<ProjectEnvironment>) => Promise<void>;
   updateProjectEnvironment: (id: string, env: Partial<ProjectEnvironment>) => Promise<void>;
@@ -89,6 +95,7 @@ export const useStore = create<Store>((set, get) => ({
   projects: [], projectsLoading: false, activeProject: null,
   tasks: [], members: [], milestones: [], efforts: [],
   changeRequests: [], issues: [], risks: [], activities: [], projectEnvironments: [], projectProgressSnapshots: [], masterCodes: [],
+  notes: [],
   dataLoading: false, error: null,
 
   // ── Projects ───────────────────────────────────────────────────────────────
@@ -158,6 +165,50 @@ export const useStore = create<Store>((set, get) => ({
     }
   },
   setActiveProject: (p) => set({ activeProject: p, tasks: [], members: [], milestones: [], efforts: [], changeRequests: [], issues: [], risks: [], activities: [], projectEnvironments: [] }),
+
+  // ── Notes ──────────────────────────────────────────────────────────────────
+  fetchNotes: async () => {
+    try { set({ notes: (await noteApi.getAll()).data }); }
+    catch (e) { set({ error: (e as Error).message }); }
+  },
+  createNote: async (note) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      const res = await noteApi.create(note);
+      set((s) => ({ notes: [...s.notes, res.data].sort((a, b) => String(a.id).localeCompare(String(b.id))) }));
+      return res.data;
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  updateNote: async (id, note) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      const res = await noteApi.update(id, note);
+      set((s) => ({ notes: s.notes.map((item) => (item.id === id ? res.data : item)).sort((a, b) => String(a.id).localeCompare(String(b.id))) }));
+      return res.data;
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  deleteNote: async (id) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      await noteApi.remove(id);
+      set((s) => ({ notes: s.notes.filter((item) => item.id !== id) }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
 
   // ── Tasks ──────────────────────────────────────────────────────────────────
   fetchTasks: async (pid?: string) => {

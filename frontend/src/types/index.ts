@@ -50,6 +50,17 @@ export interface ProjectProgressSnapshot {
   updatedAt: string;
 }
 
+export interface Note {
+  id: string;
+  title: string;
+  details: string;
+  startDate: string;
+  endDate: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Task {
   id: string;
   projectId: string;

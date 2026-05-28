@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { C } from '../Common';
 import SetupModal from '../Setup/SetupModal';
+import SystemNotesModal from '../SystemNotes/SystemNotesModal';
 import TaskTemplateModal from '../Setup/TaskTemplateModal';
 import { Bell, Home, LogOut, Moon, Sun, Copy } from 'lucide-react';
 
@@ -17,8 +18,10 @@ export default function Navbar() {
   const [isMobile, setIsMobile] = React.useState(false);
   const [notifyOpen, setNotifyOpen] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
+  const [notesOpen, setNotesOpen] = React.useState(false);
   const [taskTemplateOpen, setTaskTemplateOpen] = React.useState(false);
   const [setupLoading, setSetupLoading] = React.useState(false);
+  const [notesLoading, setNotesLoading] = React.useState(false);
   const bellRef = React.useRef<HTMLDivElement | null>(null);
   const isDark = theme === 'dark';
 
@@ -56,6 +59,18 @@ export default function Navbar() {
       setSetupOpen(true);
     } finally {
       setSetupLoading(false);
+    }
+  };
+
+  const openNotes = async () => {
+    setNotesLoading(true);
+    try {
+      await useStore.getState().fetchNotes();
+      setNotesOpen(true);
+    } catch {
+      setNotesOpen(true);
+    } finally {
+      setNotesLoading(false);
     }
   };
 
@@ -183,18 +198,32 @@ export default function Navbar() {
           </>
         )}
         {profile?.role === 'admin' && (
-          <button
-            onClick={openSetup}
-            title="Open admin setup"
-            disabled={setupLoading}
-            style={{
-              padding: '8px 12px', borderRadius: 10, border: `1px solid ${isDark ? C.border2 : C.border}`,
-              background: isDark ? '#1E293B' : C.white, color: textColor, cursor: setupLoading ? 'wait' : 'pointer', fontSize: 12,
-              opacity: setupLoading ? 0.6 : 1,
-            }}
-          >
-            {setupLoading ? 'Loading…' : 'Setup'}
-          </button>
+          <>
+            <button
+              onClick={openSetup}
+              title="Open admin setup"
+              disabled={setupLoading}
+              style={{
+                padding: '8px 12px', borderRadius: 10, border: `1px solid ${isDark ? C.border2 : C.border}`,
+                background: isDark ? '#1E293B' : C.white, color: textColor, cursor: setupLoading ? 'wait' : 'pointer', fontSize: 12,
+                opacity: setupLoading ? 0.6 : 1,
+              }}
+            >
+              {setupLoading ? 'Loading…' : 'Setup'}
+            </button>
+            <button
+              onClick={openNotes}
+              title="Open system notes"
+              disabled={notesLoading}
+              style={{
+                padding: '8px 12px', borderRadius: 10, border: `1px solid ${isDark ? C.border2 : C.border}`,
+                background: isDark ? '#1E293B' : C.white, color: textColor, cursor: notesLoading ? 'wait' : 'pointer', fontSize: 12,
+                opacity: notesLoading ? 0.6 : 1,
+              }}
+            >
+              {notesLoading ? 'Loading…' : 'Notes'}
+            </button>
+          </>
         )}
 
         <button
@@ -334,6 +363,7 @@ export default function Navbar() {
         )}
       </div>
       {setupOpen && <SetupModal onClose={() => setSetupOpen(false)} />}
+      {notesOpen && <SystemNotesModal onClose={() => setNotesOpen(false)} />}
       {taskTemplateOpen && <TaskTemplateModal onClose={() => setTaskTemplateOpen(false)} />}
     </nav>
   );
