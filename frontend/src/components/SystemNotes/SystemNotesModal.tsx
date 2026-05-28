@@ -76,7 +76,7 @@ export default function SystemNotesModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title="System Notes" onClose={onClose} width={1100}>
+    <Modal title="System Notes" onClose={onClose} width={1450}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, color: C.text2 }}>Admin-only records for system-level announcements and internal notes.</div>
         <Btn small onClick={openCreate}><Plus size={14} /> Add Note</Btn>
@@ -86,11 +86,9 @@ export default function SystemNotesModal({ onClose }: { onClose: () => void }) {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: C.bg }}>
-              <th style={{ ...TH, width: 80 }}>ID</th>
-              <th style={TH}>Title</th>
+              <th style={{ ...TH, width: 70 }}>No.</th>
+              <th style={{ ...TH, width: 320 }}>Title</th>
               <th style={TH}>Details</th>
-              <th style={{ ...TH, width: 120 }}>Start</th>
-              <th style={{ ...TH, width: 120 }}>End</th>
               <th style={{ ...TH, width: 100 }}>Status</th>
               <th style={{ ...TH, width: 110 }}>Actions</th>
             </tr>
@@ -98,11 +96,9 @@ export default function SystemNotesModal({ onClose }: { onClose: () => void }) {
           <tbody>
             {sortedNotes.map((note, index) => (
               <tr key={note.id} style={{ background: index % 2 === 0 ? C.white : C.bg }}>
-                <td style={{ ...TD, fontSize: 11, color: C.text3, whiteSpace: 'nowrap' }}>{note.id}</td>
-                <td style={{ ...TD, fontWeight: 700 }}>{note.title}</td>
+                <td style={{ ...TD, fontSize: 11, color: C.text3, whiteSpace: 'nowrap', textAlign: 'center' }}>{index + 1}</td>
+                <td style={{ ...TD, fontWeight: 700, minWidth: 320 }}>{note.title}</td>
                 <td style={{ ...TD, color: C.text2 }}>{note.details || '-'}</td>
-                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{note.startDate ? fmtDate(note.startDate) : '-'}</td>
-                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{note.endDate ? fmtDate(note.endDate) : '-'}</td>
                 <td style={TD}>
                   <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: note.status === 'active' ? C.greenBg : C.bg2, color: note.status === 'active' ? C.green : C.text2 }}>
                     {note.status}
@@ -122,7 +118,7 @@ export default function SystemNotesModal({ onClose }: { onClose: () => void }) {
             ))}
             {sortedNotes.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ padding: 30, textAlign: 'center', color: C.text3 }}>No notes yet.</td>
+                <td colSpan={5} style={{ padding: 30, textAlign: 'center', color: C.text3 }}>No notes yet.</td>
               </tr>
             )}
           </tbody>
@@ -172,7 +168,7 @@ function NoteModal({
   const up = (key: keyof Note, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <Modal title={form.id ? 'Edit Note' : 'Add Note'} onClose={onClose} width={720}>
+    <Modal title={form.id ? 'Edit Note' : 'Add Note'} onClose={onClose} width={920}>
       <FormRow label="Title" required>
         <Input autoFocus value={form.title ?? ''} onChange={(v) => up('title', v)} placeholder="Topic" />
       </FormRow>
