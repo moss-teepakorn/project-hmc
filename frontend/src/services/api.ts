@@ -386,6 +386,8 @@ export const noteApi = {
     delete row.id;
     delete row.created_at;
     delete row.updated_at;
+    if (row.start_date === '') row.start_date = null;
+    if (row.end_date === '') row.end_date = null;
     const { data, error } = await supabase.from('notes').insert(row).select().single();
     if (error) throw new Error(error.message);
     return { data: rowToObj<Note>(data) };
@@ -398,6 +400,8 @@ export const noteApi = {
     delete row.id;
     delete row.created_at;
     delete row.updated_at;
+    if (row.start_date === '') row.start_date = null;
+    if (row.end_date === '') row.end_date = null;
     const { data, error } = await supabase.from('notes').update(row).eq('id', id).select().single();
     if (error) throw new Error(error.message);
     return { data: rowToObj<Note>(data) };
