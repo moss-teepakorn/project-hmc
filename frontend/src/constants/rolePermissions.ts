@@ -34,7 +34,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewPortfolioOverview: true,
   },
   client: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'cr', 'issues', 'risks', 'activities', 'env'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'project-checklist', 'setup-checklist', 'migrate-checklist', 'cr', 'issues', 'risks', 'activities', 'env'],
     // Note: 'ms' (Milestone), 'effort', 'report' are excluded
     maskFinancialAmounts: true,
     canViewPortfolioOverview: false,
