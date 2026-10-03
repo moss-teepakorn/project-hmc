@@ -30,6 +30,24 @@ function getTodayPassword(): string {
   return `${dd}${mm}${yyyy}`;
 }
 
+function ChecklistPlaceholder({ title }: { title: string }) {
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: 24, boxSizing: 'border-box' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: C.text }}>{title}</h3>
+        <div aria-hidden="true" style={{ display: 'grid', gap: 10 }}>
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: C.white, border: `1px solid ${C.border}`, borderRadius: 8 }}>
+              <span style={{ width: 16, height: 16, flexShrink: 0, border: `1px solid ${C.border2}`, borderRadius: 3 }} />
+              <span style={{ width: `${62 + (index % 2) * 18}%`, height: 8, background: C.bg2, borderRadius: 4 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectDetail({ project }: Props) {
   const [activeTab, setActiveTab]   = useState('tasks');
   const [isMobile, setIsMobile] = useState(false);
@@ -185,6 +203,9 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'members',  label: 'Members',    icon: '👥', count: members.length },
     { id: 'ms',       label: 'Milestones', icon: '🏁', count: milestones.length },
     { id: 'effort',   label: 'Effort',     icon: '⚡', count: efforts.length },
+    { id: 'project-checklist', label: 'Project Checklist', icon: '☑️' },
+    { id: 'setup-checklist', label: 'Setup Check List', icon: '⚙️' },
+    { id: 'migrate-checklist', label: 'Migrate Check List', icon: '🔄' },
     { id: 'cr',       label: 'Change Req', icon: '📝', count: changeRequests.length },
     { id: 'issues',   label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
     { id: 'risks',    label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
@@ -295,6 +316,9 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'members' && <div style={{ height: '100%', overflowY: 'auto' }}><MembersTab        projectId={project.id} extraActions={copyButton('members')} /></div>}
         {activeTab === 'ms'      && <div style={{ height: '100%', overflowY: 'auto' }}><MilestonesTab     projectId={project.id} extraActions={copyButton('ms')} /></div>}
         {activeTab === 'effort'  && <div style={{ height: '100%', overflowY: 'auto' }}><EffortTab         projectId={project.id} extraActions={copyButton('effort')} /></div>}
+        {activeTab === 'project-checklist' && <ChecklistPlaceholder title="Project Checklist" />}
+        {activeTab === 'setup-checklist' && <ChecklistPlaceholder title="Setup Check List" />}
+        {activeTab === 'migrate-checklist' && <ChecklistPlaceholder title="Migrate Check List" />}
         {activeTab === 'cr'      && <div style={{ height: '100%', overflowY: 'auto' }}><ChangeRequestTab  projectId={project.id} /></div>}
         {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
         {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} extraActions={copyButton('risks')} /></div>}

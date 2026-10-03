@@ -18,17 +18,17 @@ export interface RolePermissions {
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'project-checklist', 'setup-checklist', 'migrate-checklist', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
     maskFinancialAmounts: false,
     canViewPortfolioOverview: true,
   },
   pm: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'project-checklist', 'setup-checklist', 'migrate-checklist', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
     maskFinancialAmounts: true,
     canViewPortfolioOverview: true,
   },
   member: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'project-checklist', 'setup-checklist', 'migrate-checklist', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
     // Note: 'ms' (Milestone) is excluded
     maskFinancialAmounts: true,
     canViewPortfolioOverview: true,
