@@ -126,6 +126,7 @@ import { compareWbs } from '../utils';
 import { supabase } from './supabase';
 import { parseISO, isValid } from 'date-fns';
 import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem, Activity, Note } from '../types';
+import type { ProjectChecklistCategoryId, ProjectChecklistProgress, ProjectChecklistProgressEntry, ProjectChecklistTopic } from '../utils/projectChecklist';
 
 const TASK_DEPENDENCY_TYPES = new Set(['FS', 'SS', 'FF', 'SF']);
 
@@ -415,6 +416,113 @@ export const noteApi = {
   },
 };
 
+
+// ── Project Checklist ──────────────────────────────────────────────────────
+
+export const projectChecklistApi = {
+  getTopics: async (): Promise<ProjectChecklistTopic[]> => {
+    const { userId } = await getCurrentUserRoleAndId();
+    if (!userId) throw new Error('UNAUTHENTICATED');
+    const { data, error } = await supabase
+      .from('project_checklist_topics')
+      .select('*')
+      .order('category', { ascending: true })
+      .order('work_system', { ascending: true })
+      .order('stage', { ascending: true })
+      .order('order_no', { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data || []).map((row: Record<string, unknown>) => ({
+      id: String(row.id),
+      category: row.category as ProjectChecklistCategoryId,
+      ...(row.work_system ? { workSystem: String(row.work_system) } : {}),
+      ...(row.stage ? { stage: String(row.stage) as ProjectChecklistTopic['stage'] } : {}),
+      orderNo: Number(row.order_no || 10),
+      title: String(row.title || ''),
+    }));
+  },
+
+  replaceTopics: async (topics: ProjectChecklistTopic[]): Promise<ProjectChecklistTopic[]> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+
+    const rows = topics.map((topic) => {
+      const workSystem = topic.category === 'project' ? '' : String(topic.workSystem || '').trim();
+      const stage = topic.category === 'project' ? String(topic.stage || '').trim() : '';
+      if (topic.category !== 'project' && !workSystem) throw new Error('WORK_SYSTEM_REQUIRED');
+      if (topic.category === 'project' && !stage) throw new Error('STAGE_REQUIRED');
+      const orderNo = Number(topic.orderNo);
+      if (!Number.isFinite(orderNo) || orderNo < 1) throw new Error('INVALID_ORDER_NO');
+      return {
+        id: topic.id,
+        category: topic.category,
+        work_system: workSystem,
+        stage,
+        order_no: orderNo,
+        title: topic.title.trim(),
+      };
+    });
+
+    const { data: existingRows, error: listError } = await supabase.from('project_checklist_topics').select('id');
+    if (listError) throw new Error(listError.message);
+    if (rows.length) {
+      const { error } = await supabase.from('project_checklist_topics').upsert(rows, { onConflict: 'id' });
+      if (error) throw new Error(error.message);
+    }
+
+    const retainedIds = new Set(rows.map((row) => row.id));
+    const removedIds = (existingRows || [])
+      .map((row: { id: string }) => row.id)
+      .filter((id: string) => !retainedIds.has(id));
+    if (removedIds.length) {
+      const { error } = await supabase.from('project_checklist_topics').delete().in('id', removedIds);
+      if (error) throw new Error(error.message);
+    }
+
+    return projectChecklistApi.getTopics();
+  },
+
+  getProgress: async (projectId: string): Promise<ProjectChecklistProgress> => {
+    const canRead = await checkProjectPermission(projectId, 'read');
+    if (!canRead) throw new Error('FORBIDDEN');
+    const { data, error } = await supabase
+      .from('project_checklist_progress')
+      .select('topic_id, done, completion_date, completed_by, jira_id, notes')
+      .eq('project_id', projectId);
+    if (error) throw new Error(error.message);
+
+    return (data || []).reduce<ProjectChecklistProgress>((progress, row: Record<string, unknown>) => {
+      progress[String(row.topic_id)] = {
+        done: Boolean(row.done),
+        completionDate: String(row.completion_date || ''),
+        completedBy: String(row.completed_by || ''),
+        jiraId: String(row.jira_id || ''),
+        notes: String(row.notes || ''),
+      };
+      return progress;
+    }, {});
+  },
+
+  saveProgress: async (projectId: string, progress: ProjectChecklistProgress): Promise<void> => {
+    const canWrite = await checkProjectPermission(projectId, 'write');
+    if (!canWrite) throw new Error('FORBIDDEN');
+    const { userId } = await getCurrentUserRoleAndId();
+    const rows = Object.entries(progress).map(([topicId, item]) => ({
+      project_id: projectId,
+      topic_id: topicId,
+      done: Boolean(item.done),
+      completion_date: item.completionDate || null,
+      completed_by: item.completedBy || '',
+      jira_id: item.jiraId || '',
+      notes: item.notes || '',
+      updated_by: userId || null,
+    }));
+    if (!rows.length) return;
+    const { error } = await supabase
+      .from('project_checklist_progress')
+      .upsert(rows, { onConflict: 'project_id,topic_id' });
+    if (error) throw new Error(error.message);
+  },
+};
 // ── Tasks ───────────────────────────────────────────────────────────────────
 
 export const taskApi = {

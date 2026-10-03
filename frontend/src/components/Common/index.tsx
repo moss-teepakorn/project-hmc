@@ -170,15 +170,15 @@ export const ProgressBar: React.FC<{ value: number; color?: string; height?: num
   </div>
 );
 
-export const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; width?: number }> = ({ title, onClose, children, width = 540 }) => (
+export const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; width?: number; height?: number | string; contentStyle?: React.CSSProperties }> = ({ title, onClose, children, width = 540, height, contentStyle }) => (
   <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
     <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
-    <div style={{ position: 'relative', background: C.white, borderRadius: 16, width, maxWidth: 'calc(100vw - 32px)', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: 'Poppins, sans-serif' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, background: C.white, zIndex: 1 }}>
+    <div style={{ position: 'relative', display: height ? 'flex' : undefined, flexDirection: height ? 'column' : undefined, background: C.white, borderRadius: 16, width, height, maxWidth: 'calc(100vw - 32px)', maxHeight: '92vh', overflowY: height ? 'hidden' : 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: 'Poppins, sans-serif' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, background: C.white, zIndex: 1, flexShrink: 0 }}>
         <span style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{title}</span>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: C.text3 }}>✕</button>
       </div>
-      <div style={{ padding: 24 }}>{children}</div>
+      <div style={{ padding: 24, ...(height ? { flex: '1 1 auto', minHeight: 0, overflowY: 'auto' as const } : {}), ...contentStyle }}>{children}</div>
     </div>
   </div>
 );
@@ -229,7 +229,7 @@ export const Tabs: React.FC<{
     <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, overflowX: 'auto' }}>
       {tabs.map(t => (
         <button key={t.id} onClick={() => onChange(t.id)}
-          style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, fontWeight: active === t.id ? 600 : 500, padding: '10px 16px', border: 'none', background: 'none', cursor: 'pointer', color: active === t.id ? C.primary : C.text2, borderBottom: active === t.id ? `2px solid ${C.primary}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+          style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, fontWeight: active === t.id ? 600 : 500, padding: '10px 8px', border: 'none', background: 'none', cursor: 'pointer', color: active === t.id ? C.primary : C.text2, borderBottom: active === t.id ? `2px solid ${C.primary}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
           {t.icon && <span>{t.icon}</span>}
           {t.label}
           {t.count != null && (

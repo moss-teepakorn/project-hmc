@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, Copy, Home } from 'lucide-react';
+import { ChevronLeft, Copy, Home, Plus, Save, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Badge, Tabs, C, PROJECT_STATUS, ProgressBar, Btn, Modal, FormRow, Select, Input } from '../Common';
 import { fmtDate, computeBaselineProgress } from '../../utils';
@@ -16,12 +16,26 @@ import ActivitiesTab     from '../Activities/ActivitiesTab';
 import ProjectEnvironmentTab from './ProjectEnvironmentTab';
 import ExecutiveOnePage  from './ExecutiveOnePage';
 import { useStore }      from '../../store';
+import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
-import { effortApi, memberApi, milestoneApi, riskApi, taskApi } from '../../services/api';
+import { effortApi, memberApi, milestoneApi, projectChecklistApi, riskApi, taskApi } from '../../services/api';
+import {
+  PROJECT_CHECKLIST_CATEGORIES,
+  PROJECT_CHECKLIST_STAGES,
+  type ProjectChecklistProgress,
+  type ProjectChecklistProgressEntry,
+  type ProjectChecklistCategoryId,
+  type ProjectChecklistStageId,
+  type ProjectChecklistTopic,
+} from '../../utils/projectChecklist';
 
 interface Props { project: Project; }
 type CopyScope = 'tasks' | 'members' | 'ms' | 'effort' | 'risks';
-
+const CHECKLIST_TABS = [
+  { id: 'project', label: 'Project', icon: '📋' },
+  { id: 'setup', label: 'Setup', icon: '⚙️' },
+  { id: 'migrate-data', label: 'Migrate Data', icon: '🔄' },
+];
 function getTodayPassword(): string {
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, '0');
@@ -30,18 +44,233 @@ function getTodayPassword(): string {
   return `${dd}${mm}${yyyy}`;
 }
 
-function ChecklistPlaceholder({ title }: { title: string }) {
+function getLocalDateInputValue(): string {
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function ProjectChecklistTable({ projectId, category, workSystem }: { projectId: string; category: ProjectChecklistCategoryId; workSystem: string }) {
+  const { profile } = useAuth();
+  const [topics, setTopics] = useState<ProjectChecklistTopic[] | null>(null);
+  const [progress, setProgress] = useState<ProjectChecklistProgress>({});
+  const [savedSnapshot, setSavedSnapshot] = useState('');
+  const [loadedProjectId, setLoadedProjectId] = useState('');
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    setLoadedProjectId('');
+    setLoadError('');
+    Promise.all([projectChecklistApi.getTopics(), projectChecklistApi.getProgress(projectId)])
+      .then(([loadedTopics, loadedProgress]) => {
+        if (!active) return;
+        setTopics(loadedTopics);
+        setProgress(loadedProgress);
+        setSavedSnapshot(JSON.stringify(loadedProgress));
+      })
+      .catch((error) => {
+        if (!active) return;
+        setTopics([]);
+        setProgress({});
+        setSavedSnapshot('{}');
+        setLoadError(error instanceof Error ? error.message : 'Unable to load checklist data');
+      })
+      .finally(() => { if (active) setLoadedProjectId(projectId); });
+    return () => { active = false; };
+  }, [projectId]);
+
+  useEffect(() => {
+    let active = true;
+    const refreshTopics = async () => {
+      try {
+        const loadedTopics = await projectChecklistApi.getTopics();
+        if (active) setTopics(loadedTopics);
+      } catch (error) {
+        if (active) toast.error(error instanceof Error ? error.message : 'Unable to refresh checklist topics');
+      }
+    };
+    window.addEventListener('checklist-topics-updated', refreshTopics);
+    return () => {
+      active = false;
+      window.removeEventListener('checklist-topics-updated', refreshTopics);
+    };
+  }, []);
+
+  const isLoaded = loadedProjectId === projectId;
+  const stageOrder = new Map<ProjectChecklistStageId, number>(PROJECT_CHECKLIST_STAGES.map((stage, index) => [stage.id, index]));
+  const matchingTopics = (topics || []).filter((topic) =>
+    topic.category === category && (category === 'project' || (Boolean(workSystem) && topic.workSystem === workSystem))
+  );
+  const currentTopics = !isLoaded ? [] : category === 'project'
+    ? matchingTopics.filter((topic) => topic.stage).slice().sort((left, right) => (stageOrder.get(left.stage!)! - stageOrder.get(right.stage!)!) || left.orderNo - right.orderNo)
+    : matchingTopics.slice().sort((left, right) => left.orderNo - right.orderNo);
+  const requiresWorkSystem = category !== 'project';
+  const categoryLabel = PROJECT_CHECKLIST_CATEGORIES.find((item) => item.id === category)?.label || 'Project';
+  const hasUnsavedChanges = isLoaded && JSON.stringify(progress) !== savedSnapshot;
+
+  const updateProgress = (topicId: string, updates: Partial<ProjectChecklistProgressEntry>) => {
+    setProgress((currentProgress) => {
+      const existing = currentProgress[topicId];
+      return {
+        ...currentProgress,
+        [topicId]: {
+          done: updates.done ?? existing?.done ?? Boolean(existing?.completionDate),
+          completionDate: updates.completionDate ?? existing?.completionDate ?? '',
+          completedBy: updates.completedBy ?? existing?.completedBy ?? '',
+          jiraId: updates.jiraId ?? existing?.jiraId ?? '',
+          notes: updates.notes ?? existing?.notes ?? '',
+        },
+      };
+    });
+  };
+
+  const saveItems = async () => {
+    try {
+      const topicIds = new Set((topics || []).map((topic) => topic.id));
+      const savedProgress = Object.fromEntries(
+        Object.entries(progress).filter(([topicId]) => topicIds.has(topicId))
+      );
+      const serializedItems = JSON.stringify(savedProgress);
+      await projectChecklistApi.saveProgress(projectId, savedProgress);
+      setProgress(savedProgress);
+      setSavedSnapshot(serializedItems);
+      toast.success('Progress saved');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not save progress');
+    }
+  };
+
+  const headerStyle: React.CSSProperties = {
+    padding: '10px 12px',
+    background: C.bg2,
+    borderBottom: `1px solid ${C.border}`,
+    color: C.text2,
+    fontSize: 10,
+    fontWeight: 700,
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
+  };
+  const cellStyle: React.CSSProperties = {
+    padding: '4px 8px',
+    borderBottom: `1px solid ${C.border}`,
+    color: C.text,
+    fontSize: 10,
+    verticalAlign: 'middle',
+  };
+  const inputStyle: React.CSSProperties = {
+    height: 28,
+    width: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
+    padding: '4px 8px',
+    border: `1px solid ${C.border}`,
+    borderRadius: 6,
+    background: C.white,
+    color: C.text,
+    fontFamily: 'Poppins, sans-serif',
+    fontSize: 10,
+  };
+  const renderTopicRow = (topic: ProjectChecklistTopic, index: number) => {
+    const itemProgress = progress[topic.id] || { done: false, completionDate: '', completedBy: '', jiraId: '', notes: '' };
+    const isDone = Boolean(itemProgress.done || itemProgress.completionDate);
+    return (
+      <tr key={topic.id}>
+        <td style={{ ...cellStyle, color: C.text3, fontVariantNumeric: 'tabular-nums' }}>{String(topic.orderNo).padStart(2, '0')}</td>
+        <td style={{ ...cellStyle, fontWeight: 600 }}>{topic.title}</td>
+        <td style={{ ...cellStyle, textAlign: 'center' }}>
+          <input
+            type="checkbox"
+            aria-label={`Mark ${topic.title} done`}
+            checked={isDone}
+            onChange={(event) => {
+              const done = event.currentTarget.checked;
+              updateProgress(topic.id, {
+                done,
+                completionDate: done ? getLocalDateInputValue() : '',
+                completedBy: done ? (profile?.fullName?.trim() || profile?.email || '') : '',
+              });
+            }}
+            style={{ width: 17, height: 17, accentColor: C.green, cursor: 'pointer' }}
+          />
+        </td>
+        <td style={cellStyle}><input aria-label={`${topic.title} completion date`} type="date" value={itemProgress.completionDate} onChange={(event) => updateProgress(topic.id, { completionDate: event.target.value })} style={inputStyle} /></td>
+        <td style={cellStyle}><input aria-label={`${topic.title} completed by`} value={itemProgress.completedBy} placeholder="Name" onChange={(event) => updateProgress(topic.id, { completedBy: event.target.value })} style={inputStyle} /></td>
+        <td style={cellStyle}><input aria-label={`${topic.title} JIRA ID`} value={itemProgress.jiraId} placeholder="HMC-123" onChange={(event) => updateProgress(topic.id, { jiraId: event.target.value })} style={inputStyle} /></td>
+        <td style={cellStyle}><input aria-label={`${topic.title} notes`} value={itemProgress.notes} placeholder="Notes" onChange={(event) => updateProgress(topic.id, { notes: event.target.value })} style={inputStyle} /></td>
+      </tr>
+    );
+  };
+
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: 24, boxSizing: 'border-box' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: C.text }}>{title}</h3>
-        <div aria-hidden="true" style={{ display: 'grid', gap: 10 }}>
-          {Array.from({ length: 4 }, (_, index) => (
-            <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: C.white, border: `1px solid ${C.border}`, borderRadius: 8 }}>
-              <span style={{ width: 16, height: 16, flexShrink: 0, border: `1px solid ${C.border2}`, borderRadius: 3 }} />
-              <span style={{ width: `${62 + (index % 2) * 18}%`, height: 8, background: C.bg2, borderRadius: 4 }} />
-            </div>
-          ))}
+      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>{categoryLabel} Checklist</h3>
+            <span style={{ display: 'block', marginTop: 4, color: C.text3, fontSize: 11 }}>
+              Topics are managed in Setup{requiresWorkSystem ? ` · Work System: ${workSystem || 'Not set'}` : ''}. Progress is stored in the project database.
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {hasUnsavedChanges && <span style={{ color: C.amber, fontSize: 12, fontWeight: 600 }}>Unsaved changes</span>}
+            <Btn onClick={saveItems} disabled={!isLoaded || !hasUnsavedChanges || !currentTopics.length} small>
+              <Save size={14} /> Save Progress
+            </Btn>
+          </div>
+        </div>
+        {loadError && (
+          <div style={{ marginBottom: 12, padding: '9px 12px', border: `1px solid ${C.red}`, background: C.redBg, color: C.red, fontSize: 12 }}>
+            Unable to load checklist data. Apply the project checklist database migration and verify project access. {loadError}
+          </div>
+        )}
+        <div style={{ overflowX: 'auto', border: `1px solid ${C.border}`, borderRadius: 12, background: C.white }}>
+          <table style={{ width: '100%', minWidth: 1160, borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
+            <colgroup>
+              <col style={{ width: 64 }} />
+              <col style={{ width: 400 }} />
+              <col style={{ width: 72 }} />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 130 }} />
+              <col />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={headerStyle}>No.</th>
+                <th style={headerStyle}>Checklist Topic</th>
+                <th style={{ ...headerStyle, textAlign: 'center' }}>Done</th>
+                <th style={headerStyle}>Completion Date</th>
+                <th style={headerStyle}>Completed By</th>
+                <th style={headerStyle}>JIRA ID</th>
+                <th style={headerStyle}>Notes</th>
+              </tr>
+            </thead>
+            {category === 'project' ? PROJECT_CHECKLIST_STAGES.map((stage) => {
+              const stageTopics = currentTopics.filter((topic) => topic.stage === stage.id);
+              return (
+                <tbody key={stage.id}>
+                  <tr>
+                    <td colSpan={7} style={{ padding: '10px 12px', background: C.bg2, borderBottom: `1px solid ${C.border}`, color: C.text, fontSize: 10, fontWeight: 700 }}>
+                      Stage: {stage.label}
+                    </td>
+                  </tr>
+                  {stageTopics.map(renderTopicRow)}
+                  {stageTopics.length === 0 && (
+                    <tr><td colSpan={7} style={{ padding: '10px 12px', color: C.text3, fontSize: 10 }}>No topics configured for this stage.</td></tr>
+                  )}
+                </tbody>
+              );
+            }) : (
+              <tbody>
+                {currentTopics.map(renderTopicRow)}
+                {currentTopics.length === 0 && (
+                  <tr><td colSpan={7} style={{ padding: '10px 12px', color: C.text3, fontSize: 10 }}>{workSystem ? `No ${categoryLabel.toLowerCase()} topics configured for ${workSystem}.` : 'Set a Work System on this project to view its topics.'}</td></tr>
+                )}
+              </tbody>
+            )}
+          </table>
         </div>
       </div>
     </div>
@@ -50,6 +279,7 @@ function ChecklistPlaceholder({ title }: { title: string }) {
 
 export default function ProjectDetail({ project }: Props) {
   const [activeTab, setActiveTab]   = useState('tasks');
+  const [activeChecklistTab, setActiveChecklistTab] = useState<ProjectChecklistCategoryId>('project');
   const [isMobile, setIsMobile] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [copySourceProjectId, setCopySourceProjectId] = useState('');
@@ -203,9 +433,6 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'members',  label: 'Members',    icon: '👥', count: members.length },
     { id: 'ms',       label: 'Milestones', icon: '🏁', count: milestones.length },
     { id: 'effort',   label: 'Effort',     icon: '⚡', count: efforts.length },
-    { id: 'project-checklist', label: 'Project Checklist', icon: '☑️' },
-    { id: 'setup-checklist', label: 'Setup Check List', icon: '⚙️' },
-    { id: 'migrate-checklist', label: 'Migrate Check List', icon: '🔄' },
     { id: 'cr',       label: 'Change Req', icon: '📝', count: changeRequests.length },
     { id: 'issues',   label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
     { id: 'risks',    label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
@@ -219,6 +446,7 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'members',  label: 'Members',    icon: '👥', count: members.length },
     { id: 'ms',       label: 'Milestones', icon: '🏁', count: milestones.length },
     { id: 'effort',   label: 'Effort',     icon: '⚡', count: efforts.length },
+    { id: 'checklists', label: 'Checklist', icon: '☑️' },
     { id: 'cr',       label: 'Change Req', icon: '📝', count: changeRequests.length },
     { id: 'issues',   label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
     { id: 'risks',    label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
@@ -306,7 +534,10 @@ export default function ProjectDetail({ project }: Props) {
               </div>
             </div>
           </div>
-          <Tabs tabs={TABS} active={activeTab} onChange={id => setActiveTab(id)} />
+          <Tabs tabs={TABS} active={activeTab} onChange={id => {
+            if (id === 'checklists') setActiveChecklistTab('project');
+            setActiveTab(id);
+          }} />
         </div>
       </div>
 
@@ -316,9 +547,16 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'members' && <div style={{ height: '100%', overflowY: 'auto' }}><MembersTab        projectId={project.id} extraActions={copyButton('members')} /></div>}
         {activeTab === 'ms'      && <div style={{ height: '100%', overflowY: 'auto' }}><MilestonesTab     projectId={project.id} extraActions={copyButton('ms')} /></div>}
         {activeTab === 'effort'  && <div style={{ height: '100%', overflowY: 'auto' }}><EffortTab         projectId={project.id} extraActions={copyButton('effort')} /></div>}
-        {activeTab === 'project-checklist' && <ChecklistPlaceholder title="Project Checklist" />}
-        {activeTab === 'setup-checklist' && <ChecklistPlaceholder title="Setup Check List" />}
-        {activeTab === 'migrate-checklist' && <ChecklistPlaceholder title="Migrate Check List" />}
+        {activeTab === 'checklists' && (
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: isMobile ? '0 16px' : '0 24px' }}>
+              <Tabs tabs={CHECKLIST_TABS} active={activeChecklistTab} onChange={(category) => setActiveChecklistTab(category as ProjectChecklistCategoryId)} />
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <ProjectChecklistTable projectId={project.id} category={activeChecklistTab} workSystem={project.softwareVersion} />
+            </div>
+          </div>
+        )}
         {activeTab === 'cr'      && <div style={{ height: '100%', overflowY: 'auto' }}><ChangeRequestTab  projectId={project.id} /></div>}
         {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
         {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} extraActions={copyButton('risks')} /></div>}

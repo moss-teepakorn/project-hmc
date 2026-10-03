@@ -377,7 +377,7 @@ export default function Dashboard() {
               ) : selected ? (
                 <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onEdit={() => setEditing(selected)} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} onOpenWithTab={(tab) => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab } })), 80); }} isMobile={isMobile} />
               ) : (
-                <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setSelected} onEdit={setEditing} onDelete={setDeleting} isMobile={isMobile} />
+                <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} onEdit={setEditing} onDelete={setDeleting} isMobile={isMobile} />
               )
             ) : (
               <PortfolioReportSummary />
