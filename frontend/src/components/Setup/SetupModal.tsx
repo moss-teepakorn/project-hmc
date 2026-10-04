@@ -55,6 +55,7 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
   }, [needsWorkSystem, workSystems]);
 
   const hasUnsavedChanges = JSON.stringify(topics) !== savedSnapshot;
+  const workSystemOrderMap = new Map(workSystems.map((system, index) => [system.trim().toLocaleLowerCase(), index]));
   const categoryTopics = topics
     .filter((topic) => topic.category === category)
     .slice()
@@ -64,7 +65,13 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
         const rightStageOrder = PROJECT_CHECKLIST_STAGES.findIndex((stage) => stage.id === right.stage);
         if (leftStageOrder !== rightStageOrder) return (leftStageOrder < 0 ? Infinity : leftStageOrder) - (rightStageOrder < 0 ? Infinity : rightStageOrder);
       }
-      if (needsWorkSystem && left.workSystem !== right.workSystem) return String(left.workSystem || '').localeCompare(String(right.workSystem || ''));
+      if (needsWorkSystem && left.workSystem !== right.workSystem) {
+        const leftModule = String(left.workSystem || '').trim();
+        const rightModule = String(right.workSystem || '').trim();
+        const leftOrder = workSystemOrderMap.get(leftModule.toLocaleLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+        const rightOrder = workSystemOrderMap.get(rightModule.toLocaleLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+        return leftOrder - rightOrder || leftModule.localeCompare(rightModule, undefined, { numeric: true, sensitivity: 'base' });
+      }
       return left.orderNo - right.orderNo || left.title.localeCompare(right.title, undefined, { numeric: true, sensitivity: 'base' });
     });
   const orderGroupTopics = categoryTopics.filter((topic) =>

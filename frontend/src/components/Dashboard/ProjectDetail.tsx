@@ -103,16 +103,17 @@ function ProjectChecklistTable({ project, category, workSystem, workSystemOrder 
 
   const isLoaded = loadedProjectId === projectId;
   const stageOrder = new Map<ProjectChecklistStageId, number>(PROJECT_CHECKLIST_STAGES.map((stage, index) => [stage.id, index]));
+  const requiresWorkSystem = category !== 'project';
+  const workSystemOrderMap = new Map(workSystemOrder.map((system, index) => [system.trim().toLocaleLowerCase(), index]));
+  const getWorkSystemOrder = (system?: string) => workSystemOrderMap.get(String(system || '').trim().toLocaleLowerCase()) ?? Number.MAX_SAFE_INTEGER;
   const matchingTopics = (topics || []).filter((topic) =>
     topic.category === category && (category === 'project' || !workSystem || topic.workSystem === workSystem)
   );
   const currentTopics = !isLoaded ? [] : category === 'project'
     ? matchingTopics.filter((topic) => topic.stage).slice().sort((left, right) => (stageOrder.get(left.stage!)! - stageOrder.get(right.stage!)!) || left.orderNo - right.orderNo || left.title.localeCompare(right.title))
-    : matchingTopics.slice().sort((left, right) => Number(left.orderNo) - Number(right.orderNo) || left.title.localeCompare(right.title));
-  const requiresWorkSystem = category !== 'project';
-  const workSystemOrderMap = new Map(workSystemOrder.map((system, index) => [system, index]));
+    : matchingTopics.slice().sort((left, right) => getWorkSystemOrder(left.workSystem) - getWorkSystemOrder(right.workSystem) || Number(left.orderNo) - Number(right.orderNo) || left.title.localeCompare(right.title));
   const moduleNames = [...new Set(currentTopics.map((topic) => topic.workSystem || ''))]
-    .sort((left, right) => (workSystemOrderMap.get(left) ?? Number.MAX_SAFE_INTEGER) - (workSystemOrderMap.get(right) ?? Number.MAX_SAFE_INTEGER) || left.localeCompare(right));
+    .sort((left, right) => getWorkSystemOrder(left) - getWorkSystemOrder(right) || left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }));
   const checklistColumnCount = category === 'migrate-data' ? 13 : requiresWorkSystem ? 7 : 8;
   const categoryLabel = PROJECT_CHECKLIST_CATEGORIES.find((item) => item.id === category)?.label || 'Project';
   const hasUnsavedChanges = isLoaded && JSON.stringify(progress) !== savedSnapshot;
