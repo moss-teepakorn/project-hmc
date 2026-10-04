@@ -218,9 +218,9 @@ function ProjectChecklistTable({ project, category, workSystem, workSystemOrder 
         if (mark !== notRequiredMark && mark !== doneMark) return;
         const centerX = data.cell.x + data.cell.width / 2;
         const centerY = data.cell.y + data.cell.height / 2;
-        const size = Math.min(2.2, data.cell.height * 0.3);
+        const size = Math.min(1.1, data.cell.height * 0.15);
         doc.setDrawColor(30, 41, 59);
-        doc.setLineWidth(0.45);
+        doc.setLineWidth(0.225);
         if (mark === notRequiredMark) {
           doc.line(centerX - size, centerY - size, centerX + size, centerY + size);
           doc.line(centerX + size, centerY - size, centerX - size, centerY + size);
