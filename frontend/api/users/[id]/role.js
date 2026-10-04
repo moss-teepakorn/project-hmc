@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const { id } = req.query;
   const { role } = req.body || {};
   if (!id) return res.status(400).json({ error: 'Missing user id' });
-  if (!['admin', 'member', 'client'].includes(role)) return res.status(400).json({ error: 'INVALID_ROLE' });
+  if (!['member', 'client'].includes(role)) return res.status(400).json({ error: 'INVALID_ROLE' });
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;

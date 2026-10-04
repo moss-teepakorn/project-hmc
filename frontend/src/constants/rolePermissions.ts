@@ -15,6 +15,26 @@ export interface RolePermissions {
   /** Whether to show Portfolio Overview tab on Dashboard */
   canViewPortfolioOverview: boolean;
 }
+export type ScreenAccessLevel = 'hidden' | 'read' | 'full';
+export type UserScreenPermissions = Record<string, ScreenAccessLevel>;
+
+export const USER_SCREEN_OPTIONS = [
+  { id: 'portfolio-overview', label: 'Portfolio Overview' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'summary', label: 'Summary' },
+  { id: 'members', label: 'Members' },
+  { id: 'ms', label: 'Milestones' },
+  { id: 'effort', label: 'Effort' },
+  { id: 'checklists', label: 'Checklist' },
+  { id: 'cr', label: 'Change Request' },
+  { id: 'issues', label: 'Issues' },
+  { id: 'risks', label: 'Risks' },
+  { id: 'activities', label: 'Activities' },
+  { id: 'env', label: 'Program URL' },
+  { id: 'onepage', label: 'One Page' },
+] as const;
+
+export const USER_SCREEN_IDS = USER_SCREEN_OPTIONS.map((screen) => screen.id);
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {

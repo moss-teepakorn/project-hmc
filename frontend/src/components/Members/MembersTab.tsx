@@ -184,9 +184,8 @@ export default function MembersTab({ projectId, extraActions }: Props) {
   // PATCH user role (admin only)
   const handlePatchRole = async (userId: string, newRole: UserRole) => {
     try {
-      // Only allow 'admin', 'member', 'client'
-      if (!['admin','member','client'].includes(newRole)) throw new Error('Invalid role');
-      await updateUserRole(userId, newRole as 'admin' | 'member' | 'client');
+      if (!['member','client'].includes(newRole)) throw new Error('Invalid role');
+      await updateUserRole(userId, newRole as 'member' | 'client');
       toast.success('Role updated');
       // reload profiles
       const { data } = await supabase.from('profiles').select('*');
@@ -310,7 +309,6 @@ export default function MembersTab({ projectId, extraActions }: Props) {
                               onChange={e => handlePatchRole(profile.id, e.target.value as UserRole)}
                               style={{ fontSize: 11, borderRadius: 6, border: '1px solid #ddd', padding: '2px 6px' }}
                             >
-                              <option value="admin">admin</option>
                               <option value="member">member</option>
                               <option value="client">client</option>
                             </select>

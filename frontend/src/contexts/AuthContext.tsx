@@ -87,9 +87,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fullName: data.full_name ?? '',
         avatarUrl: data.avatar_url ?? '',
         role: data.role ?? 'member',
+        isActive: data.is_active !== false,
+        projectAccessScope: data.project_access_scope === 'all' ? 'all' : 'member',
+        screenPermissions: Array.isArray(data.screen_permissions)
+          ? data.screen_permissions
+          : data.screen_permissions && typeof data.screen_permissions === 'object'
+            ? data.screen_permissions
+            : null,
         createdAt: data.created_at ?? '',
         updatedAt: data.updated_at ?? '',
       });
+      if (data.is_active === false) {
+        setProfile(null);
+        window.setTimeout(() => { void supabase.auth.signOut(); }, 0);
+      }
     } catch {
       setProfile(null);
     } finally {
@@ -99,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const normalizedEmail = email.trim().toLowerCase();
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
     });
@@ -113,6 +124,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('บัญชียังไม่ยืนยันอีเมล กรุณาเปิดอีเมลแล้วกดยืนยันก่อนเข้าสู่ระบบ');
       }
       throw new Error(error.message);
+    }
+
+    if (data.user) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_active')
+        .eq('id', data.user.id)
+        .maybeSingle();
+      if (!profileError && profileData?.is_active === false) {
+        await supabase.auth.signOut();
+        throw new Error('ACCOUNT_INACTIVE');
+      }
     }
   };
 

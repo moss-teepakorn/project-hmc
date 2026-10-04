@@ -1,5 +1,5 @@
 // ── User Role Management (Admin Only) ─────────────────────────────────────
-export async function updateUserRole(userId: string, newRole: 'admin' | 'member' | 'client'): Promise<void> {
+export async function updateUserRole(userId: string, newRole: 'member' | 'client'): Promise<void> {
   // Get current user profile for role
   const { data: sessionData } = await supabase.auth.getSession();
   let role = 'member';
@@ -10,16 +10,26 @@ export async function updateUserRole(userId: string, newRole: 'admin' | 'member'
     if (profile?.role) role = profile.role;
   }
   if (role !== 'admin') throw new Error('FORBIDDEN');
-  if (!['admin','member','client'].includes(newRole)) throw new Error('INVALID_ROLE');
+  if (!['member','client'].includes(newRole)) throw new Error('INVALID_ROLE');
   const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
   if (error) throw new Error(error.message);
 }
 // ── RBAC Utility ──────────────────────────────────────────────────────────
-export async function checkProjectPermission(projectId: string, action: 'read' | 'write'): Promise<boolean> {
-  const { role, userId, email } = await getCurrentUserRoleAndId();
+export async function checkProjectPermission(projectId: string, action: 'read' | 'write', screenId?: string): Promise<boolean> {
+  const { role, userId, email, projectAccessScope, screenPermissions } = await getCurrentUserRoleAndId();
   if (role === 'admin') return true;
-  if (role === 'client') return action === 'read' && await isProjectMember(projectId, userId, email);
-  if (role === 'member' || role === 'pm') return await isProjectMember(projectId, userId, email);
+  const isMember = await isProjectMember(projectId, userId, email);
+  if (screenId && screenPermissions) {
+    const access = Array.isArray(screenPermissions)
+      ? screenPermissions.includes(screenId) ? 'full' : 'hidden'
+      : screenPermissions[screenId] || 'hidden';
+    if (access === 'hidden') return false;
+    if (action === 'read') return projectAccessScope === 'all' || isMember;
+    return access === 'full' && (projectAccessScope === 'all' || isMember);
+  }
+  if (action === 'read' && projectAccessScope === 'all') return true;
+  if (role === 'client') return action === 'read' && isMember;
+  if (role === 'member' || role === 'pm') return isMember;
   return false;
 }
 
@@ -78,7 +88,8 @@ async function isProjectMember(projectId: string, userId: string, email: string 
 }
 
 // helper: get current user id and role (with short-lived cache to avoid lock contention)
-let _authCache: { role: string; userId: string; email: string | null; expiresAt: number } | null = null;
+type CachedAuthInfo = { role: string; userId: string; email: string | null; projectAccessScope: 'member' | 'all'; screenPermissions: Record<string, 'hidden' | 'read' | 'full'> | string[] | null };
+let _authCache: (CachedAuthInfo & { expiresAt: number }) | null = null;
 const AUTH_CACHE_TTL_MS = 30_000;
 
 export function clearAuthCache(): void {
@@ -86,12 +97,12 @@ export function clearAuthCache(): void {
 }
 
 // Deduplicate concurrent calls: if a fetch is in-flight, queue behind it
-let _authFetchPromise: Promise<{ role: string; userId: string; email: string | null }> | null = null;
+let _authFetchPromise: Promise<CachedAuthInfo> | null = null;
 
-export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId: string; email: string | null }> {
+export async function getCurrentUserRoleAndId(): Promise<CachedAuthInfo> {
   const now = Date.now();
   if (_authCache && _authCache.expiresAt > now) {
-    return { role: _authCache.role, userId: _authCache.userId, email: _authCache.email };
+    return { role: _authCache.role, userId: _authCache.userId, email: _authCache.email, projectAccessScope: _authCache.projectAccessScope, screenPermissions: _authCache.screenPermissions };
   }
   if (_authFetchPromise) return _authFetchPromise;
 
@@ -100,19 +111,24 @@ export async function getCurrentUserRoleAndId(): Promise<{ role: string; userId:
     let role = 'member';
     let userId = '';
     let email: string | null = null;
+    let projectAccessScope: 'member' | 'all' = 'member';
+    let screenPermissions: CachedAuthInfo['screenPermissions'] = null;
     const user = sessionData?.session?.user;
     if (user?.id) {
       userId = user.id;
-      const { data: profile, error } = await supabase.from('profiles').select('role,email').eq('id', userId).maybeSingle();
+      const { data: profile, error } = await supabase.from('profiles').select('role,email,project_access_scope,screen_permissions').eq('id', userId).maybeSingle();
       if (error) throw new Error(error.message);
       if ((profile as any)?.role) role = (profile as any).role;
       if ((profile as any)?.email) email = (profile as any).email;
+      if ((profile as any)?.project_access_scope === 'all') projectAccessScope = 'all';
+      if (Array.isArray((profile as any)?.screen_permissions)) screenPermissions = (profile as any).screen_permissions;
+      else if ((profile as any)?.screen_permissions && typeof (profile as any).screen_permissions === 'object') screenPermissions = (profile as any).screen_permissions;
       if (!email && user.email) {
         email = user.email;
       }
     }
-    _authCache = { role, userId, email, expiresAt: Date.now() + AUTH_CACHE_TTL_MS };
-    return { role, userId, email };
+    _authCache = { role, userId, email, projectAccessScope, screenPermissions, expiresAt: Date.now() + AUTH_CACHE_TTL_MS };
+    return { role, userId, email, projectAccessScope, screenPermissions };
   })().finally(() => { _authFetchPromise = null; });
 
   return _authFetchPromise;
@@ -165,9 +181,8 @@ function rowsToObjs<T>(rows: Record<string, unknown>[]): T[] {
 
 export const projectApi = {
   getAll: async (): Promise<{ data: Project[] }> => {
-    const { role, userId, email } = await getCurrentUserRoleAndId();
-    if (role === 'admin') {
-      // Admin เห็นทุก project
+    const { role, userId, email, projectAccessScope } = await getCurrentUserRoleAndId();
+    if (role === 'admin' || projectAccessScope === 'all') {
       const { data, error } = await supabase
         .from('projects')
         .select('*')
@@ -205,7 +220,7 @@ export const projectApi = {
   },
 
   update: async (id: string, p: Partial<Project>): Promise<{ data: Project }> => {
-    const can = await checkProjectPermission(id, 'write');
+    const can = await checkProjectPermission(id, 'write', 'portfolio-overview');
     if (!can) throw new Error('FORBIDDEN');
     const row = objToRow(p as Record<string, unknown>);
     delete row.id;
@@ -222,7 +237,7 @@ export const projectApi = {
   },
 
   remove: async (id: string): Promise<void> => {
-    const can = await checkProjectPermission(id, 'write');
+    const can = await checkProjectPermission(id, 'write', 'portfolio-overview');
     if (!can) throw new Error('FORBIDDEN');
     const { error } = await supabase.from('projects').delete().eq('id', id);
     if (error) throw new Error(error.message);
@@ -242,6 +257,9 @@ export const projectEnvironmentApi = {
   },
 
   create: async (env: Partial<ProjectEnvironment>): Promise<{ data: ProjectEnvironment }> => {
+    const projectId = String(env.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'env')) throw new Error('FORBIDDEN');
     const row = objToRow(env as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -255,6 +273,11 @@ export const projectEnvironmentApi = {
   },
 
   update: async (id: string, env: Partial<ProjectEnvironment>): Promise<{ data: ProjectEnvironment }> => {
+    const { data: existing, error: lookupError } = await supabase.from('project_environments').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || env.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'env')) throw new Error('FORBIDDEN');
     const row = objToRow(env as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -269,6 +292,11 @@ export const projectEnvironmentApi = {
   },
 
   remove: async (id: string): Promise<void> => {
+    const { data: existing, error: lookupError } = await supabase.from('project_environments').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'env')) throw new Error('FORBIDDEN');
     const { error } = await supabase.from('project_environments').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
@@ -285,7 +313,7 @@ export const projectProgressApi = {
 
   save: async (snapshot: Partial<ProjectProgressSnapshot>): Promise<{ data: ProjectProgressSnapshot }> => {
     if (!snapshot.projectId) throw new Error('MISSING_PROJECT_ID');
-    const can = await checkProjectPermission(snapshot.projectId, 'write');
+    const can = await checkProjectPermission(snapshot.projectId, 'write', 'summary');
     if (!can) throw new Error('FORBIDDEN');
     const row = objToRow(snapshot as Record<string, unknown>);
     delete row.id;
@@ -317,7 +345,7 @@ export const projectProgressApi = {
     if (fetchErr) throw new Error(fetchErr.message);
     const projectId = (data as any)?.project_id;
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
-    const can = await checkProjectPermission(projectId, 'write');
+    const can = await checkProjectPermission(projectId, 'write', 'summary');
     if (!can) throw new Error('FORBIDDEN');
     const { error } = await supabase.from('project_progress_snapshots').delete().eq('id', id);
     if (error) throw new Error(error.message);
@@ -482,38 +510,53 @@ export const projectChecklistApi = {
   },
 
   getProgress: async (projectId: string): Promise<ProjectChecklistProgress> => {
-    const canRead = await checkProjectPermission(projectId, 'read');
+    const canRead = await checkProjectPermission(projectId, 'read', 'checklists');
     if (!canRead) throw new Error('FORBIDDEN');
     const { data, error } = await supabase
       .from('project_checklist_progress')
-      .select('topic_id, done, completion_date, completed_by, jira_id, notes')
+      .select('topic_id, not_required, done, completion_date, completed_by, jira_id, notes, uat_customer, uat_hmc, production_customer, production_hmc')
       .eq('project_id', projectId);
     if (error) throw new Error(error.message);
 
     return (data || []).reduce<ProjectChecklistProgress>((progress, row: Record<string, unknown>) => {
       progress[String(row.topic_id)] = {
+        notRequired: Boolean(row.not_required),
         done: Boolean(row.done),
         completionDate: String(row.completion_date || ''),
         completedBy: String(row.completed_by || ''),
         jiraId: String(row.jira_id || ''),
         notes: String(row.notes || ''),
+        uatCustomer: row.uat_customer == null ? '' : String(row.uat_customer),
+        uatHmc: row.uat_hmc == null ? '' : String(row.uat_hmc),
+        productionCustomer: row.production_customer == null ? '' : String(row.production_customer),
+        productionHmc: row.production_hmc == null ? '' : String(row.production_hmc),
       };
       return progress;
     }, {});
   },
 
   saveProgress: async (projectId: string, progress: ProjectChecklistProgress): Promise<void> => {
-    const canWrite = await checkProjectPermission(projectId, 'write');
+    const canWrite = await checkProjectPermission(projectId, 'write', 'checklists');
     if (!canWrite) throw new Error('FORBIDDEN');
     const { userId } = await getCurrentUserRoleAndId();
+    const numberOrNull = (value?: string) => {
+      if (value == null || value.trim() === '') return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
     const rows = Object.entries(progress).map(([topicId, item]) => ({
       project_id: projectId,
       topic_id: topicId,
+      not_required: Boolean(item.notRequired),
       done: Boolean(item.done),
       completion_date: item.completionDate || null,
       completed_by: item.completedBy || '',
       jira_id: item.jiraId || '',
       notes: item.notes || '',
+      uat_customer: numberOrNull(item.uatCustomer),
+      uat_hmc: numberOrNull(item.uatHmc),
+      production_customer: numberOrNull(item.productionCustomer),
+      production_hmc: numberOrNull(item.productionHmc),
       updated_by: userId || null,
     }));
     if (!rows.length) return;
@@ -561,7 +604,7 @@ export const taskApi = {
 
   saveBaselineOnce: async (projectId: string): Promise<{ data: Task[] }> => {
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
-    const canWrite = await checkProjectPermission(projectId, 'write');
+    const canWrite = await checkProjectPermission(projectId, 'write', 'tasks');
     if (!canWrite) throw new Error('FORBIDDEN');
 
     const { data: existingRows, error: existingErr } = await supabase
@@ -649,7 +692,7 @@ export const taskApi = {
 
     // permission: must have write access to project
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
-    const okCreate = await checkProjectPermission(projectId, 'write');
+    const okCreate = await checkProjectPermission(projectId, 'write', 'tasks');
     if (!okCreate) throw new Error('FORBIDDEN');
 
     const { data, error } = await supabase
@@ -689,7 +732,7 @@ export const taskApi = {
     const { data: existing } = await supabase.from('tasks').select('project_id').eq('id', id).maybeSingle();
     const projectIdForUpdate = (existing as any)?.project_id || row.project_id;
     if (!projectIdForUpdate) throw new Error('MISSING_PROJECT_ID');
-    const okUpdate = await checkProjectPermission(projectIdForUpdate, 'write');
+    const okUpdate = await checkProjectPermission(projectIdForUpdate, 'write', 'tasks');
     if (!okUpdate) throw new Error('FORBIDDEN');
 
     const { data, error } = await supabase
@@ -776,7 +819,7 @@ export const taskApi = {
   },
 
   reorderSiblings: async (projectId: string, orderedIds: string[]): Promise<{ allTasks: Task[] }> => {
-    const ok = await checkProjectPermission(projectId, 'write');
+    const ok = await checkProjectPermission(projectId, 'write', 'tasks');
     if (!ok) throw new Error('FORBIDDEN');
     // Assign clean, monotonically-increasing sort_order values so recalcStructure
     // will produce the exact WBS sequence that matches the desired visual order.
@@ -797,6 +840,12 @@ export const taskApi = {
   },
 
   setComplete: async (id: string, pct: number): Promise<{ allTasks: Task[] }> => {
+    const { data: existing, error: lookupError } = await supabase.from('tasks').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const canWrite = await checkProjectPermission(projectId, 'write', 'tasks');
+    if (!canWrite) throw new Error('FORBIDDEN');
     const { data, error } = await supabase
       .from('tasks')
       .update({ percent_complete: pct })
@@ -822,7 +871,7 @@ export const taskApi = {
       .single();
     const projectId = taskData?.project_id;
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
-    const okRemove = await checkProjectPermission(projectId, 'write');
+    const okRemove = await checkProjectPermission(projectId, 'write', 'tasks');
     if (!okRemove) throw new Error('FORBIDDEN');
     // Delete task and children
     await deleteTaskAndChildren(id);
@@ -837,7 +886,7 @@ export const taskApi = {
   },
 
   copyFromProject: async (sourceProjectId: string, targetProjectId: string, scope: 'all' | 'main' = 'all'): Promise<{ data: Task[] }> => {
-    const canWriteTarget = await checkProjectPermission(targetProjectId, 'write');
+    const canWriteTarget = await checkProjectPermission(targetProjectId, 'write', 'tasks');
     if (!canWriteTarget) throw new Error('FORBIDDEN');
     const src = await taskApi.getByProject(sourceProjectId);
     const selectedSource = scope === 'main'
@@ -908,7 +957,7 @@ export const taskApi = {
   },
 
   replaceFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Task[] }> => {
-    const canWriteTarget = await checkProjectPermission(targetProjectId, 'write');
+    const canWriteTarget = await checkProjectPermission(targetProjectId, 'write', 'tasks');
     if (!canWriteTarget) throw new Error('FORBIDDEN');
 
     const existing = await taskApi.getByProject(targetProjectId);
@@ -923,7 +972,7 @@ export const taskApi = {
 
   replaceByImport: async (projectId: string, importedTasks: Array<Partial<Task> & { parentWbs?: string; predecessorWbs?: string; predecessorType?: string; predecessorLagDays?: number }>): Promise<{ data: Task[] }> => {
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
-    const okWrite = await checkProjectPermission(projectId, 'write');
+    const okWrite = await checkProjectPermission(projectId, 'write', 'tasks');
     if (!okWrite) throw new Error('FORBIDDEN');
 
     const clean = (value: unknown) => String(value ?? '').trim();
@@ -1178,7 +1227,7 @@ export const taskTemplateApi = {
   },
 
   applyToProject: async (templateId: string, targetProjectId: string): Promise<{ data: Task[] }> => {
-    const canWriteTarget = await checkProjectPermission(targetProjectId, 'write');
+    const canWriteTarget = await checkProjectPermission(targetProjectId, 'write', 'tasks');
     if (!canWriteTarget) throw new Error('FORBIDDEN');
 
     const { data: itemRows, error: itemErr } = await supabase
@@ -1454,7 +1503,7 @@ function calcDurationFromDates(task: Task): number {
 export const memberApi = {
   getByProject: async (pid?: string): Promise<{ data: Member[] }> => {
     if (pid) {
-      const ok = await checkProjectPermission(pid, 'read');
+      const ok = await checkProjectPermission(pid, 'read', 'members');
       if (!ok) throw new Error('FORBIDDEN');
     }
     let q = supabase.from('members').select('*');
@@ -1468,7 +1517,7 @@ export const memberApi = {
   create: async (m: Partial<Member>): Promise<{ data: Member }> => {
     const projectId = String((m as any).projectId || '');
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
-    const ok = await checkProjectPermission(projectId, 'write');
+    const ok = await checkProjectPermission(projectId, 'write', 'members');
     if (!ok) throw new Error('FORBIDDEN');
 
     const row = objToRow(m as Record<string, unknown>);
@@ -1488,7 +1537,7 @@ export const memberApi = {
     const { data: orig } = await supabase.from('members').select('project_id').eq('id', id).maybeSingle();
     const pid = (orig as any)?.project_id || (m as any).projectId;
     if (!pid) throw new Error('MISSING_PROJECT_ID');
-    const ok = await checkProjectPermission(pid, 'write');
+    const ok = await checkProjectPermission(pid, 'write', 'members');
     if (!ok) throw new Error('FORBIDDEN');
 
     const row = objToRow(m as Record<string, unknown>);
@@ -1508,14 +1557,14 @@ export const memberApi = {
     const { data: orig } = await supabase.from('members').select('project_id').eq('id', id).maybeSingle();
     const pid = (orig as any)?.project_id;
     if (!pid) throw new Error('MISSING_PROJECT_ID');
-    const ok = await checkProjectPermission(pid, 'write');
+    const ok = await checkProjectPermission(pid, 'write', 'members');
     if (!ok) throw new Error('FORBIDDEN');
     const { error } = await supabase.from('members').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 
   copyFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Member[] }> => {
-    const ok = await checkProjectPermission(targetProjectId, 'write');
+    const ok = await checkProjectPermission(targetProjectId, 'write', 'members');
     if (!ok) throw new Error('FORBIDDEN');
 
     const src = await memberApi.getByProject(sourceProjectId);
@@ -1547,6 +1596,9 @@ export const milestoneApi = {
   },
 
   create: async (m: Partial<Milestone>): Promise<{ data: Milestone }> => {
+    const projectId = String(m.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'ms')) throw new Error('FORBIDDEN');
     const row = objToRow(m as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -1560,6 +1612,11 @@ export const milestoneApi = {
   },
 
   update: async (id: string, m: Partial<Milestone>): Promise<{ data: Milestone }> => {
+    const { data: existing, error: lookupError } = await supabase.from('milestones').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || m.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'ms')) throw new Error('FORBIDDEN');
     const row = objToRow(m as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -1574,12 +1631,17 @@ export const milestoneApi = {
   },
 
   remove: async (id: string): Promise<void> => {
+    const { data: existing, error: lookupError } = await supabase.from('milestones').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'ms')) throw new Error('FORBIDDEN');
     const { error } = await supabase.from('milestones').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 
   copyFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Milestone[] }> => {
-    const ok = await checkProjectPermission(targetProjectId, 'write');
+    const ok = await checkProjectPermission(targetProjectId, 'write', 'ms');
     if (!ok) throw new Error('FORBIDDEN');
 
     const src = await milestoneApi.getByProject(sourceProjectId);
@@ -1627,6 +1689,9 @@ export const effortApi = {
   },
 
   create: async (e: Partial<Effort>): Promise<{ data: Effort }> => {
+    const projectId = String(e.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'effort')) throw new Error('FORBIDDEN');
     const base: Record<string, unknown> = {
       project_id: e.projectId,
       module: e.module ?? '',
@@ -1647,6 +1712,11 @@ export const effortApi = {
   },
 
   update: async (id: string, e: Partial<Effort>): Promise<{ data: Effort }> => {
+    const { data: existing, error: lookupError } = await supabase.from('efforts').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || e.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'effort')) throw new Error('FORBIDDEN');
     const base: Record<string, unknown> = {
       module: e.module ?? '',
       budget_amount: e.budgetAmount ?? 0,
@@ -1666,6 +1736,11 @@ export const effortApi = {
   },
 
   updateMonthly: async (id: string, month: string, manday: number): Promise<void> => {
+    const { data: existing, error: lookupError } = await supabase.from('efforts').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'effort')) throw new Error('FORBIDDEN');
     // Upsert monthly record
     const { error } = await supabase
       .from('effort_monthly')
@@ -1677,13 +1752,18 @@ export const effortApi = {
   },
 
   remove: async (id: string): Promise<void> => {
+    const { data: existing, error: lookupError } = await supabase.from('efforts').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'effort')) throw new Error('FORBIDDEN');
     // effort_monthly cascades via FK
     const { error } = await supabase.from('efforts').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 
   copyFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Effort[] }> => {
-    const ok = await checkProjectPermission(targetProjectId, 'write');
+    const ok = await checkProjectPermission(targetProjectId, 'write', 'effort');
     if (!ok) throw new Error('FORBIDDEN');
 
     const src = await effortApi.getByProject(sourceProjectId);
@@ -1736,6 +1816,9 @@ export const crApi = {
     c: Partial<ChangeRequest> & { items?: Partial<CRItem>[] }
   ): Promise<{ data: ChangeRequest & { items: CRItem[] } }> => {
     const { items, ...rest } = c;
+    const projectId = String(rest.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'cr')) throw new Error('FORBIDDEN');
     const row = objToRow(rest as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -1771,6 +1854,11 @@ export const crApi = {
     c: Partial<ChangeRequest> & { items?: Partial<CRItem>[] }
   ): Promise<{ data: ChangeRequest & { items: CRItem[] } }> => {
     const { items, ...rest } = c;
+    const { data: existing, error: lookupError } = await supabase.from('change_requests').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || rest.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'cr')) throw new Error('FORBIDDEN');
     const row = objToRow(rest as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -1807,6 +1895,11 @@ export const crApi = {
 
   remove: async (id: string): Promise<void> => {
     // cr_items cascades via FK
+    const { data: existing, error: lookupError } = await supabase.from('change_requests').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'cr')) throw new Error('FORBIDDEN');
     const { error } = await supabase.from('change_requests').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
@@ -1825,6 +1918,9 @@ export const issueApi = {
   },
 
   create: async (i: Partial<Issue>): Promise<{ data: Issue }> => {
+    const projectId = String(i.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'issues')) throw new Error('FORBIDDEN');
     const row = objToRow(i as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -1838,6 +1934,11 @@ export const issueApi = {
   },
 
   update: async (id: string, i: Partial<Issue>): Promise<{ data: Issue }> => {
+    const { data: existing, error: lookupError } = await supabase.from('issues').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || i.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'issues')) throw new Error('FORBIDDEN');
     const row = objToRow(i as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -1852,6 +1953,11 @@ export const issueApi = {
   },
 
   remove: async (id: string): Promise<void> => {
+    const { data: existing, error: lookupError } = await supabase.from('issues').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'issues')) throw new Error('FORBIDDEN');
     const { error } = await supabase.from('issues').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
@@ -1862,7 +1968,7 @@ export const issueApi = {
 export const activityApi = {
   getByProject: async (pid?: string): Promise<{ data: Activity[] }> => {
     if (pid) {
-      const ok = await checkProjectPermission(pid, 'read');
+      const ok = await checkProjectPermission(pid, 'read', 'activities');
       if (!ok) throw new Error('FORBIDDEN');
     }
     let q = supabase.from('activities').select('*');
@@ -1876,7 +1982,7 @@ export const activityApi = {
   create: async (a: Partial<Activity>): Promise<{ data: Activity }> => {
     const projectId = String((a as any).projectId || '');
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
-    const ok = await checkProjectPermission(projectId, 'write');
+    const ok = await checkProjectPermission(projectId, 'write', 'activities');
     if (!ok) throw new Error('FORBIDDEN');
 
     const row = objToRow(a as Record<string, unknown>);
@@ -1895,7 +2001,7 @@ export const activityApi = {
     const { data: orig } = await supabase.from('activities').select('project_id').eq('id', id).maybeSingle();
     const projectId = (orig as any)?.project_id || (a as any).projectId;
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
-    const ok = await checkProjectPermission(projectId, 'write');
+    const ok = await checkProjectPermission(projectId, 'write', 'activities');
     if (!ok) throw new Error('FORBIDDEN');
 
     const row = objToRow(a as Record<string, unknown>);
@@ -1915,7 +2021,7 @@ export const activityApi = {
     const { data: orig } = await supabase.from('activities').select('project_id').eq('id', id).maybeSingle();
     const projectId = (orig as any)?.project_id;
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
-    const ok = await checkProjectPermission(projectId, 'write');
+    const ok = await checkProjectPermission(projectId, 'write', 'activities');
     if (!ok) throw new Error('FORBIDDEN');
 
     const { error } = await supabase.from('activities').delete().eq('id', id);
@@ -1936,6 +2042,9 @@ export const riskApi = {
   },
 
   create: async (r: Partial<Risk>): Promise<{ data: Risk }> => {
+    const projectId = String(r.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'risks')) throw new Error('FORBIDDEN');
     const row = objToRow(r as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -1949,6 +2058,11 @@ export const riskApi = {
   },
 
   update: async (id: string, r: Partial<Risk>): Promise<{ data: Risk }> => {
+    const { data: existing, error: lookupError } = await supabase.from('risks').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || r.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'risks')) throw new Error('FORBIDDEN');
     const row = objToRow(r as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -1963,12 +2077,17 @@ export const riskApi = {
   },
 
   remove: async (id: string): Promise<void> => {
+    const { data: existing, error: lookupError } = await supabase.from('risks').select('project_id').eq('id', id).maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'risks')) throw new Error('FORBIDDEN');
     const { error } = await supabase.from('risks').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 
   copyFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Risk[] }> => {
-    const ok = await checkProjectPermission(targetProjectId, 'write');
+    const ok = await checkProjectPermission(targetProjectId, 'write', 'risks');
     if (!ok) throw new Error('FORBIDDEN');
 
     const src = await riskApi.getByProject(sourceProjectId);

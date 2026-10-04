@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, Copy, Home, Plus, Save, Trash2 } from 'lucide-react';
+import { ChevronLeft, Copy, Download, Home, Plus, Save, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Badge, Tabs, C, PROJECT_STATUS, ProgressBar, Btn, Modal, FormRow, Select, Input } from '../Common';
 import { fmtDate, computeBaselineProgress } from '../../utils';
 import type { Project } from '../../types';
@@ -51,7 +53,8 @@ function getLocalDateInputValue(): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-function ProjectChecklistTable({ projectId, category, workSystem }: { projectId: string; category: ProjectChecklistCategoryId; workSystem: string }) {
+function ProjectChecklistTable({ project, category, workSystem, workSystemOrder }: { project: Project; category: ProjectChecklistCategoryId; workSystem: string; workSystemOrder: string[] }) {
+  const projectId = project.id;
   const { profile } = useAuth();
   const [topics, setTopics] = useState<ProjectChecklistTopic[] | null>(null);
   const [progress, setProgress] = useState<ProjectChecklistProgress>({});
@@ -101,14 +104,149 @@ function ProjectChecklistTable({ projectId, category, workSystem }: { projectId:
   const isLoaded = loadedProjectId === projectId;
   const stageOrder = new Map<ProjectChecklistStageId, number>(PROJECT_CHECKLIST_STAGES.map((stage, index) => [stage.id, index]));
   const matchingTopics = (topics || []).filter((topic) =>
-    topic.category === category && (category === 'project' || (Boolean(workSystem) && topic.workSystem === workSystem))
+    topic.category === category && (category === 'project' || !workSystem || topic.workSystem === workSystem)
   );
   const currentTopics = !isLoaded ? [] : category === 'project'
-    ? matchingTopics.filter((topic) => topic.stage).slice().sort((left, right) => (stageOrder.get(left.stage!)! - stageOrder.get(right.stage!)!) || left.orderNo - right.orderNo)
-    : matchingTopics.slice().sort((left, right) => left.orderNo - right.orderNo);
+    ? matchingTopics.filter((topic) => topic.stage).slice().sort((left, right) => (stageOrder.get(left.stage!)! - stageOrder.get(right.stage!)!) || left.orderNo - right.orderNo || left.title.localeCompare(right.title))
+    : matchingTopics.slice().sort((left, right) => Number(left.orderNo) - Number(right.orderNo) || left.title.localeCompare(right.title));
   const requiresWorkSystem = category !== 'project';
+  const workSystemOrderMap = new Map(workSystemOrder.map((system, index) => [system, index]));
+  const moduleNames = [...new Set(currentTopics.map((topic) => topic.workSystem || ''))]
+    .sort((left, right) => (workSystemOrderMap.get(left) ?? Number.MAX_SAFE_INTEGER) - (workSystemOrderMap.get(right) ?? Number.MAX_SAFE_INTEGER) || left.localeCompare(right));
+  const checklistColumnCount = category === 'migrate-data' ? 13 : requiresWorkSystem ? 7 : 8;
   const categoryLabel = PROJECT_CHECKLIST_CATEGORIES.find((item) => item.id === category)?.label || 'Project';
   const hasUnsavedChanges = isLoaded && JSON.stringify(progress) !== savedSnapshot;
+
+  const exportChecklistPdf = () => {
+    const title = category === 'project' ? 'Project Checklist' : category === 'setup' ? 'Setup Checklist' : 'Data Migration Checklist';
+    let sequenceNo = 0;
+    const columns = category === 'migrate-data'
+      ? ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'UAT Customer', 'UAT HMC', 'UAT Diff', 'Production Customer', 'Production HMC', 'Production Diff', 'Notes']
+      : requiresWorkSystem
+        ? ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'Notes']
+        : ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'JIRA ID', 'Notes'];
+    const pdfHead: any[][] = category === 'migrate-data'
+      ? [
+          [
+            { content: 'No.', rowSpan: 2 }, { content: 'Checklist Topic', rowSpan: 2 },
+            { content: 'Not Required', rowSpan: 2 }, { content: 'Done', rowSpan: 2 },
+            { content: 'Completion Date', rowSpan: 2 }, { content: 'Completed By', rowSpan: 2 },
+            { content: 'UAT Stage', colSpan: 3 }, { content: 'Production Stage', colSpan: 3 },
+            { content: 'Notes', rowSpan: 2 },
+          ],
+          ['Customer', 'HMC', 'Diff', 'Customer', 'HMC', 'Diff'],
+        ]
+      : [columns];
+    const body: any[] = [];
+    const progressCells = (topic: ProjectChecklistTopic, rowNumber: number) => {
+      const item = progress[topic.id] || { notRequired: false, done: false, completionDate: '', completedBy: '', jiraId: '', notes: '' };
+      const row = [
+        String(rowNumber).padStart(2, '0'),
+        topic.title,
+        item.notRequired ? 'Yes' : '',
+        !item.notRequired && (item.done || item.completionDate) ? 'Yes' : '',
+        item.completionDate ? fmtDate(item.completionDate) : '',
+        item.completedBy,
+      ];
+      if (category === 'migrate-data') {
+        const diff = (customer?: string, hmc?: string) => {
+          if (!customer && !hmc) return '';
+          const difference = (Number(customer) || 0) - (Number(hmc) || 0);
+          return String(Math.round(difference * 100) / 100);
+        };
+        row.push(item.uatCustomer || '', item.uatHmc || '', diff(item.uatCustomer, item.uatHmc));
+        row.push(item.productionCustomer || '', item.productionHmc || '', diff(item.productionCustomer, item.productionHmc));
+      } else if (!requiresWorkSystem) row.push(item.jiraId);
+      row.push(item.notes);
+      return row;
+    };
+    const groupRow = (label: string) => [{
+      content: label,
+      colSpan: columns.length,
+      styles: { fillColor: [241, 245, 249], textColor: [30, 30, 30], fontStyle: 'bold' as const, halign: 'left' as const },
+    }];
+
+    if (category === 'project') {
+      PROJECT_CHECKLIST_STAGES.forEach((stage) => {
+        const stageTopics = currentTopics.filter((topic) => topic.stage === stage.id);
+        body.push(groupRow(`Stage: ${stage.label}`));
+        stageTopics.forEach((topic) => body.push(progressCells(topic, ++sequenceNo)));
+      });
+    } else {
+      moduleNames.forEach((moduleName) => {
+        const moduleTopics = currentTopics.filter((topic) => (topic.workSystem || '') === moduleName);
+        body.push(groupRow(`Module: ${moduleName || '—'}`));
+        moduleTopics.forEach((topic) => body.push(progressCells(topic, ++sequenceNo)));
+      });
+    }
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const left = 8;
+    const right = 8;
+    const headerHeight = 18;
+    const footerHeight = 10;
+    const contentWidth = pageWidth - left - right;
+    autoTable(doc, {
+      head: pdfHead,
+      body,
+      startY: headerHeight + 5,
+      margin: { top: headerHeight + 5, bottom: footerHeight + 5, left, right },
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 7, cellPadding: 2, textColor: [30, 30, 30], lineColor: [203, 213, 225], lineWidth: 0.15, overflow: 'linebreak' },
+      headStyles: { fillColor: [239, 246, 255], textColor: [49, 46, 129], fontStyle: 'bold', halign: 'center' },
+      columnStyles: category === 'migrate-data'
+        ? {
+            0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 58 },
+            2: { cellWidth: 18, halign: 'center' }, 3: { cellWidth: 14, halign: 'center' },
+            4: { cellWidth: 22, halign: 'center' }, 5: { cellWidth: 30 },
+            6: { cellWidth: 17, halign: 'center' }, 7: { cellWidth: 15, halign: 'center' }, 8: { cellWidth: 14, halign: 'center' },
+            9: { cellWidth: 17, halign: 'center' }, 10: { cellWidth: 15, halign: 'center' }, 11: { cellWidth: 14, halign: 'center' },
+            12: { cellWidth: 37 },
+          }
+        : { 0: { cellWidth: 12, halign: 'center' }, 1: { cellWidth: 76 }, 2: { cellWidth: 25, halign: 'center' }, 3: { cellWidth: 16, halign: 'center' }, 4: { cellWidth: 30 }, 5: { cellWidth: 38 } },
+      showHead: 'everyPage',
+    });
+
+    const today = new Date();
+    const reportDate = [String(today.getDate()).padStart(2, '0'), String(today.getMonth() + 1).padStart(2, '0'), today.getFullYear()].join('-');
+    const totalPages = doc.getNumberOfPages();
+    for (let page = 1; page <= totalPages; page += 1) {
+      doc.setPage(page);
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(left, 2, contentWidth, headerHeight, 3, 3, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+      doc.setFontSize(9.5);
+      doc.text(doc.splitTextToSize(project.client || project.name || 'Project', 150)[0], left + 5.5, 10.8);
+      doc.setFontSize(11.5);
+      doc.text(title, left + 5.5, 16.2);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Print Date : ${reportDate}`, pageWidth - right - 5, 11, { align: 'right' });
+
+      const footerLineY = pageHeight - footerHeight;
+      const footerTextY = pageHeight - footerHeight + 5;
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.2);
+      doc.line(left, footerLineY, pageWidth - right, footerLineY);
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Prepared by Humanica Public Company Limited', left, footerTextY);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Confidential', pageWidth / 2, footerTextY, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Project ID: ${project.code || projectId} | Page ${page} of ${totalPages}`, pageWidth - right, footerTextY, { align: 'right' });
+    }
+
+    const customerAbbreviation = String(project.customerAbbreviation || '').trim().replace(/[\\/:*?"<>|]/g, '-');
+    doc.save(`${customerAbbreviation ? `${customerAbbreviation} ` : ''}${title}.pdf`);
+    toast.success('Exported PDF');
+  };
 
   const updateProgress = (topicId: string, updates: Partial<ProjectChecklistProgressEntry>) => {
     setProgress((currentProgress) => {
@@ -116,11 +254,16 @@ function ProjectChecklistTable({ projectId, category, workSystem }: { projectId:
       return {
         ...currentProgress,
         [topicId]: {
+          notRequired: updates.notRequired ?? existing?.notRequired ?? false,
           done: updates.done ?? existing?.done ?? Boolean(existing?.completionDate),
           completionDate: updates.completionDate ?? existing?.completionDate ?? '',
           completedBy: updates.completedBy ?? existing?.completedBy ?? '',
           jiraId: updates.jiraId ?? existing?.jiraId ?? '',
           notes: updates.notes ?? existing?.notes ?? '',
+          uatCustomer: updates.uatCustomer ?? existing?.uatCustomer ?? '',
+          uatHmc: updates.uatHmc ?? existing?.uatHmc ?? '',
+          productionCustomer: updates.productionCustomer ?? existing?.productionCustomer ?? '',
+          productionHmc: updates.productionHmc ?? existing?.productionHmc ?? '',
         },
       };
     });
@@ -143,7 +286,7 @@ function ProjectChecklistTable({ projectId, category, workSystem }: { projectId:
   };
 
   const headerStyle: React.CSSProperties = {
-    padding: '10px 12px',
+    padding: category === 'migrate-data' ? '7px 5px' : '10px 12px',
     background: C.bg2,
     borderBottom: `1px solid ${C.border}`,
     color: C.text2,
@@ -153,7 +296,7 @@ function ProjectChecklistTable({ projectId, category, workSystem }: { projectId:
     whiteSpace: 'nowrap',
   };
   const cellStyle: React.CSSProperties = {
-    padding: '4px 8px',
+    padding: category === 'migrate-data' ? '3px 4px' : '4px 8px',
     borderBottom: `1px solid ${C.border}`,
     color: C.text,
     fontSize: 10,
@@ -172,18 +315,47 @@ function ProjectChecklistTable({ projectId, category, workSystem }: { projectId:
     fontFamily: 'Poppins, sans-serif',
     fontSize: 10,
   };
-  const renderTopicRow = (topic: ProjectChecklistTopic, index: number) => {
-    const itemProgress = progress[topic.id] || { done: false, completionDate: '', completedBy: '', jiraId: '', notes: '' };
-    const isDone = Boolean(itemProgress.done || itemProgress.completionDate);
+  const disabledInputStyle: React.CSSProperties = {
+    background: C.bg2,
+    borderColor: C.border,
+    color: C.text3,
+    cursor: 'not-allowed',
+  };
+  const renderTopicRow = (topic: ProjectChecklistTopic, index: number, rowNumber = topic.orderNo) => {
+    const itemProgress = progress[topic.id] || { notRequired: false, done: false, completionDate: '', completedBy: '', jiraId: '', notes: '' };
+    const isNotRequired = Boolean(itemProgress.notRequired);
+    const isDone = !isNotRequired && Boolean(itemProgress.done || itemProgress.completionDate);
+    const progressFieldStyle = isNotRequired ? { ...inputStyle, ...disabledInputStyle } : inputStyle;
+    const diffValue = (customer?: string, hmc?: string) => {
+      if (!customer && !hmc) return '—';
+      const difference = (Number(customer) || 0) - (Number(hmc) || 0);
+      return String(Math.round(difference * 100) / 100);
+    };
     return (
       <tr key={topic.id}>
-        <td style={{ ...cellStyle, color: C.text3, fontVariantNumeric: 'tabular-nums' }}>{String(topic.orderNo).padStart(2, '0')}</td>
+        <td style={{ ...cellStyle, color: C.text3, fontVariantNumeric: 'tabular-nums' }}>{String(rowNumber).padStart(2, '0')}</td>
         <td style={{ ...cellStyle, fontWeight: 600 }}>{topic.title}</td>
+        <td style={{ ...cellStyle, textAlign: 'center' }}>
+          <input
+            type="checkbox"
+            aria-label={`Mark ${topic.title} not required`}
+            checked={isNotRequired}
+            onChange={(event) => {
+              const notRequired = event.currentTarget.checked;
+              updateProgress(topic.id, {
+                notRequired,
+                ...(notRequired ? { done: false, completionDate: '', completedBy: '' } : {}),
+              });
+            }}
+            style={{ width: 16, height: 16, accentColor: C.text2, cursor: 'pointer' }}
+          />
+        </td>
         <td style={{ ...cellStyle, textAlign: 'center' }}>
           <input
             type="checkbox"
             aria-label={`Mark ${topic.title} done`}
             checked={isDone}
+            disabled={isNotRequired}
             onChange={(event) => {
               const done = event.currentTarget.checked;
               updateProgress(topic.id, {
@@ -192,13 +364,21 @@ function ProjectChecklistTable({ projectId, category, workSystem }: { projectId:
                 completedBy: done ? (profile?.fullName?.trim() || profile?.email || '') : '',
               });
             }}
-            style={{ width: 17, height: 17, accentColor: C.green, cursor: 'pointer' }}
+            style={{ width: 17, height: 17, accentColor: C.green, cursor: isNotRequired ? 'not-allowed' : 'pointer' }}
           />
         </td>
-        <td style={cellStyle}><input aria-label={`${topic.title} completion date`} type="date" value={itemProgress.completionDate} onChange={(event) => updateProgress(topic.id, { completionDate: event.target.value })} style={inputStyle} /></td>
-        <td style={cellStyle}><input aria-label={`${topic.title} completed by`} value={itemProgress.completedBy} placeholder="Name" onChange={(event) => updateProgress(topic.id, { completedBy: event.target.value })} style={inputStyle} /></td>
-        <td style={cellStyle}><input aria-label={`${topic.title} JIRA ID`} value={itemProgress.jiraId} placeholder="HMC-123" onChange={(event) => updateProgress(topic.id, { jiraId: event.target.value })} style={inputStyle} /></td>
-        <td style={cellStyle}><input aria-label={`${topic.title} notes`} value={itemProgress.notes} placeholder="Notes" onChange={(event) => updateProgress(topic.id, { notes: event.target.value })} style={inputStyle} /></td>
+        <td style={cellStyle}><input aria-label={`${topic.title} completion date`} type="date" value={itemProgress.completionDate} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { completionDate: event.target.value })} style={{ ...progressFieldStyle, width: 110, maxWidth: '100%' }} /></td>
+        <td style={cellStyle}><input aria-label={`${topic.title} completed by`} value={itemProgress.completedBy} placeholder="Name" disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { completedBy: event.target.value })} style={progressFieldStyle} /></td>
+        {category === 'migrate-data' && <>
+          <td style={cellStyle}><input aria-label={`${topic.title} UAT Customer`} type="number" step="any" value={itemProgress.uatCustomer || ''} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { uatCustomer: event.target.value })} style={{ ...progressFieldStyle, textAlign: 'right' }} /></td>
+          <td style={cellStyle}><input aria-label={`${topic.title} UAT HMC`} type="number" step="any" value={itemProgress.uatHmc || ''} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { uatHmc: event.target.value })} style={{ ...progressFieldStyle, textAlign: 'right' }} /></td>
+          <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 700, color: Number(itemProgress.uatCustomer || 0) - Number(itemProgress.uatHmc || 0) < 0 ? C.red : C.text }}>{diffValue(itemProgress.uatCustomer, itemProgress.uatHmc)}</td>
+          <td style={cellStyle}><input aria-label={`${topic.title} Production Customer`} type="number" step="any" value={itemProgress.productionCustomer || ''} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { productionCustomer: event.target.value })} style={{ ...progressFieldStyle, textAlign: 'right' }} /></td>
+          <td style={cellStyle}><input aria-label={`${topic.title} Production HMC`} type="number" step="any" value={itemProgress.productionHmc || ''} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { productionHmc: event.target.value })} style={{ ...progressFieldStyle, textAlign: 'right' }} /></td>
+          <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 700, color: Number(itemProgress.productionCustomer || 0) - Number(itemProgress.productionHmc || 0) < 0 ? C.red : C.text }}>{diffValue(itemProgress.productionCustomer, itemProgress.productionHmc)}</td>
+        </>}
+        {!requiresWorkSystem && <td style={cellStyle}><input aria-label={`${topic.title} JIRA ID`} value={itemProgress.jiraId} placeholder="HMC-123" disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { jiraId: event.target.value })} style={progressFieldStyle} /></td>}
+        <td style={cellStyle}><input aria-label={`${topic.title} notes`} value={itemProgress.notes} placeholder="Notes" disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { notes: event.target.value })} style={progressFieldStyle} /></td>
       </tr>
     );
   };
@@ -210,11 +390,12 @@ function ProjectChecklistTable({ projectId, category, workSystem }: { projectId:
           <div>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>{categoryLabel} Checklist</h3>
             <span style={{ display: 'block', marginTop: 4, color: C.text3, fontSize: 11 }}>
-              Topics are managed in Setup{requiresWorkSystem ? ` · Work System: ${workSystem || 'Not set'}` : ''}. Progress is stored in the project database.
+              Topics are managed in Setup{requiresWorkSystem && workSystem ? ` · System Module: ${workSystem}` : ''}. Progress is stored in the project database.
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {hasUnsavedChanges && <span style={{ color: C.amber, fontSize: 12, fontWeight: 600 }}>Unsaved changes</span>}
+            <Btn onClick={exportChecklistPdf} disabled={!isLoaded || !currentTopics.length} small><Download size={14} /> Export PDF</Btn>
             <Btn onClick={saveItems} disabled={!isLoaded || !hasUnsavedChanges || !currentTopics.length} small>
               <Save size={14} /> Save Progress
             </Btn>
@@ -225,50 +406,88 @@ function ProjectChecklistTable({ projectId, category, workSystem }: { projectId:
             Unable to load checklist data. Apply the project checklist database migration and verify project access. {loadError}
           </div>
         )}
-        <div style={{ overflowX: 'auto', border: `1px solid ${C.border}`, borderRadius: 12, background: C.white }}>
-          <table style={{ width: '100%', minWidth: 1160, borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
+        <div style={{ overflowX: 'hidden', border: `1px solid ${C.border}`, borderRadius: 12, background: C.white, width: '100%', minWidth: 0 }}>
+          <table style={{ width: '100%', minWidth: 0, borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
             <colgroup>
-              <col style={{ width: 64 }} />
-              <col style={{ width: 400 }} />
-              <col style={{ width: 72 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 130 }} />
-              <col />
+              {category === 'migrate-data' ? <>
+                <col style={{ width: '4%' }} /><col style={{ width: '16%' }} />
+                <col style={{ width: '7%' }} /><col style={{ width: '4%' }} />
+                <col style={{ width: '9%' }} /><col style={{ width: '11%' }} />
+                <col style={{ width: '7%' }} /><col style={{ width: '6%' }} /><col style={{ width: '5%' }} />
+                <col style={{ width: '7%' }} /><col style={{ width: '6%' }} /><col style={{ width: '5%' }} />
+                <col style={{ width: '13%' }} />
+              </> : <>
+                <col style={{ width: 64 }} />
+                <col style={{ width: 400 }} />
+                <col style={{ width: 88 }} />
+                <col style={{ width: 72 }} />
+                <col style={{ width: 130 }} />
+                <col style={{ width: 160 }} />
+                {!requiresWorkSystem && <col style={{ width: 130 }} />}
+                <col />
+              </>}
             </colgroup>
             <thead>
-              <tr>
+              {category === 'migrate-data' ? <>
+                <tr>
+                  <th rowSpan={2} style={headerStyle}>No.</th>
+                  <th rowSpan={2} style={headerStyle}>Checklist Topic</th>
+                  <th rowSpan={2} style={{ ...headerStyle, textAlign: 'center' }}>Not Required</th>
+                  <th rowSpan={2} style={{ ...headerStyle, textAlign: 'center' }}>Done</th>
+                  <th rowSpan={2} style={headerStyle}>Completion Date</th>
+                  <th rowSpan={2} style={headerStyle}>Completed By</th>
+                  <th colSpan={3} style={{ ...headerStyle, textAlign: 'center' }}>UAT Stage</th>
+                  <th colSpan={3} style={{ ...headerStyle, textAlign: 'center' }}>Production Stage</th>
+                  <th rowSpan={2} style={headerStyle}>Notes</th>
+                </tr>
+                <tr>
+                  {['Customer', 'HMC', 'Diff', 'Customer', 'HMC', 'Diff'].map((label, index) => <th key={`${label}-${index}`} style={{ ...headerStyle, textAlign: index % 3 === 2 ? 'right' : 'left' }}>{label}</th>)}
+                </tr>
+              </> : <tr>
                 <th style={headerStyle}>No.</th>
                 <th style={headerStyle}>Checklist Topic</th>
+                <th style={{ ...headerStyle, textAlign: 'center' }}>Not Required</th>
                 <th style={{ ...headerStyle, textAlign: 'center' }}>Done</th>
                 <th style={headerStyle}>Completion Date</th>
                 <th style={headerStyle}>Completed By</th>
-                <th style={headerStyle}>JIRA ID</th>
+                {!requiresWorkSystem && <th style={headerStyle}>JIRA ID</th>}
                 <th style={headerStyle}>Notes</th>
-              </tr>
+              </tr>}
             </thead>
             {category === 'project' ? PROJECT_CHECKLIST_STAGES.map((stage) => {
               const stageTopics = currentTopics.filter((topic) => topic.stage === stage.id);
               return (
                 <tbody key={stage.id}>
                   <tr>
-                    <td colSpan={7} style={{ padding: '10px 12px', background: C.bg2, borderBottom: `1px solid ${C.border}`, color: C.text, fontSize: 10, fontWeight: 700 }}>
+                    <td colSpan={checklistColumnCount} style={{ padding: '10px 12px', background: C.bg2, borderBottom: `1px solid ${C.border}`, color: C.text, fontSize: 10, fontWeight: 700, textAlign: 'left' }}>
                       Stage: {stage.label}
                     </td>
                   </tr>
-                  {stageTopics.map(renderTopicRow)}
+                  {stageTopics.map((topic, index) => renderTopicRow(topic, index))}
                   {stageTopics.length === 0 && (
-                    <tr><td colSpan={7} style={{ padding: '10px 12px', color: C.text3, fontSize: 10 }}>No topics configured for this stage.</td></tr>
+                    <tr><td colSpan={checklistColumnCount} style={{ padding: '10px 12px', color: C.text3, fontSize: 10 }}>No topics configured for this stage.</td></tr>
                   )}
                 </tbody>
               );
             }) : (
-              <tbody>
-                {currentTopics.map(renderTopicRow)}
+              <>
+                {moduleNames.map((moduleName) => {
+                  const moduleTopics = currentTopics.filter((topic) => (topic.workSystem || '') === moduleName);
+                  return (
+                    <tbody key={moduleName}>
+                      <tr>
+                        <td colSpan={checklistColumnCount} style={{ padding: '10px 12px', background: C.bg2, borderBottom: `1px solid ${C.border}`, color: C.text, fontSize: 10, fontWeight: 700, textAlign: 'left' }}>
+                          Module: {moduleName || '—'}
+                        </td>
+                      </tr>
+                      {moduleTopics.map((topic, index) => renderTopicRow(topic, index, index + 1))}
+                    </tbody>
+                  );
+                })}
                 {currentTopics.length === 0 && (
-                  <tr><td colSpan={7} style={{ padding: '10px 12px', color: C.text3, fontSize: 10 }}>{workSystem ? `No ${categoryLabel.toLowerCase()} topics configured for ${workSystem}.` : 'Set a Work System on this project to view its topics.'}</td></tr>
+                  <tbody><tr><td colSpan={checklistColumnCount} style={{ padding: '10px 12px', color: C.text3, fontSize: 10 }}>{workSystem ? `No ${categoryLabel.toLowerCase()} topics configured for ${workSystem}.` : `No ${categoryLabel.toLowerCase()} topics configured in Setup.`}</td></tr></tbody>
                 )}
-              </tbody>
+              </>
             )}
           </table>
         </div>
@@ -281,6 +500,7 @@ export default function ProjectDetail({ project }: Props) {
   const [activeTab, setActiveTab]   = useState('tasks');
   const [activeChecklistTab, setActiveChecklistTab] = useState<ProjectChecklistCategoryId>('project');
   const [isMobile, setIsMobile] = useState(false);
+  const readOnlyContentRef = React.useRef<HTMLDivElement>(null);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [copySourceProjectId, setCopySourceProjectId] = useState('');
   const [copyPassword, setCopyPassword] = useState('');
@@ -311,6 +531,11 @@ export default function ProjectDetail({ project }: Props) {
   } = useStore();
 
   const { masterCodes } = useStore();
+  const workSystemOrder = masterCodes
+    .filter((code) => code.codeType === 'work_system' && code.active)
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder || left.codeValue.localeCompare(right.codeValue))
+    .map((code) => code.codeValue.trim());
   const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
   const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: project.status || 'Unknown' };
   const projectTasks = tasks.filter((t) => t.projectId === project.id);
@@ -457,6 +682,7 @@ export default function ProjectDetail({ project }: Props) {
 
   // Filter tabs based on role permissions
   const TABS = allTabs.filter(tab => permissions.isTabVisible(tab.id));
+  const activeScreenAccess = permissions.getScreenAccess(activeTab);
 
   React.useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -468,11 +694,22 @@ export default function ProjectDetail({ project }: Props) {
   React.useEffect(() => {
     const handleSetTab = (e: Event) => {
       const tab = (e as CustomEvent<{ tab: string }>).detail?.tab;
-      if (tab) setActiveTab(tab);
+      if (tab && permissions.isTabVisible(tab)) setActiveTab(tab);
     };
     window.addEventListener('app-set-tab', handleSetTab);
     return () => window.removeEventListener('app-set-tab', handleSetTab);
-  }, []);
+  }, [permissions]);
+
+  React.useEffect(() => {
+    if (TABS.length && !permissions.isTabVisible(activeTab)) setActiveTab(TABS[0].id);
+  }, [activeTab, permissions, TABS]);
+
+  React.useEffect(() => {
+    const content = readOnlyContentRef.current;
+    if (!content) return;
+    if (activeScreenAccess === 'read') content.setAttribute('inert', '');
+    else content.removeAttribute('inert');
+  }, [activeScreenAccess]);
 
   React.useEffect(() => {
     if (!projects.length) {
@@ -541,7 +778,12 @@ export default function ProjectDetail({ project }: Props) {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflow: 'hidden', background: activeTab === 'tasks' ? C.white : C.bg }}>
+      <div ref={readOnlyContentRef} aria-readonly={activeScreenAccess === 'read'} style={{ flex: 1, overflow: 'hidden', background: activeTab === 'tasks' ? C.white : C.bg }}>
+        {TABS.length === 0 ? (
+          <div style={{ display: 'grid', placeItems: 'center', height: '100%', padding: 24, color: C.text2, fontSize: 13, textAlign: 'center' }}>
+            No project screens are enabled for your account. Contact an administrator.
+          </div>
+        ) : <>
         {activeTab === 'tasks'   && <div style={{ height: '100%' }}><TasksTab         projectId={project.id} extraActions={copyButton('tasks')} /></div>}
         {activeTab === 'summary' && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectSummaryTab project={project} /></div>}
         {activeTab === 'members' && <div style={{ height: '100%', overflowY: 'auto' }}><MembersTab        projectId={project.id} extraActions={copyButton('members')} /></div>}
@@ -553,7 +795,7 @@ export default function ProjectDetail({ project }: Props) {
               <Tabs tabs={CHECKLIST_TABS} active={activeChecklistTab} onChange={(category) => setActiveChecklistTab(category as ProjectChecklistCategoryId)} />
             </div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-              <ProjectChecklistTable projectId={project.id} category={activeChecklistTab} workSystem={project.softwareVersion} />
+              <ProjectChecklistTable project={project} category={activeChecklistTab} workSystem={project.softwareVersion} workSystemOrder={workSystemOrder} />
             </div>
           </div>
         )}
@@ -563,6 +805,7 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'activities' && <div style={{ height: '100%', overflowY: 'auto' }}><ActivitiesTab projectId={project.id} /></div>}
         {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
         {activeTab === 'onepage' && <div style={{ height: '100%', overflowY: 'auto' }}><ExecutiveOnePage project={project} /></div>}
+        </>}
       </div>
 
       {copyModalOpen && copyScope && (

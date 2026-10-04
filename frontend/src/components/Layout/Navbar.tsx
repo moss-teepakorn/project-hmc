@@ -5,9 +5,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { C } from '../Common';
 import SetupModal from '../Setup/SetupModal';
+import ManageUsersModal from '../Users/ManageUsersModal';
 import SystemNotesModal from '../SystemNotes/SystemNotesModal';
 import TaskTemplateModal from '../Setup/TaskTemplateModal';
-import { Bell, Home, LogOut, Moon, Sun, Copy } from 'lucide-react';
+import { Bell, Home, LogOut, Moon, Sun, Copy, Users, Settings, StickyNote } from 'lucide-react';
 
 const F = 'Poppins, sans-serif';
 
@@ -18,6 +19,7 @@ export default function Navbar() {
   const [isMobile, setIsMobile] = React.useState(false);
   const [notifyOpen, setNotifyOpen] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
+  const [manageUsersOpen, setManageUsersOpen] = React.useState(false);
   const [notesOpen, setNotesOpen] = React.useState(false);
   const [taskTemplateOpen, setTaskTemplateOpen] = React.useState(false);
   const [setupLoading, setSetupLoading] = React.useState(false);
@@ -204,24 +206,37 @@ export default function Navbar() {
               title="Open admin setup"
               disabled={setupLoading}
               style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap', width: 'auto', minWidth: 'max-content',
                 padding: '8px 12px', borderRadius: 10, border: `1px solid ${isDark ? C.border2 : C.border}`,
                 background: isDark ? '#1E293B' : C.white, color: textColor, cursor: setupLoading ? 'wait' : 'pointer', fontSize: 12,
                 opacity: setupLoading ? 0.6 : 1,
               }}
             >
-              {setupLoading ? 'Loading…' : 'Setup'}
+              {setupLoading ? 'Loading…' : <><Settings size={14} /> Setup</>}
+            </button>
+            <button
+              onClick={() => setManageUsersOpen(true)}
+              title="Manage system users"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '8px 12px', borderRadius: 10, border: `1px solid ${isDark ? C.border2 : C.border}`,
+                background: isDark ? '#1E293B' : C.white, color: textColor, cursor: 'pointer', fontSize: 12,
+              }}
+            >
+              <Users size={14} /> User
             </button>
             <button
               onClick={openNotes}
               title="Open system notes"
               disabled={notesLoading}
               style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap', width: 'auto', minWidth: 'max-content',
                 padding: '8px 12px', borderRadius: 10, border: `1px solid ${isDark ? C.border2 : C.border}`,
                 background: isDark ? '#1E293B' : C.white, color: textColor, cursor: notesLoading ? 'wait' : 'pointer', fontSize: 12,
                 opacity: notesLoading ? 0.6 : 1,
               }}
             >
-              {notesLoading ? 'Loading…' : 'Notes'}
+              {notesLoading ? 'Loading…' : <><StickyNote size={14} /> Notes</>}
             </button>
           </>
         )}
@@ -363,6 +378,7 @@ export default function Navbar() {
         )}
       </div>
       {setupOpen && <SetupModal onClose={() => setSetupOpen(false)} />}
+      {manageUsersOpen && <ManageUsersModal onClose={() => setManageUsersOpen(false)} />}
       {notesOpen && <SystemNotesModal onClose={() => setNotesOpen(false)} />}
       {taskTemplateOpen && <TaskTemplateModal onClose={() => setTaskTemplateOpen(false)} />}
     </nav>

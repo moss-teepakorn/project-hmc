@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { parseISO, isValid, addDays } from 'date-fns';
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Home, Mail } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Home, Mail, ClipboardList, FileSearch, Settings, FlaskConical, Rocket, Headphones, CircleDot, FolderKanban } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import { useStore } from '../../store';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,28 +12,39 @@ import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, MILESTONE_STATUS, TH, T
 import { fmtDate, fmtMoney, compareWbs, computeBaselineProgress, getHalfMonthSnapshotDates } from '../../utils';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
-import PortfolioReportSummary from './PortfolioReportSummary';
 
 const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care'];
+const STATUS_ACCENT_PALETTE = ['#B45309', '#0F766E', '#C2410C', '#2563EB', '#15803D', '#BE185D', '#6D28D9', '#4D7C0F', '#0369A1', '#A21CAF', '#B91C1C', '#475569'];
 const DASHBOARD_VIEW_STATE_KEY = 'dashboard-view-state';
 
-function loadDashboardViewState(): { selectedProjectId: string | null; dashboardTab: 'overview' | 'report' | null } {
+function loadDashboardViewState(): { selectedProjectId: string | null } {
   try {
     const raw = window.sessionStorage.getItem(DASHBOARD_VIEW_STATE_KEY);
-    if (!raw) return { selectedProjectId: null, dashboardTab: null };
-    const parsed = JSON.parse(raw) as { selectedProjectId?: unknown; dashboardTab?: unknown };
+    if (!raw) return { selectedProjectId: null };
+    const parsed = JSON.parse(raw) as { selectedProjectId?: unknown };
     const selectedProjectId = typeof parsed.selectedProjectId === 'string' && parsed.selectedProjectId ? parsed.selectedProjectId : null;
-    const dashboardTab = parsed.dashboardTab === 'overview' || parsed.dashboardTab === 'report' ? parsed.dashboardTab : null;
-    return { selectedProjectId, dashboardTab };
+    return { selectedProjectId };
   } catch {
-    return { selectedProjectId: null, dashboardTab: null };
+    return { selectedProjectId: null };
   }
+}
+
+function getStatusIcon(status: string) {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === 'planning') return <ClipboardList size={19} strokeWidth={2} />;
+  if (normalized === 'req & design') return <FileSearch size={19} strokeWidth={2} />;
+  if (normalized === 'setup') return <Settings size={19} strokeWidth={2} />;
+  if (normalized === 'testing') return <FlaskConical size={19} strokeWidth={2} />;
+  if (normalized === 'go live') return <Rocket size={19} strokeWidth={2} />;
+  if (normalized === 'hyper care') return <Headphones size={19} strokeWidth={2} />;
+  return <CircleDot size={19} strokeWidth={2} />;
 }
 
 export default function Dashboard() {
   const { projects, tasks, milestones, issues, risks, changeRequests, activeProject, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts, masterCodes } = useStore();
   const { profile } = useAuth();
   const permissions = useRolePermissions();
+  const canEditOverview = permissions.getScreenAccess('portfolio-overview') === 'full';
   const savedView = React.useMemo(() => loadDashboardViewState(), []);
   const restoreSelectedProjectIdRef = React.useRef<string | null>(savedView.selectedProjectId);
   const [selected,   setSelected]   = useState<Project | null>(null);
@@ -40,11 +53,6 @@ export default function Dashboard() {
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [showAdd,    setShowAdd]    = useState(false);
   const [showHypercare, setShowHypercare] = useState(false);
-  const [dashboardTab, setDashboardTab] = useState<'overview' | 'report'>(() => {
-    if (savedView.dashboardTab === 'report') return 'report';
-    if (savedView.dashboardTab === 'overview' && permissions.canViewPortfolioOverview) return 'overview';
-    return permissions.canViewPortfolioOverview ? 'overview' : 'report';
-  });
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [notificationsShown, setNotificationsShown] = useState(false);
   const [sendingAll, setSendingAll] = useState(false);
@@ -60,7 +68,6 @@ export default function Dashboard() {
   React.useEffect(() => {
     const onHome = () => {
       setSelected(null);
-      setDashboardTab('overview');
       // Disable one-time restore after explicit Home navigation.
       restoreSelectedProjectIdRef.current = null;
       setRestoreDone(true);
@@ -177,10 +184,9 @@ export default function Dashboard() {
       DASHBOARD_VIEW_STATE_KEY,
       JSON.stringify({
         selectedProjectId: selected?.id || null,
-        dashboardTab,
       })
     );
-  }, [selected?.id, dashboardTab]);
+  }, [selected?.id]);
 
   // Separate normal projects from Hypercare
   const statusOrder = masterCodes
@@ -220,8 +226,10 @@ export default function Dashboard() {
         onMouseLeave={e => { e.currentTarget.style.background = C.white; }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
           <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.35, whiteSpace: 'normal', wordBreak: 'break-word' }}>
-            <span style={{ color: C.text2 }}>Project ID : </span>
-            <span style={{ color: C.primary, fontFamily: 'Poppins, sans-serif' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <FolderKanban size={14} color={p.color || C.primary} />
+              <span><span style={{ color: C.text2 }}>Project ID : </span><span style={{ color: C.primary, fontFamily: 'Poppins, sans-serif' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span></span>
+            </span>
           </div>
           <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
 
@@ -273,40 +281,6 @@ export default function Dashboard() {
           <div style={{ width: '100%', minHeight: 0 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '16px 14px 0' : '24px 32px 0' }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                {permissions.canViewPortfolioOverview && (
-                  <button
-                    onClick={() => setDashboardTab('overview')}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 10,
-                      border: dashboardTab === 'overview' ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
-                      background: dashboardTab === 'overview' ? C.primaryBg : C.white,
-                      color: dashboardTab === 'overview' ? C.primary : C.text,
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                      fontSize: 12,
-                      fontFamily: 'Poppins, sans-serif',
-                    }}
-                  >
-                    Portfolio Overview
-                  </button>
-                )}
-                <button
-                  onClick={() => setDashboardTab('report')}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 10,
-                    border: dashboardTab === 'report' ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
-                    background: dashboardTab === 'report' ? C.primaryBg : C.white,
-                    color: dashboardTab === 'report' ? C.primary : C.text,
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: 12,
-                    fontFamily: 'Poppins, sans-serif',
-                  }}
-                >
-                  Project Summary Report
-                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -330,7 +304,7 @@ export default function Dashboard() {
                 ><Home size={14} /> Home</button>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                {dashboardTab === 'overview' && (
+                {permissions.canViewPortfolioOverview && (
                   <Btn variant="outline" onClick={async () => {
                     setSendingAll(true);
                     try {
@@ -361,26 +335,37 @@ export default function Dashboard() {
                     {sendingAll ? 'Sending…' : 'Send Email'}
                   </Btn>
                 )}
-                {profile?.role === 'admin' && dashboardTab === 'overview' && (
+                {profile?.role === 'admin' && (
                   <Btn variant="outline" onClick={() => setShowEmailLogs(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Mail size={13} /> Email Logs
                   </Btn>
                 )}
-                <Btn onClick={() => setShowAdd(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }}>
+                <Btn onClick={() => setShowAdd(true)} disabled={!canEditOverview} title={canEditOverview ? 'Add project' : 'Read-only access'} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }}>
                   <Plus size={12} style={{ marginRight: 6 }} /> Add Project
                 </Btn>
               </div>
             </div>
-            {dashboardTab === 'overview' ? (
-              !restoreDone ? (
-                <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', color: C.text2, fontSize: 13 }}>Loading dashboard…</div>
-              ) : selected ? (
-                <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onEdit={() => setEditing(selected)} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} onOpenWithTab={(tab) => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab } })), 80); }} isMobile={isMobile} />
-              ) : (
-                <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} onEdit={setEditing} onDelete={setDeleting} isMobile={isMobile} />
-              )
+            {!restoreDone ? (
+              <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', color: C.text2, fontSize: 13 }}>Loading dashboard…</div>
+            ) : selected ? (
+              <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onEdit={() => setEditing(selected)} canEdit={permissions.getScreenAccess('summary') === 'full'} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} onOpenWithTab={(tab) => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab } })), 80); }} isMobile={isMobile} />
+            ) : permissions.canViewPortfolioOverview ? (
+              <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} onEdit={setEditing} onDelete={setDeleting} canEdit={canEditOverview} isMobile={isMobile} />
             ) : (
-              <PortfolioReportSummary />
+              <div style={{ padding: isMobile ? '18px 14px' : '28px 32px' }}>
+                <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: '0 0 16px' }}>My Projects</h2>
+                <div style={{ overflowX: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: C.white }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+                    <thead><tr>{['Project ID', 'Project Name', 'Customer', 'Status'].map((label) => <th key={label} style={{ textAlign: 'left', padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 11, color: C.text2 }}>{label}</th>)}</tr></thead>
+                    <tbody>{allProjects.map((project) => <tr key={project.id} onClick={() => setActiveProject(project)} style={{ cursor: 'pointer', borderBottom: `1px solid ${C.border}` }}>
+                      <td style={{ padding: '12px 14px', fontSize: 12, color: C.primary, fontWeight: 700 }}>{project.code || project.id}</td>
+                      <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{project.name}</td>
+                      <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{project.client || '—'}</td>
+                      <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{project.status || '—'}</td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </div>
       </div>
@@ -400,7 +385,7 @@ export default function Dashboard() {
 }
 
 // ── Welcome / global summary ──────────────────────────────────────────────────
-function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void; onEdit: (p: Project) => void; onDelete: (p: Project) => void; isMobile: boolean }) {
+function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, isMobile }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void; onEdit: (p: Project) => void; onDelete: (p: Project) => void; canEdit: boolean; isMobile: boolean }) {
   const { masterCodes } = useStore();
   const [showHC, setShowHC] = useState(false);
   const [projectView, setProjectView] = useState<'card' | 'table'>('table');
@@ -451,25 +436,27 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
         onMouseLeave={e => { e.currentTarget.style.background = C.white; }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
           <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.35, whiteSpace: 'normal', wordBreak: 'break-word' }}>
-            <span style={{ color: C.text2 }}>Project ID : </span>
-            <span style={{ color: C.primary, fontFamily: 'Poppins, sans-serif' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <FolderKanban size={14} color={fallbackColor} />
+              <span><span style={{ color: C.text2 }}>Project ID : </span><span style={{ color: C.primary, fontFamily: 'Poppins, sans-serif' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span></span>
+            </span>
           </div>
           <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+            {canEdit && <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(p); }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
               title="Edit Project"
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.primary; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}>
               <Pencil size={12} />
-            </button>
-            <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(p); }}
+            </button>}
+            {canEdit && <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(p); }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
               title="Delete Project"
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.red; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}>
               <Trash2 size={12} />
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -504,13 +491,15 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
       <p style={{ color: C.text2, fontSize: 13, marginBottom: 24 }}>Select a project from the list below to view its executive summary.</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 14, marginBottom: 28 }}>
-        {statusCards.map((s) => (
-          <Card key={s.label} style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 11, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{s.icon}</div>
-            <div><div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
+        {statusCards.map((s, index) => {
+          const accent = STATUS_ACCENT_PALETTE[index] || `hsl(${((index - STATUS_ACCENT_PALETTE.length) * 360) / Math.max(statusCards.length - STATUS_ACCENT_PALETTE.length, 1)} 62% 38%)`;
+          return (
+          <Card key={s.label} style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, border: `1px solid ${accent}66`, borderLeft: `4px solid ${accent}`, boxShadow: `0 5px 18px ${accent}1A` }}>
+            <div style={{ width: 42, height: 42, borderRadius: 11, background: s.bg, color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{getStatusIcon(s.codeValue)}</div>
+            <div><div style={{ fontSize: 24, fontWeight: 800, color: accent }}>{s.value}</div>
               <div style={{ fontSize: 11, color: C.text2 }}>{s.label}</div></div>
           </Card>
-        ))}
+        );})}
       </div>
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
@@ -558,7 +547,9 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
                   <tr key={p.id} onClick={() => onOpen(p)} style={{ cursor: 'pointer', background: C.white, transition: 'background 0.15s' }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = '#F8FAFF'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'; }}>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.primary, fontWeight: 700 }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.primary, fontWeight: 700 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><FolderKanban size={15} color={p.color || C.primary} />{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
+                    </td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{p.name || '-'}</td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{p.client || '-'}</td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{fmtDate(p.startDate)}</td>
@@ -566,6 +557,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{stage}</td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{prog}%</td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text, width: 56 }}>
+                      {canEdit && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -579,6 +571,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
                       >
                         <Pencil size={12} />
                       </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -598,8 +591,42 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
             🛡️ Hyper Care Projects ({hypercareProjects.length})
           </button>
           {showHC && (
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px,1fr))', gap: 14, marginTop: 12 }}>
-              {hypercareProjects.map(p => renderOverviewProjectCard(p, C.amber))}
+            <div style={{ overflowX: 'auto', marginTop: 12, border: `1px solid ${C.amber}66`, borderRadius: 8, background: C.white }}>
+              <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: C.amberBg }}>
+                    {['Project ID', 'Project Name', 'Customer', 'Start Date', 'End Date', '% Progress', ''].map((label) => (
+                      <th key={label} style={{ textAlign: 'left', padding: '11px 14px', borderBottom: `1px solid ${C.amber}55`, fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {hypercareProjects.map((project) => {
+                    const roots = tasks.filter((task) => task.projectId === project.id && !task.parentId);
+                    const progress = roots.length ? Math.round(roots.reduce((sum: number, task: any) => sum + task.percentComplete, 0) / roots.length) : 0;
+                    return (
+                      <tr key={project.id} onClick={() => onOpen(project)} style={{ cursor: 'pointer', borderBottom: `1px solid ${C.border}`, transition: 'background 0.15s' }}
+                        onMouseEnter={(event) => { event.currentTarget.style.background = C.amberBg; }}
+                        onMouseLeave={(event) => { event.currentTarget.style.background = C.white; }}>
+                        <td style={{ padding: '11px 14px', fontSize: 12, fontWeight: 700, color: C.primary, whiteSpace: 'nowrap' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><FolderKanban size={15} color={C.amber} />{project.code || project.id}</span>
+                        </td>
+                        <td style={{ padding: '11px 14px', fontSize: 12, color: C.text, fontWeight: 600 }}>{project.name || '—'}</td>
+                        <td style={{ padding: '11px 14px', fontSize: 12, color: C.text2 }}>{project.client || '—'}</td>
+                        <td style={{ padding: '11px 14px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap' }}>{fmtDate(project.startDate)}</td>
+                        <td style={{ padding: '11px 14px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap' }}>{fmtDate(project.endDate)}</td>
+                        <td style={{ padding: '11px 14px', fontSize: 12, color: progress >= 100 ? C.green : C.amber, fontWeight: 700 }}>{progress}%</td>
+                        <td style={{ padding: '8px 12px', width: 72, whiteSpace: 'nowrap' }}>
+                          {canEdit && <>
+                            <button type="button" aria-label={`Edit ${project.name}`} onClick={(event) => { event.stopPropagation(); onEdit(project); }} style={{ border: 0, background: 'transparent', color: C.text3, padding: 5, cursor: 'pointer' }}><Pencil size={14} /></button>
+                            <button type="button" aria-label={`Delete ${project.name}`} onClick={(event) => { event.stopPropagation(); onDelete(project); }} style={{ border: 0, background: 'transparent', color: C.text3, padding: 5, cursor: 'pointer' }}><Trash2 size={14} /></button>
+                          </>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -609,7 +636,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, isMobile }:
 }
 
 // ── Per-project summary panel ─────────────────────────────────────────────────
-function ProjectSummaryPanel({ project, onOpen, onEdit, onViewMilestones, onOpenWithTab, isMobile }: { project: Project; onOpen: () => void; onEdit: () => void; onViewMilestones: () => void; onOpenWithTab: (tab: string) => void; isMobile: boolean }) {
+function ProjectSummaryPanel({ project, onOpen, onEdit, canEdit, onViewMilestones, onOpenWithTab, isMobile }: { project: Project; onOpen: () => void; onEdit: () => void; canEdit: boolean; onViewMilestones: () => void; onOpenWithTab: (tab: string) => void; isMobile: boolean }) {
   const { tasks, milestones, members, efforts, changeRequests, issues, risks, masterCodes } = useStore();
   const permissions = useRolePermissions();
   const [showAllCompletedModal, setShowAllCompletedModal] = React.useState(false);
@@ -802,7 +829,7 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, onViewMilestones, onOpen
                 <span>Project: {(project.code || project.id || '-').replace(/\s+/g, ' ').trim()}</span>
                 <span>Client: {project.client || '-'}</span>
                 <span>{fmtDate(project.startDate)} - {fmtDate(project.endDate)}</span>
-                <button
+                {canEdit && <button
                   type="button"
                   onClick={onEdit}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 0, display: 'inline-flex', alignItems: 'center' }}
@@ -811,7 +838,7 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, onViewMilestones, onOpen
                   onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}
                 >
                   <Pencil size={11} />
-                </button>
+                </button>}
               </div>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Executive Summary</div>
               <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.45, marginTop: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{overviewText}</div>
@@ -1132,16 +1159,13 @@ function EmailLogsModal({ onClose }: { onClose: () => void }) {
       setLoading(true);
       setError(null);
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData?.session?.access_token;
-        const headers: HeadersInit = new Headers();
-        if (accessToken) {
-          (headers as Headers).set('Authorization', `Bearer ${accessToken}`);
-        }
-        const res = await fetch('/api/email-reminder-logs?limit=200', { headers });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result?.error || 'Failed to load logs');
-        setLogs(result.logs || []);
+        const { data, error } = await supabase
+          .from('email_reminder_logs')
+          .select('id,project_id,project_name,project_code,type,scheduled_time,sent_at,status,recipient,tasks_count,error_message,created_at')
+          .order('created_at', { ascending: false })
+          .limit(200);
+        if (error) throw new Error(error.message);
+        setLogs((data || []) as EmailLog[]);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load');
       }
@@ -1154,16 +1178,13 @@ function EmailLogsModal({ onClose }: { onClose: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-      const headers: HeadersInit = new Headers();
-      if (accessToken) {
-        (headers as Headers).set('Authorization', `Bearer ${accessToken}`);
-      }
-      const res = await fetch('/api/email-reminder-logs?limit=200', { headers });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result?.error || 'Failed to load logs');
-      setLogs(result.logs || []);
+      const { data, error } = await supabase
+        .from('email_reminder_logs')
+        .select('id,project_id,project_name,project_code,type,scheduled_time,sent_at,status,recipient,tasks_count,error_message,created_at')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw new Error(error.message);
+      setLogs((data || []) as EmailLog[]);
       setSelectedIds([]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load');
@@ -1173,23 +1194,23 @@ function EmailLogsModal({ onClose }: { onClose: () => void }) {
 
   const handleDeleteSelected = async () => {
     if (!selectedIds.length) return;
-    if (!window.confirm(`Delete ${selectedIds.length} selected log(s)?`)) return;
+    const confirmation = await Swal.fire({
+      title: 'Delete selected email logs?',
+      text: `${selectedIds.length} log(s) will be permanently deleted.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Delete logs',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: C.red,
+      cancelButtonColor: C.text3,
+      reverseButtons: true,
+      focusCancel: true,
+    });
+    if (!confirmation.isConfirmed) return;
     setDeleting(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-      const headers: HeadersInit = new Headers();
-      (headers as Headers).set('Content-Type', 'application/json');
-      if (accessToken) {
-        (headers as Headers).set('Authorization', `Bearer ${accessToken}`);
-      }
-      const res = await fetch('/api/email-reminder-logs', {
-        method: 'DELETE',
-        headers,
-        body: JSON.stringify({ ids: selectedIds }),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result?.error || 'Failed to delete logs');
+      const { error } = await supabase.from('email_reminder_logs').delete().in('id', selectedIds);
+      if (error) throw new Error(error.message);
       await reloadLogs();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete logs');

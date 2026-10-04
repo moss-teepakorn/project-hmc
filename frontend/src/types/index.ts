@@ -3,6 +3,8 @@ export interface Project {
   name: string;
   code: string;
   client: string;
+  customerAbbreviation: string;
+  customerId: string;
   softwareVersion: '' | 'Humatrix' | 'Workplaze';
   status: string;
   startDate: string;
@@ -219,6 +221,9 @@ export interface Profile {
   fullName: string;
   avatarUrl: string;
   role: UserRole;
+  isActive?: boolean;
+  projectAccessScope?: 'member' | 'all';
+  screenPermissions?: Record<string, 'hidden' | 'read' | 'full'> | string[] | null;
   createdAt: string;
   updatedAt: string;
 }

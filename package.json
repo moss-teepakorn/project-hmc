@@ -4,8 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npm --prefix frontend run dev",
-    "start": "npm --prefix frontend run dev",
+    "dev": "npm --prefix frontend run dev:vercel",
+    "dev:vite": "npm --prefix frontend run dev:vite",
+    "dev:vercel": "npm --prefix frontend run dev:vercel",
+    "start": "npm --prefix frontend run dev:vercel",
     "build": "npm --prefix frontend install && npm --prefix frontend run build && rm -rf dist && cp -R frontend/dist dist",
     "preview": "npm --prefix frontend run preview",
     "lint:modal-size": "node scripts/check-modal-size.mjs",

@@ -27,11 +27,16 @@ export interface ProjectChecklistTopic {
 }
 
 export interface ProjectChecklistProgressEntry {
+  notRequired: boolean;
   done: boolean;
   completionDate: string;
   completedBy: string;
   jiraId: string;
   notes: string;
+  uatCustomer?: string;
+  uatHmc?: string;
+  productionCustomer?: string;
+  productionHmc?: string;
 }
 
 export type ProjectChecklistProgress = Record<string, ProjectChecklistProgressEntry>;

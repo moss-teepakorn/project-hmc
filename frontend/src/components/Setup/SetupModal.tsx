@@ -157,39 +157,46 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
         <Btn onClick={saveTopics} disabled={topicsLoading || savingTopics || !hasUnsavedChanges} small><Save size={14} /> {savingTopics ? 'Saving…' : 'Save Topics'}</Btn>
       </div>
 
-      <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 14, fontSize: 10 }}>
-        <table style={{ width: '100%', minWidth: needsWorkSystem ? 790 : 650, borderCollapse: 'collapse', fontSize: 10 }}>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', marginBottom: 14, fontSize: 10, width: '100%', minWidth: 0 }}>
+        <table style={{ width: '100%', minWidth: 0, tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 10 }}>
+          <colgroup>
+            {needsWorkSystem && <col style={{ width: '18%' }} />}
+            {needsStage && <col style={{ width: '22%' }} />}
+            <col style={{ width: '11%' }} />
+            <col />
+            <col style={{ width: 72 }} />
+          </colgroup>
           <thead>
             <tr style={{ background: C.bg2, color: C.text2, textAlign: 'left', fontWeight: 700, fontSize: 10 }}>
-              {needsWorkSystem && <th style={{ padding: '10px 12px', width: 150 }}>Work System</th>}
-              {needsStage && <th style={{ padding: '10px 12px', width: 190 }}>Stage</th>}
-              <th style={{ padding: '10px 12px', width: 90 }}>Order No.</th>
-              <th style={{ padding: '10px 12px' }}>Topic</th>
-              <th style={{ padding: '10px 12px', width: 56 }} aria-label="Actions" />
+              {needsWorkSystem && <th style={{ padding: '8px 9px', overflowWrap: 'anywhere' }}>Work System</th>}
+              {needsStage && <th style={{ padding: '8px 9px', overflowWrap: 'anywhere' }}>Stage</th>}
+              <th style={{ padding: '8px 9px', overflowWrap: 'anywhere' }}>Order No.</th>
+              <th style={{ padding: '8px 9px' }}>Topic</th>
+              <th style={{ padding: '8px 6px' }} aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
             {categoryTopics.map((topic) => {
               const draft = editing[topic.id];
               return (
-                <tr key={topic.id} style={{ borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 10, height: topicRowHeight }}>
+                <tr key={topic.id} style={{ borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 10, minHeight: topicRowHeight }}>
                   {needsWorkSystem && (
-                    <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
-                      {draft ? <Select value={draft.workSystem || ''} onChange={(value) => setEditing((current) => ({ ...current, [topic.id]: { ...current[topic.id], workSystem: value } }))} options={workSystems.map((value) => ({ value, label: value }))} style={compactSelectStyle} /> : <span style={{ color: C.text }}>{topic.workSystem || '—'}</span>}
+                    <td style={{ padding: '4px 7px', verticalAlign: 'middle', overflowWrap: 'anywhere' }}>
+                      {draft ? <Select value={draft.workSystem || ''} onChange={(value) => setEditing((current) => ({ ...current, [topic.id]: { ...current[topic.id], workSystem: value } }))} options={workSystems.map((value) => ({ value, label: value }))} style={{ ...compactSelectStyle, width: '100%', minWidth: 0 }} /> : <span style={{ color: C.text, overflowWrap: 'anywhere' }}>{topic.workSystem || '—'}</span>}
                     </td>
                   )}
                   {needsStage && (
-                    <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
-                      {draft ? <Select value={draft.stage || 'planning'} onChange={(value) => setEditing((current) => ({ ...current, [topic.id]: { ...current[topic.id], stage: value as ProjectChecklistStageId } }))} options={PROJECT_CHECKLIST_STAGES.map((stage) => ({ value: stage.id, label: stage.label }))} style={compactSelectStyle} /> : <span style={{ color: C.text }}>{PROJECT_CHECKLIST_STAGES.find((stage) => stage.id === topic.stage)?.label || '—'}</span>}
+                    <td style={{ padding: '4px 7px', verticalAlign: 'middle', overflowWrap: 'anywhere' }}>
+                      {draft ? <Select value={draft.stage || 'planning'} onChange={(value) => setEditing((current) => ({ ...current, [topic.id]: { ...current[topic.id], stage: value as ProjectChecklistStageId } }))} options={PROJECT_CHECKLIST_STAGES.map((stage) => ({ value: stage.id, label: stage.label }))} style={{ ...compactSelectStyle, width: '100%', minWidth: 0 }} /> : <span style={{ color: C.text, overflowWrap: 'anywhere' }}>{PROJECT_CHECKLIST_STAGES.find((stage) => stage.id === topic.stage)?.label || '—'}</span>}
                     </td>
                   )}
-                  <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
-                    {draft ? <Input type="number" value={String(draft.orderNo)} onChange={(value) => setEditing((current) => ({ ...current, [topic.id]: { ...current[topic.id], orderNo: Number(value) } }))} style={compactFieldStyle} /> : <span style={{ color: C.text }}>{topic.orderNo}</span>}
+                  <td style={{ padding: '4px 7px', verticalAlign: 'middle' }}>
+                    {draft ? <Input type="number" value={String(draft.orderNo)} onChange={(value) => setEditing((current) => ({ ...current, [topic.id]: { ...current[topic.id], orderNo: Number(value) } }))} style={{ ...compactFieldStyle, width: '100%', minWidth: 0 }} /> : <span style={{ color: C.text }}>{topic.orderNo}</span>}
                   </td>
-                  <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
-                    {draft ? <Input value={draft.title} onChange={(value) => setEditing((current) => ({ ...current, [topic.id]: { ...current[topic.id], title: value } }))} placeholder="Checklist topic" style={compactFieldStyle} /> : <span style={{ color: C.text }}>{topic.title}</span>}
+                  <td style={{ padding: '4px 7px', verticalAlign: 'middle', overflowWrap: 'anywhere' }}>
+                    {draft ? <Input value={draft.title} onChange={(value) => setEditing((current) => ({ ...current, [topic.id]: { ...current[topic.id], title: value } }))} placeholder="Checklist topic" style={{ ...compactFieldStyle, width: '100%', minWidth: 0 }} /> : <span style={{ color: C.text, overflowWrap: 'anywhere' }}>{topic.title}</span>}
                   </td>
-                  <td style={{ padding: '4px 8px', verticalAlign: 'middle', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '4px 5px', verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
                     {draft ? (
                       <>
                         <button type="button" aria-label={`Save ${topic.title || 'checklist topic'}`} onClick={() => saveEdit(topic.id)} style={{ ...rowActionStyle, background: C.primary, color: C.white }}><Save size={14} /></button>
@@ -300,11 +307,19 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
   );
 
   const workSystemOptions = useMemo(
-    () => Array.from(new Set(masterCodes
-      .filter((code) => code.codeType === 'work_system' && code.active)
-      .map((code) => code.codeValue.trim())
-      .filter(Boolean)))
-      .sort((left, right) => left.localeCompare(right)),
+    () => {
+      const seen = new Set<string>();
+      return masterCodes
+        .filter((code) => code.codeType === 'work_system' && code.active)
+        .slice()
+        .sort((left, right) => left.sortOrder - right.sortOrder || left.codeValue.localeCompare(right.codeValue))
+        .map((code) => code.codeValue.trim())
+        .filter((value) => {
+          if (!value || seen.has(value)) return false;
+          seen.add(value);
+          return true;
+        });
+    },
     [masterCodes]
   );
 

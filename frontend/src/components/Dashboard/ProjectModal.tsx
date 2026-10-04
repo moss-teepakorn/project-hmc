@@ -13,6 +13,8 @@ interface ProjectForm {
   name: string;
   code: string;
   client: string;
+  customerAbbreviation: string;
+  customerId: string;
   status: string;
   startDate: string;
   endDate: string;
@@ -50,6 +52,8 @@ export default function ProjectModal({ project, onClose }: Props) {
     name:                        project?.name                        ?? '',
     code:                        project?.code                        ?? '',
     client:                      project?.client                      ?? '',
+    customerAbbreviation:        project?.customerAbbreviation        ?? '',
+    customerId:                  project?.customerId                  ?? '',
     status:                      project?.status ?? statusOptions[0]?.value ?? 'Planning',
     startDate:                   project?.startDate                   ?? '',
     endDate:                     project?.endDate                     ?? '',
@@ -143,6 +147,15 @@ export default function ProjectModal({ project, onClose }: Props) {
         <FormRow label="Client">
           <Input value={form.client} onChange={v => up('client', v)} placeholder="Client company name" />
         </FormRow>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <FormRow label="Customer Abbreviation">
+          <Input value={form.customerAbbreviation} onChange={v => up('customerAbbreviation', v)} placeholder="e.g. PCHI" />
+        </FormRow>
+        <FormRow label="Customer ID">
+          <Input value={form.customerId} onChange={v => up('customerId', v)} placeholder="Customer ID" />
+        </FormRow>
+        <div />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         <FormRow label="Start Date"><Input type="date" value={form.startDate} onChange={v => up('startDate', v)} /></FormRow>

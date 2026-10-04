@@ -36,16 +36,17 @@ type TaskColumnId =
 
 const COLS: Array<{ id: TaskColumnId; label: string; w: number; canHide: boolean }> = [
   { id: 'wbs',             label: 'WBS',           w: 52,  canHide: false },
-  { id: 'taskName',        label: 'Task Name',     w: 320, canHide: false },
-  { id: 'startDate',       label: 'Start',         w: 94,  canHide: true },
-  { id: 'endDate',         label: 'Finish',        w: 94,  canHide: true },
-  { id: 'actualFinish',    label: 'Actual Finish', w: 120, canHide: true },
-  { id: 'duration',        label: 'Days',          w: 46,  canHide: true },
-  { id: 'percentComplete', label: '% Done',        w: 120, canHide: true },
-  { id: 'effortManday',    label: 'Effort (MD)',   w: 94,  canHide: true },
+  { id: 'taskName',        label: 'Task Name',     w: 420, canHide: false },
+  { id: 'duration',        label: 'Days',          w: 72,  canHide: true },
+  { id: 'startDate',       label: 'Start',         w: 130, canHide: true },
+  { id: 'endDate',         label: 'Finish',        w: 130, canHide: true },
+  { id: 'actualFinish',    label: 'Actual Finish', w: 130, canHide: true },
+  { id: 'percentComplete', label: '% Done',        w: 90,  canHide: true },
+  { id: 'effortManday',    label: 'Effort (MD)',   w: 90,  canHide: true },
   { id: 'resource',        label: 'Resource',      w: 160, canHide: true },
-  { id: 'actions',         label: '',              w: 76,  canHide: true },
+  { id: 'actions',         label: '',              w: 66,  canHide: true },
 ];
+const MIN_COLUMN_WIDTHS = [44, 220, 56, 110, 110, 110, 64, 72, 96, 50];
 const DEFAULT_COLUMN_VISIBILITY: Record<TaskColumnId, boolean> = COLS.reduce((acc, col) => {
   acc[col.id] = true;
   return acc;
@@ -139,6 +140,20 @@ function isWeekend(date: Date): boolean {
   return day === 0 || day === 6;
 }
 
+function calculateEndDateFromWorkingDays(startDate: string, durationDays: number): string {
+  const start = parseIsoDateSafe(startDate);
+  if (!start || durationDays <= 0) return '';
+  const cursor = new Date(start);
+  let countedDays = 0;
+  while (countedDays < durationDays) {
+    if (!isWeekend(cursor)) countedDays += 1;
+    if (countedDays < durationDays) cursor.setDate(cursor.getDate() + 1);
+  }
+  const month = String(cursor.getMonth() + 1).padStart(2, '0');
+  const day = String(cursor.getDate()).padStart(2, '0');
+  return `${cursor.getFullYear()}-${month}-${day}`;
+}
+
 function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -226,6 +241,7 @@ interface NewTaskInsert {
   effortManday: number;
   startDate: string;
   endDate: string;
+  duration: number;
   actualFinish: string;
   resource: string;
   percentComplete: number;
@@ -351,7 +367,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const { tasks, members, activeProject, fetchTasks, createTask, updateTask, reorderTasks, deleteTask, masterCodes } = useStore();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
-  const [view, setView]         = useState<ViewMode>(() => typeof window !== 'undefined' && window.innerWidth < 768 ? 'table' : 'split');
+  const [view, setView]         = useState<ViewMode>('table');
   const [addModal, setAddModal] = useState(false);
   const [editModal, setEditModal] = useState<Task | null>(null);
   const [loading, setLoading]   = useState(false);
@@ -360,6 +376,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const [savingBaseline, setSavingBaseline] = useState(false);
   const [importPreview, setImportPreview] = useState<TaskImportPreview | null>(null);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [tableViewportWidth, setTableViewportWidth] = useState(0);
+  const [tableWidthRatio, setTableWidthRatio] = useState(0.85);
   const isMobile = windowWidth < 768;
   const [buttonFocus, setButtonFocus] = useState<'expand' | 'collapse' | null>(null);
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; taskLevel: number }>({ visible: false, x: 0, y: 0, task: null, taskLevel: 0 });
@@ -395,6 +413,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const dragTaskIdRef = useRef<string | null>(null);
 
   // Scroll sync
+  const tableViewportRef = useRef<HTMLDivElement>(null);
   const tableBodyRef = useRef<HTMLDivElement>(null);
   const tableHeaderRef = useRef<HTMLDivElement>(null);
   const ganttBodyRef = useRef<HTMLDivElement>(null);
@@ -406,6 +425,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const resizingColumn = useRef<number | null>(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
+  const resizeStartTableWidth = useRef(0);
 
   // Resize drag
   const dragRef    = useRef(false);
@@ -435,6 +455,20 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    const updateTableWidth = () => {
+      setTableViewportWidth(tableViewportRef.current?.clientWidth || window.innerWidth);
+    };
+    updateTableWidth();
+    if (typeof ResizeObserver === 'undefined' || !tableViewportRef.current) {
+      window.addEventListener('resize', updateTableWidth);
+      return () => window.removeEventListener('resize', updateTableWidth);
+    }
+    const observer = new ResizeObserver(updateTableWidth);
+    observer.observe(tableViewportRef.current);
+    return () => observer.disconnect();
+  }, [view, isMobile, windowWidth]);
 
   useEffect(() => {
     setColumnPrefsUserKey(getColumnPrefsUserKeyFromLocalStorage());
@@ -891,6 +925,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       effortManday: 0,
       startDate: todayIso,
       endDate: nextWeekIso,
+      duration: calcDuration(todayIso, nextWeekIso),
       actualFinish: '',
       resource: '',
       percentComplete: 0,
@@ -1164,7 +1199,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         startDate: normalized.startDate,
         endDate: normalized.endDate,
         actualFinish: normalizedActualFinish,
-        duration: calcDuration(normalized.startDate, normalized.endDate),
+        duration: calcDuration(normalized.startDate, normalized.endDate) || newTaskInsert.duration,
         resource: newTaskInsert.resource,
         phase: newTaskInsert.phase,
         percentComplete: newTaskInsert.percentComplete,
@@ -1279,9 +1314,14 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       return;
     }
     const updates: Partial<Task> = { [field]: iso };
+    if (field === 'actualFinish') updates.percentComplete = 100;
     if (currentTask && (field === 'startDate' || field === 'endDate')) {
       const nextStart = field === 'startDate' ? iso : String(currentTask.startDate || '');
-      const nextEnd = field === 'endDate' ? iso : String(currentTask.endDate || '');
+      const nextEnd = field === 'endDate'
+        ? iso
+        : Number(currentTask.duration || 0) > 0
+          ? calculateEndDateFromWorkingDays(iso, Number(currentTask.duration))
+          : String(currentTask.endDate || '');
       const normalized = normalizeTaskDateRange(nextStart, nextEnd);
       updates.startDate = normalized.startDate;
       updates.endDate = normalized.endDate;
@@ -1291,6 +1331,19 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       }
     }
     try { await updateTask(id, updates); }
+    catch { toast.error('Failed to save'); }
+  }, [projectTasks, updateTask]);
+
+  const handleUpdateDuration = useCallback(async (id: string, value: string) => {
+    const duration = Number(value);
+    if (!Number.isInteger(duration) || duration < 0) {
+      toast.error('Days must be a whole number greater than or equal to 0');
+      return;
+    }
+    const currentTask = projectTasks.find((task) => task.id === id);
+    if (!currentTask) return;
+    const endDate = calculateEndDateFromWorkingDays(String(currentTask.startDate || ''), duration);
+    try { await updateTask(id, { duration, endDate }); }
     catch { toast.error('Failed to save'); }
   }, [projectTasks, updateTask]);
 
@@ -1527,21 +1580,25 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const onColumnResizeStart = useCallback((index: number, e: React.MouseEvent<HTMLDivElement>) => {
     resizingColumn.current = index;
     resizeStartX.current = e.clientX;
-    resizeStartWidth.current = colWidths[index];
+    resizeStartWidth.current = e.currentTarget.parentElement?.getBoundingClientRect().width || colWidths[index];
+    resizeStartTableWidth.current = (tableViewportWidth || windowWidth - 24) * tableWidthRatio;
     e.preventDefault();
     e.stopPropagation();
-  }, [colWidths]);
+  }, [colWidths, tableViewportWidth, tableWidthRatio, windowWidth]);
 
   const onColumnResizeMove = useCallback((e: MouseEvent) => {
     if (resizingColumn.current === null) return;
     const delta = e.clientX - resizeStartX.current;
     const nextWidth = Math.max(60, resizeStartWidth.current + delta);
+    if (resizingColumn.current === 1 && tableViewportWidth) {
+      setTableWidthRatio(Math.max(0.85, Math.min(1, (resizeStartTableWidth.current + delta) / tableViewportWidth)));
+    }
     setColWidths((prev) => {
       const next = [...prev];
       if (resizingColumn.current !== null) next[resizingColumn.current] = nextWidth;
       return next;
     });
-  }, []);
+  }, [tableViewportWidth]);
 
   const onColumnResizeEnd = useCallback(() => {
     resizingColumn.current = null;
@@ -2209,6 +2266,39 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     [isColumnVisible],
   );
 
+  const tableContentWidth = Math.max(320, Math.floor((tableViewportWidth || windowWidth - 24) * tableWidthRatio));
+  const fittedColumnWidths = useMemo(() => {
+    const visibleIndices = visibleHeaderColumns.map(({ index }) => index);
+    if (!visibleIndices.length) return colWidths;
+
+    const availableWidth = Math.max(320, tableContentWidth - 4);
+    const minimumScale = Math.min(1, availableWidth / visibleIndices.reduce((sum, index) => sum + MIN_COLUMN_WIDTHS[index], 0));
+    const minimums = MIN_COLUMN_WIDTHS.map((width) => width * minimumScale);
+    const bases = colWidths.map((width, index) => Math.max(width, minimums[index]));
+    const totalBaseWidth = visibleIndices.reduce((sum, index) => sum + bases[index], 0);
+    const result = [...colWidths];
+    const extraWidthTarget = visibleIndices.includes(1) ? 1 : visibleIndices[0];
+
+    if (totalBaseWidth <= availableWidth) {
+      visibleIndices.forEach((index) => { result[index] = bases[index]; });
+      return result;
+    }
+
+    const shrinkCapacity = visibleIndices.reduce((sum, index) => sum + Math.max(0, bases[index] - minimums[index]), 0);
+    const shrinkAmount = totalBaseWidth - availableWidth;
+    visibleIndices.forEach((index) => {
+      const capacity = Math.max(0, bases[index] - minimums[index]);
+      result[index] = shrinkCapacity ? bases[index] - shrinkAmount * capacity / shrinkCapacity : minimums[index];
+    });
+    const fittedWidth = visibleIndices.reduce((sum, index) => sum + result[index], 0);
+    result[extraWidthTarget] += availableWidth - fittedWidth;
+    const roundedWidths = result.map((width) => Math.max(1, Math.round(width)));
+    const roundedTotal = visibleIndices.reduce((sum, index) => sum + roundedWidths[index], 0);
+    roundedWidths[extraWidthTarget] = Math.max(1, roundedWidths[extraWidthTarget] + availableWidth - roundedTotal);
+    return roundedWidths;
+  }, [colWidths, visibleHeaderColumns, tableContentWidth]);
+  const renderedColumnWidths = view === 'table' ? fittedColumnWidths : colWidths;
+
   const handleToggleColumnVisibility = (columnId: TaskColumnId) => {
     if (MANDATORY_COLUMN_IDS.has(columnId)) return;
     setColumnVisibility((prev) => normalizeColumnVisibility({ ...prev, [columnId]: !prev[columnId] }));
@@ -2222,15 +2312,15 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     <div style={{ display:'flex', flex:1, flexDirection:'column', height:'100%', overflow:'hidden', minHeight:0 }}>
       {isMobile ? taskCardContent : (
         <>
-          <div style={{ flex:1, minWidth:0, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
-            <div style={{ overflowX:'auto', overflowY:'hidden', minWidth:0 }}>
+          <div ref={tableViewportRef} style={{ flex:1, minWidth:0, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+            <div style={{ overflowX:view === 'table' ? 'hidden' : 'auto', overflowY:'hidden', minWidth:0 }}>
               {/* Table header — same height as Gantt header (HDR_H) */}
-              <div ref={tableHeaderRef} onScroll={onHeaderScroll} style={{ minWidth:'max-content', display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
+              <div ref={tableHeaderRef} onScroll={onHeaderScroll} style={{ width:view === 'table' ? tableContentWidth : undefined, minWidth:view === 'table' ? 0 : 'max-content', display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
                 {visibleHeaderColumns.map(({ col, index }) => (
                   <div key={col.id} style={{
                     position:'relative',
-                    width: colWidths[index],
-                    minWidth: colWidths[index],
+                    width: renderedColumnWidths[index],
+                    minWidth: renderedColumnWidths[index],
                     padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center'
                   }}>
                     {col.label}
@@ -2241,7 +2331,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
               </div>
             </div>
             <div ref={tableBodyRef} onScroll={onTableScroll}
-              style={{ height:`calc(100% - ${HDR_H}px)`, minHeight:0, overflowY:'scroll', overflowX:'auto', minWidth:'max-content' }}>
+              style={{ height:`calc(100% - ${HDR_H}px)`, minHeight:0, overflowY:'scroll', overflowX:view === 'table' ? 'hidden' : 'auto', width:view === 'table' ? tableContentWidth : undefined, minWidth:view === 'table' ? 0 : 'max-content' }}>
               {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
               {!loading && visibleWithInsert.map((task, i) => {
                 const isNew = isNewTaskInsert(task);
@@ -2252,7 +2342,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                 const newRow = task as NewTaskInsert;
                 const canEditEffort = isNew ? !!newRow.parentId : (!isPar && !!rowTask.parentId);
                 const level = isNew ? newRow.level : rowTask.level ?? 0;
-                const durationDays = isNew ? calcDuration(newRow.startDate, newRow.endDate) : rowTask.duration;
+                const durationDays = isNew ? newRow.duration : rowTask.duration;
                 const isDropBefore = !isNew && dropTarget?.id === rowTask.id && dropTarget.position === 'before';
                 const isDropAfter = !isNew && dropTarget?.id === rowTask.id && dropTarget.position === 'after';
                 return (
@@ -2265,7 +2355,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                     onClick={() => setSelected(task.id)}
                     onContextMenu={!isNew ? openTaskContextMenu(rowTask) : undefined}
                     style={{
-                      display:'flex', alignItems:'center', height:ROW_H,
+                      display:'flex', alignItems:'center', height:ROW_H, width:view === 'table' ? '100%' : undefined, minWidth:view === 'table' ? 0 : undefined,
                       borderTop: isDropBefore ? `2px solid ${C.primary}` : '1px solid transparent',
                       borderBottom: isDropAfter ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
                       background: isNew ? C.primaryBg : isSel ? C.primaryBg : i % 2 === 0 ? C.white : C.bg,
@@ -2274,12 +2364,12 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       flexShrink:0,
                     }}>
                     {isColumnVisible('wbs') && (
-                      <div style={{ width:colWidths[0], minWidth:colWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{isNew ? '—' : rowTask!.wbs}</div>
+                      <div style={{ width:renderedColumnWidths[0], minWidth:renderedColumnWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{isNew ? '—' : rowTask!.wbs}</div>
                     )}
                     {isColumnVisible('taskName') && (
                       <div style={{
-                        width: colWidths[1],
-                        minWidth: colWidths[1],
+                        width: renderedColumnWidths[1],
+                        minWidth: renderedColumnWidths[1],
                         padding:`0 4px 0 ${8 + level * 20}px`,
                         display:'flex', alignItems:'center', gap:4, flexShrink:0
                       }}>
@@ -2303,8 +2393,33 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                         />
                       </div>
                     )}
+                    {isColumnVisible('duration') && (
+                      <div style={{ width:renderedColumnWidths[2], minWidth:renderedColumnWidths[2], padding:'0 6px', flexShrink:0 }}>
+                        <EditableCell
+                          type="number"
+                          value={String(durationDays)}
+                          placeholder="0"
+                          onSave={(value) => {
+                            const duration = Number(value);
+                            if (!Number.isInteger(duration) || duration < 0) {
+                              toast.error('Days must be a whole number greater than or equal to 0');
+                              return;
+                            }
+                            if (isNew) {
+                              setNewTaskInsert((prev) => prev ? {
+                                ...prev,
+                                duration,
+                                endDate: calculateEndDateFromWorkingDays(prev.startDate, duration),
+                              } : prev);
+                            } else {
+                              handleUpdateDuration(rowTask.id, value);
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                     {isColumnVisible('startDate') && (
-                      <div style={{ width:colWidths[2], minWidth:colWidths[2], padding:'0 6px', flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[3], minWidth:renderedColumnWidths[3], padding:'0 6px', flexShrink:0 }}>
                         <EditableCell
                           type="date"
                           value={isNew ? toDisplayDmy(newRow.startDate) : isoToDmy(rowTask.startDate)}
@@ -2312,7 +2427,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                           onSave={(v) => {
                             if (isNew) setNewTaskInsert((prev) => {
                               if (!prev) return prev;
-                              const normalized = normalizeTaskDateRange(v, prev.endDate);
+                              const normalized = normalizeTaskDateRange(v, calculateEndDateFromWorkingDays(normalizeDateInputToIso(v), prev.duration));
                               if (normalized.adjusted) {
                                 toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
                               }
@@ -2326,7 +2441,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('endDate') && (
-                      <div style={{ width:colWidths[3], minWidth:colWidths[3], padding:'0 6px', flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[4], minWidth:renderedColumnWidths[4], padding:'0 6px', flexShrink:0 }}>
                         <EditableCell
                           type="date"
                           value={isNew ? toDisplayDmy(newRow.endDate) : isoToDmy(rowTask.endDate)}
@@ -2338,7 +2453,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                               if (normalized.adjusted) {
                                 toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
                               }
-                              return { ...prev, startDate: normalized.startDate, endDate: normalized.endDate };
+                              return { ...prev, startDate: normalized.startDate, endDate: normalized.endDate, duration: calcDuration(normalized.startDate, normalized.endDate) };
                             });
                             else handleUpdateDate(rowTask.id, 'endDate', v);
                           }}
@@ -2348,13 +2463,13 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('actualFinish') && (
-                      <div style={{ width:colWidths[4], minWidth:colWidths[4], padding:'0 6px', flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[5], minWidth:renderedColumnWidths[5], padding:'0 6px', flexShrink:0 }}>
                         <EditableCell
                           type="date"
                           value={isNew ? toDisplayDmy(newRow.actualFinish) : rowTask.actualFinish ? isoToDmy(rowTask.actualFinish) : ''}
                           placeholder="—"
                           onSave={(v) => {
-                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, actualFinish: normalizeDateInputToIso(v) } : prev);
+                            if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, actualFinish: normalizeDateInputToIso(v), percentComplete: v ? 100 : prev.percentComplete } : prev);
                             else handleUpdateDate(rowTask.id, 'actualFinish', v);
                           }}
                           alwaysSave
@@ -2362,11 +2477,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                         />
                       </div>
                     )}
-                    {isColumnVisible('duration') && (
-                      <div style={{ width:colWidths[5], minWidth:colWidths[5], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{durationDays}d</div>
-                    )}
                     {isColumnVisible('percentComplete') && (
-                      <div style={{ width:colWidths[6], minWidth:colWidths[6], padding:'0 6px', flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[6], minWidth:renderedColumnWidths[6], padding:'0 6px', flexShrink:0 }}>
                         {isNew ? (
                           <PctCell value={newRow.percentComplete} isParent={false} onSave={(n) => setNewTaskInsert((prev) => prev ? { ...prev, percentComplete: n } : prev)} />
                         ) : (
@@ -2375,7 +2487,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('effortManday') && (
-                      <div style={{ width:colWidths[7], minWidth:colWidths[7], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[7], minWidth:renderedColumnWidths[7], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>
                         {isNew ? (
                           <EditableCell
                             value={String(newRow.effortManday || 0)}
@@ -2402,7 +2514,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('resource') && (
-                      <div style={{ width:colWidths[8], minWidth:colWidths[8], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[8], minWidth:renderedColumnWidths[8], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
                         {!isNew && rowTask.resource && <Avatar name={rowTask.resource} size={20} />}
                         <EditableCell
                           value={isNew ? newRow.resource : rowTask.resource}
@@ -2415,7 +2527,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('actions') && (
-                      <div style={{ width:colWidths[9], minWidth:colWidths[9], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
+                      <div style={{ width:renderedColumnWidths[9], minWidth:renderedColumnWidths[9], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
                         {isNew ? (
                           <>
                             <button onClick={e => { e.stopPropagation(); saveNewTask(); }}

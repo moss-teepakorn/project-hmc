@@ -65,7 +65,8 @@ export default function AuthPage() {
         setSignupSuccess(true);
       }
     } catch (err) {
-      setError((err as Error).message);
+      const message = (err as Error).message;
+      setError(message === 'ACCOUNT_INACTIVE' ? 'บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ' : message);
     } finally {
       setLoading(false);
     }

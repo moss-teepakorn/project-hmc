@@ -243,6 +243,12 @@ export const Tabs: React.FC<{
   );
 };
 
+function toDmyDateInputValue(raw: string): string {
+  const text = String(raw || '').trim();
+  const isoValue = /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : dmyToIso(text);
+  return isoValue ? isoToDmy(isoValue) : '';
+}
+
 export const EditableCell: React.FC<{
   value: string; onSave: (v: string) => void;
   type?: string; placeholder?: string; style?: React.CSSProperties;
@@ -258,33 +264,94 @@ export const EditableCell: React.FC<{
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState(value);
   const [dateValue, setDateValue] = useState(type === 'date' ? toDateInputValue(value) : value);
+  const [dateDraft, setDateDraft] = useState(type === 'date' ? toDmyDateInputValue(value) : value);
   const inputRef = useRef<HTMLInputElement>(null);
+  const datePickerRef = useRef<HTMLInputElement>(null);
+  const calendarButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setDraft(value);
-    if (type === 'date') setDateValue(toDateInputValue(value));
+    if (type === 'date') {
+      const isoValue = toDateInputValue(value);
+      setDateValue(isoValue);
+      setDateDraft(toDmyDateInputValue(isoValue));
+    }
   }, [value, type, toDateInputValue]);
   useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
 
   const commit = useCallback(() => {
     let nextValue = draft;
     if (type === 'date') {
-      nextValue = dateValue ? isoToDmy(dateValue) : '';
+      const isoValue = dmyToIso(dateDraft);
+      if (dateDraft && !isoValue) {
+        setDateDraft(toDmyDateInputValue(dateValue));
+        setEditing(false);
+        return;
+      }
+      setDateValue(isoValue);
+      nextValue = isoValue ? isoToDmy(isoValue) : '';
     }
     setEditing(false);
     if (nextValue !== value || type === 'date' || alwaysSave) onSave(nextValue);
-  }, [draft, value, onSave, type, alwaysSave, dateValue]);
+  }, [draft, dateDraft, dateValue, value, onSave, type, alwaysSave]);
+
+  const openDatePicker = () => {
+    const datePicker = datePickerRef.current;
+    if (!datePicker) return;
+    try {
+      if (datePicker.showPicker) datePicker.showPicker();
+      else datePicker.click();
+    } catch {
+      datePicker.click();
+    }
+  };
+
+  const handleDatePickerChange = (isoValue: string) => {
+    const displayValue = isoValue ? isoToDmy(isoValue) : '';
+    setDateValue(isoValue);
+    setDateDraft(displayValue);
+    setEditing(false);
+    if (displayValue !== value || alwaysSave) onSave(displayValue);
+  };
+
+  if (editing && type === 'date') {
+    return (
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 4, width: '100%' }}>
+        <input ref={inputRef} type="text" value={dateDraft} placeholder="DD/MM/YYYY" inputMode="numeric"
+          onChange={(event) => setDateDraft(event.target.value)}
+          onBlur={(event) => { if (event.relatedTarget !== calendarButtonRef.current) commit(); }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') commit();
+            if (event.key === 'Escape') {
+              const isoValue = toDateInputValue(value);
+              setEditing(false);
+              setDraft(value);
+              setDateValue(isoValue);
+              setDateDraft(toDmyDateInputValue(isoValue));
+            }
+          }}
+          style={{ flex: 1, minWidth: 0, border: `1.5px solid ${C.primary}`, borderRadius: 4, padding: '2px 6px', fontSize: 12, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg, ...style }}
+        />
+        <button ref={calendarButtonRef} type="button" aria-label="Choose task date" title="Choose date" onClick={openDatePicker} onBlur={commit}
+          style={{ width: 28, height: 28, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${C.border}`, borderRadius: 6, background: C.white, color: C.text2, cursor: 'pointer' }}>
+          <Calendar size={14} />
+        </button>
+        <input ref={datePickerRef} type="date" aria-hidden="true" tabIndex={-1} value={dateValue || ''}
+          onChange={(event) => handleDatePickerChange(event.target.value)}
+          style={{ position: 'absolute', right: 30, bottom: 0, width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+        />
+      </div>
+    );
+  }
 
   if (editing) {
     return (
-      <input ref={inputRef} type={type} value={type === 'date' ? dateValue : draft}
-        onChange={e => {
-          if (type === 'date') setDateValue(e.target.value);
-          else setDraft(e.target.value);
-        }}
+      <input ref={inputRef} type={type} value={draft}
+        placeholder={placeholder}
+        onChange={e => setDraft(e.target.value)}
         onBlur={commit}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setDraft(value); if (type === 'date') setDateValue(toDateInputValue(value)); } }}
-        style={{ width: '100%', border: `1.5px solid ${C.primary}`, borderRadius: 4, padding: '2px 6px', fontSize: 12, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg, colorScheme: type === 'date' ? 'light' : undefined, ...style }}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setDraft(value); } }}
+        style={{ width: '100%', border: `1.5px solid ${C.primary}`, borderRadius: 4, padding: '2px 6px', fontSize: 12, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg, ...style }}
       />
     );
   }

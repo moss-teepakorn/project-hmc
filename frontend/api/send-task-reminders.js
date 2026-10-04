@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const REMINDER_API_SECRET = process.env.REMINDER_API_SECRET || process.env.REMINDER_SECRET;
 const GMAIL_USER = process.env.GMAIL_USER || process.env.GMAIL_USERNAME || process.env.EMAIL_USERNAME;
@@ -207,24 +207,24 @@ const sendMail = async ({ to, bcc, html, text }) => {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+  const { projectId, test, force } = req.body || {};
+  const secret = req.headers['x-reminder-secret'] || req.query.secret;
+  const accessTokenHeader = req.headers.authorization || req.headers.Authorization || '';
+  const accessToken = accessTokenHeader.startsWith('Bearer ') ? accessTokenHeader.slice(7) : accessTokenHeader || null;
+  const isTestMode = Boolean(test);
+  const isForceSend = Boolean(force);
+
   const missing = [];
   if (!SUPABASE_URL) missing.push('SUPABASE_URL');
   if (!SUPABASE_SERVICE_KEY) missing.push('SUPABASE_SERVICE_KEY or SUPABASE_SERVICE_ROLE_KEY');
   if (!GMAIL_USER) missing.push('GMAIL_USER or GMAIL_USERNAME');
   if (!GMAIL_APP_PASSWORD) missing.push('GMAIL_APP_PASSWORD or GMAIL_PASSWORD');
-  if (!REMINDER_API_SECRET) missing.push('REMINDER_API_SECRET');
+  if (!REMINDER_API_SECRET && !accessToken && !isTestMode) missing.push('REMINDER_API_SECRET or Admin authorization');
   if (missing.length > 0) {
     return res.status(500).json({ error: `Missing env: ${missing.join(', ')}` });
   }
 
   try {
-    const { projectId, test, force } = req.body || {};
-    const secret = req.headers['x-reminder-secret'] || req.query.secret;
-    const accessTokenHeader = req.headers.authorization || req.headers.Authorization || '';
-    const accessToken = accessTokenHeader.startsWith('Bearer ') ? accessTokenHeader.slice(7) : accessTokenHeader || null;
-    const isTestMode = Boolean(test);
-    const isForceSend = Boolean(force);
-
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
     let isAuthorized = false;
     if (!isTestMode && secret === REMINDER_API_SECRET) {
