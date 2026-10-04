@@ -66,7 +66,13 @@ function ProjectChecklistTable({ project, category, workSystem, workSystemOrder 
     let active = true;
     setLoadedProjectId('');
     setLoadError('');
-    Promise.all([projectChecklistApi.getTopics(), projectChecklistApi.getProgress(projectId)])
+    Promise.all([
+      projectChecklistApi.getTopics(),
+      projectChecklistApi.getProgress(projectId).catch((error) => {
+        if (active) setLoadError(error instanceof Error ? error.message : 'Unable to load checklist progress');
+        return {};
+      }),
+    ])
       .then(([loadedTopics, loadedProgress]) => {
         if (!active) return;
         setTopics(loadedTopics);
@@ -107,7 +113,7 @@ function ProjectChecklistTable({ project, category, workSystem, workSystemOrder 
   const workSystemOrderMap = new Map(workSystemOrder.map((system, index) => [system.trim().toLocaleLowerCase(), index]));
   const getWorkSystemOrder = (system?: string) => workSystemOrderMap.get(String(system || '').trim().toLocaleLowerCase()) ?? Number.MAX_SAFE_INTEGER;
   const matchingTopics = (topics || []).filter((topic) =>
-    topic.category === category && (category === 'project' || !workSystem || topic.workSystem === workSystem)
+    topic.category === category && (category === 'project' || !workSystem || String(topic.workSystem || '').trim().toLocaleLowerCase() === workSystem.trim().toLocaleLowerCase())
   );
   const currentTopics = !isLoaded ? [] : category === 'project'
     ? matchingTopics.filter((topic) => topic.stage).slice().sort((left, right) => (stageOrder.get(left.stage!)! - stageOrder.get(right.stage!)!) || left.orderNo - right.orderNo || left.title.localeCompare(right.title))
