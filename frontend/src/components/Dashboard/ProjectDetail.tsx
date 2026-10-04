@@ -119,6 +119,8 @@ function ProjectChecklistTable({ project, category, workSystem, workSystemOrder 
 
   const exportChecklistPdf = () => {
     const title = category === 'project' ? 'Project Checklist' : category === 'setup' ? 'Setup Checklist' : 'Data Migration Checklist';
+    const notRequiredMark = '__CHECKLIST_NOT_REQUIRED__';
+    const doneMark = '__CHECKLIST_DONE__';
     let sequenceNo = 0;
     const columns = category === 'migrate-data'
       ? ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'UAT Customer', 'UAT HMC', 'UAT Diff', 'Production Customer', 'Production HMC', 'Production Diff', 'Notes']
@@ -143,8 +145,8 @@ function ProjectChecklistTable({ project, category, workSystem, workSystemOrder 
       const row = [
         String(rowNumber).padStart(2, '0'),
         topic.title,
-        item.notRequired ? 'Yes' : '',
-        !item.notRequired && (item.done || item.completionDate) ? 'Yes' : '',
+        item.notRequired ? notRequiredMark : '',
+        !item.notRequired && (item.done || item.completionDate) ? doneMark : '',
         item.completionDate ? fmtDate(item.completionDate) : '',
         item.completedBy,
       ];
@@ -207,6 +209,26 @@ function ProjectChecklistTable({ project, category, workSystem, workSystemOrder 
           }
         : { 0: { cellWidth: 12, halign: 'center' }, 1: { cellWidth: 76 }, 2: { cellWidth: 25, halign: 'center' }, 3: { cellWidth: 16, halign: 'center' }, 4: { cellWidth: 30 }, 5: { cellWidth: 38 } },
       showHead: 'everyPage',
+      didParseCell: (data: any) => {
+        if (data.cell.raw === notRequiredMark || data.cell.raw === doneMark) data.cell.text = [];
+      },
+      didDrawCell: (data: any) => {
+        if (data.section !== 'body') return;
+        const mark = data.cell.raw;
+        if (mark !== notRequiredMark && mark !== doneMark) return;
+        const centerX = data.cell.x + data.cell.width / 2;
+        const centerY = data.cell.y + data.cell.height / 2;
+        const size = Math.min(2.2, data.cell.height * 0.3);
+        doc.setDrawColor(30, 41, 59);
+        doc.setLineWidth(0.45);
+        if (mark === notRequiredMark) {
+          doc.line(centerX - size, centerY - size, centerX + size, centerY + size);
+          doc.line(centerX + size, centerY - size, centerX - size, centerY + size);
+        } else {
+          doc.line(centerX - size, centerY, centerX - size * 0.2, centerY + size * 0.75);
+          doc.line(centerX - size * 0.2, centerY + size * 0.75, centerX + size, centerY - size);
+        }
+      },
     });
 
     const today = new Date();
