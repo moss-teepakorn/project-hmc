@@ -2165,7 +2165,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       doc.text(`Project ID: ${proj?.code || projectId} | Page ${pg + 1} of ${totalPages}`, W - PR, ftrTextY, { align: 'right' });
     }
 
-    doc.save(opts?.fileName || `tasks-gantt-${projectId}.pdf`);
+    const customerAbbreviation = String(proj?.customerAbbreviation || '').trim().replace(/[\\/:*?"<>|]/g, '-');
+    const defaultFileName = `${customerAbbreviation ? `${customerAbbreviation} ` : ''}Project Schedule.pdf`;
+    doc.save(opts?.fileName || defaultFileName);
     toast.success(opts?.successMessage || 'Exported PDF');
     setShowExport(false);
   };
