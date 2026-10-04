@@ -130,7 +130,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
     const doneMark = '__CHECKLIST_DONE__';
     let sequenceNo = 0;
     const columns = category === 'migrate-data'
-      ? ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'UAT Customer', 'UAT HMC', 'UAT Diff', 'Production Customer', 'Production HMC', 'Production Diff', 'Notes']
+      ? ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'UAT Customer', 'UAT HMC', 'UAT HMC-CUSTOMER', 'Production Customer', 'Production HMC', 'Production HMC-CUSTOMER', 'Notes']
       : requiresWorkSystem
         ? ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'Notes']
         : ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'JIRA ID', 'Notes'];
@@ -143,7 +143,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
             { content: 'UAT Stage', colSpan: 3 }, { content: 'Production Stage', colSpan: 3 },
             { content: 'Notes', rowSpan: 2 },
           ],
-          ['Customer', 'HMC', 'Diff', 'Customer', 'HMC', 'Diff'],
+          ['Customer', 'HMC', 'HMC-CUSTOMER', 'Customer', 'HMC', 'HMC-CUSTOMER'],
         ]
       : [columns];
     const body: any[] = [];
@@ -160,7 +160,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
       if (category === 'migrate-data') {
         const diff = (customer?: string, hmc?: string) => {
           if (!customer && !hmc) return '';
-          const difference = (Number(customer) || 0) - (Number(hmc) || 0);
+          const difference = (Number(hmc) || 0) - (Number(customer) || 0);
           return String(Math.round(difference * 100) / 100);
         };
         row.push(item.uatCustomer || '', item.uatHmc || '', diff(item.uatCustomer, item.uatHmc));
@@ -357,7 +357,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
     const progressFieldStyle = isNotRequired ? { ...inputStyle, ...disabledInputStyle } : inputStyle;
     const diffValue = (customer?: string, hmc?: string) => {
       if (!customer && !hmc) return '—';
-      const difference = (Number(customer) || 0) - (Number(hmc) || 0);
+      const difference = (Number(hmc) || 0) - (Number(customer) || 0);
       return String(Math.round(difference * 100) / 100);
     };
     return (
@@ -401,10 +401,10 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
         {category === 'migrate-data' && <>
           <td style={cellStyle}><input aria-label={`${topic.title} UAT Customer`} type="number" step="any" value={itemProgress.uatCustomer || ''} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { uatCustomer: event.target.value })} style={{ ...progressFieldStyle, textAlign: 'right' }} /></td>
           <td style={cellStyle}><input aria-label={`${topic.title} UAT HMC`} type="number" step="any" value={itemProgress.uatHmc || ''} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { uatHmc: event.target.value })} style={{ ...progressFieldStyle, textAlign: 'right' }} /></td>
-          <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 700, color: Number(itemProgress.uatCustomer || 0) - Number(itemProgress.uatHmc || 0) < 0 ? C.red : C.text }}>{diffValue(itemProgress.uatCustomer, itemProgress.uatHmc)}</td>
+          <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 700, color: Number(itemProgress.uatHmc || 0) - Number(itemProgress.uatCustomer || 0) < 0 ? C.red : C.text }}>{diffValue(itemProgress.uatCustomer, itemProgress.uatHmc)}</td>
           <td style={cellStyle}><input aria-label={`${topic.title} Production Customer`} type="number" step="any" value={itemProgress.productionCustomer || ''} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { productionCustomer: event.target.value })} style={{ ...progressFieldStyle, textAlign: 'right' }} /></td>
           <td style={cellStyle}><input aria-label={`${topic.title} Production HMC`} type="number" step="any" value={itemProgress.productionHmc || ''} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { productionHmc: event.target.value })} style={{ ...progressFieldStyle, textAlign: 'right' }} /></td>
-          <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 700, color: Number(itemProgress.productionCustomer || 0) - Number(itemProgress.productionHmc || 0) < 0 ? C.red : C.text }}>{diffValue(itemProgress.productionCustomer, itemProgress.productionHmc)}</td>
+          <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 700, color: Number(itemProgress.productionHmc || 0) - Number(itemProgress.productionCustomer || 0) < 0 ? C.red : C.text }}>{diffValue(itemProgress.productionCustomer, itemProgress.productionHmc)}</td>
         </>}
         {!requiresWorkSystem && <td style={cellStyle}><input aria-label={`${topic.title} JIRA ID`} value={itemProgress.jiraId} placeholder="HMC-123" disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { jiraId: event.target.value })} style={progressFieldStyle} /></td>}
         <td style={cellStyle}><input aria-label={`${topic.title} notes`} value={itemProgress.notes} placeholder="Notes" disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { notes: event.target.value })} style={progressFieldStyle} /></td>
@@ -470,7 +470,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
                   <th rowSpan={2} style={headerStyle}>Notes</th>
                 </tr>
                 <tr>
-                  {['Customer', 'HMC', 'Diff', 'Customer', 'HMC', 'Diff'].map((label, index) => <th key={`${label}-${index}`} style={{ ...headerStyle, textAlign: index % 3 === 2 ? 'right' : 'left' }}>{label}</th>)}
+                  {['Customer', 'HMC', 'HMC-CUSTOMER', 'Customer', 'HMC', 'HMC-CUSTOMER'].map((label, index) => <th key={`${label}-${index}`} style={{ ...headerStyle, textAlign: index % 3 === 2 ? 'right' : 'left' }}>{label}</th>)}
                 </tr>
               </> : <tr>
                 <th style={headerStyle}>No.</th>
