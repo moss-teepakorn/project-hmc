@@ -113,7 +113,7 @@ function ProjectChecklistTable({ project, category, workSystem, workSystemOrder 
   const workSystemOrderMap = new Map(workSystemOrder.map((system, index) => [system.trim().toLocaleLowerCase(), index]));
   const getWorkSystemOrder = (system?: string) => workSystemOrderMap.get(String(system || '').trim().toLocaleLowerCase()) ?? Number.MAX_SAFE_INTEGER;
   const matchingTopics = (topics || []).filter((topic) =>
-    topic.category === category && (category === 'project' || !workSystem || String(topic.workSystem || '').trim().toLocaleLowerCase() === workSystem.trim().toLocaleLowerCase())
+    topic.category === category && (category === 'project' || category === 'migrate-data' || !workSystem || String(topic.workSystem || '').trim().toLocaleLowerCase() === workSystem.trim().toLocaleLowerCase())
   );
   const currentTopics = !isLoaded ? [] : category === 'project'
     ? matchingTopics.filter((topic) => topic.stage).slice().sort((left, right) => (stageOrder.get(left.stage!)! - stageOrder.get(right.stage!)!) || left.orderNo - right.orderNo || left.title.localeCompare(right.title))
@@ -419,7 +419,7 @@ function ProjectChecklistTable({ project, category, workSystem, workSystemOrder 
           <div>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>{categoryLabel} Checklist</h3>
             <span style={{ display: 'block', marginTop: 4, color: C.text3, fontSize: 11 }}>
-              Topics are managed in Setup{requiresWorkSystem && workSystem ? ` · System Module: ${workSystem}` : ''}. Progress is stored in the project database.
+              Topics are managed in Setup{requiresWorkSystem && category !== 'migrate-data' && workSystem ? ` · System Module: ${workSystem}` : ''}. Progress is stored in the project database.
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -514,7 +514,7 @@ function ProjectChecklistTable({ project, category, workSystem, workSystemOrder 
                   );
                 })}
                 {currentTopics.length === 0 && (
-                  <tbody><tr><td colSpan={checklistColumnCount} style={{ padding: '10px 12px', color: C.text3, fontSize: 10 }}>{workSystem ? `No ${categoryLabel.toLowerCase()} topics configured for ${workSystem}.` : `No ${categoryLabel.toLowerCase()} topics configured in Setup.`}</td></tr></tbody>
+                  <tbody><tr><td colSpan={checklistColumnCount} style={{ padding: '10px 12px', color: C.text3, fontSize: 10 }}>{category !== 'migrate-data' && workSystem ? `No ${categoryLabel.toLowerCase()} topics configured for ${workSystem}.` : `No ${categoryLabel.toLowerCase()} topics configured in Setup.`}</td></tr></tbody>
                 )}
               </>
             )}
