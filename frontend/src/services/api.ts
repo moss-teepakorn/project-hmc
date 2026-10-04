@@ -1589,7 +1589,7 @@ export const milestoneApi = {
   getByProject: async (pid?: string): Promise<{ data: Milestone[] }> => {
     let q = supabase.from('milestones').select('*');
     if (pid) q = q.eq('project_id', pid);
-    q = q.order('created_at', { ascending: true });
+    q = q.order('due_date', { ascending: true, nullsFirst: false }).order('name', { ascending: true });
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     return { data: rowsToObjs<Milestone>(data || []) };

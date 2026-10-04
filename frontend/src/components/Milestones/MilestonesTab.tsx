@@ -156,8 +156,10 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
 
       {phases.map(phase => {
         const pms    = milestones.filter(m => m.phase === phase).sort((a, b) => {
-          const dueDateA = String(a.dueDate || '').trim();
-          const dueDateB = String(b.dueDate || '').trim();
+          const rawDueDateA = String(a.dueDate || '').trim();
+          const rawDueDateB = String(b.dueDate || '').trim();
+          const dueDateA = /^\d{4}-\d{2}-\d{2}$/.test(rawDueDateA) ? rawDueDateA : dmyToIso(rawDueDateA);
+          const dueDateB = /^\d{4}-\d{2}-\d{2}$/.test(rawDueDateB) ? rawDueDateB : dmyToIso(rawDueDateB);
           if (!dueDateA && dueDateB) return 1;
           if (dueDateA && !dueDateB) return -1;
           return dueDateA.localeCompare(dueDateB) || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
