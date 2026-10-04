@@ -52,8 +52,11 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
     return acc;
   }, {} as Record<string, number>);
   // Order phases by Phase 1..5 then any custom
+  const customPhases = [...new Set(milestones.map(m => m.phase))]
+    .filter(p => !PHASES.includes(p))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   const phases = PHASES.filter(p => milestones.some(m => m.phase === p))
-    .concat([...new Set(milestones.map(m => m.phase))].filter(p => !PHASES.includes(p)));
+    .concat(customPhases);
 
   const handleSave = async (form: Partial<Milestone>) => {
     try {
@@ -152,7 +155,13 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
       )}
 
       {phases.map(phase => {
-        const pms    = milestones.filter(m => m.phase === phase);
+        const pms    = milestones.filter(m => m.phase === phase).sort((a, b) => {
+          const dueDateA = String(a.dueDate || '').trim();
+          const dueDateB = String(b.dueDate || '').trim();
+          if (!dueDateA && dueDateB) return 1;
+          if (dueDateA && !dueDateB) return -1;
+          return dueDateA.localeCompare(dueDateB) || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+        });
         const pTotal = pms.reduce((s, m) => s + m.amount, 0);
         const phaseBudget = phaseBudgetByPhase[phase] ?? 0;
         return (
