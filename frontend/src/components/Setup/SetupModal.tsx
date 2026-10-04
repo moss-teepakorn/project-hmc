@@ -59,9 +59,13 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
     .filter((topic) => topic.category === category)
     .slice()
     .sort((left, right) => {
-      if (needsStage && left.stage !== right.stage) return String(left.stage || '').localeCompare(String(right.stage || ''));
+      if (needsStage) {
+        const leftStageOrder = PROJECT_CHECKLIST_STAGES.findIndex((stage) => stage.id === left.stage);
+        const rightStageOrder = PROJECT_CHECKLIST_STAGES.findIndex((stage) => stage.id === right.stage);
+        if (leftStageOrder !== rightStageOrder) return (leftStageOrder < 0 ? Infinity : leftStageOrder) - (rightStageOrder < 0 ? Infinity : rightStageOrder);
+      }
       if (needsWorkSystem && left.workSystem !== right.workSystem) return String(left.workSystem || '').localeCompare(String(right.workSystem || ''));
-      return left.orderNo - right.orderNo;
+      return left.orderNo - right.orderNo || left.title.localeCompare(right.title, undefined, { numeric: true, sensitivity: 'base' });
     });
   const orderGroupTopics = categoryTopics.filter((topic) =>
     (!needsStage || topic.stage === newStage) && (!needsWorkSystem || topic.workSystem === newWorkSystem)
