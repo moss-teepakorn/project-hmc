@@ -130,7 +130,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
     const doneMark = '__CHECKLIST_DONE__';
     let sequenceNo = 0;
     const columns = category === 'migrate-data'
-      ? ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'UAT Customer', 'UAT HMC', 'UAT HMC-CUSTOMER', 'Production Customer', 'Production HMC', 'Production HMC-CUSTOMER', 'Notes']
+      ? ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'UAT Customer', 'UAT HMC', 'UAT Diff', 'Production Customer', 'Production HMC', 'Production Diff', 'Notes']
       : requiresWorkSystem
         ? ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'Notes']
         : ['No.', 'Checklist Topic', 'Not Required', 'Done', 'Completion Date', 'Completed By', 'JIRA ID', 'Notes'];
@@ -143,7 +143,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
             { content: 'UAT Stage', colSpan: 3 }, { content: 'Production Stage', colSpan: 3 },
             { content: 'Notes', rowSpan: 2 },
           ],
-          ['Customer', 'HMC', 'HMC-CUSTOMER', 'Customer', 'HMC', 'HMC-CUSTOMER'],
+          ['Customer', 'HMC', 'Diff', 'Customer', 'HMC', 'Diff'],
         ]
       : [columns];
     const body: any[] = [];
@@ -396,7 +396,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
             style={{ width: 17, height: 17, accentColor: C.green, cursor: isNotRequired ? 'not-allowed' : 'pointer' }}
           />
         </td>
-        <td style={cellStyle}><input aria-label={`${topic.title} completion date`} type="date" value={itemProgress.completionDate} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { completionDate: event.target.value })} style={{ ...progressFieldStyle, width: 110, maxWidth: '100%' }} /></td>
+        <td style={cellStyle}><Input aria-label={`${topic.title} completion date`} type="date" value={itemProgress.completionDate} placeholder="dd/mm/yyyy" disabled={isNotRequired} onChange={(value) => updateProgress(topic.id, { completionDate: value })} style={{ width: 142, maxWidth: '100%' }} /></td>
         <td style={cellStyle}><input aria-label={`${topic.title} completed by`} value={itemProgress.completedBy} placeholder="Name" disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { completedBy: event.target.value })} style={progressFieldStyle} /></td>
         {category === 'migrate-data' && <>
           <td style={cellStyle}><input aria-label={`${topic.title} UAT Customer`} type="number" step="any" value={itemProgress.uatCustomer || ''} disabled={isNotRequired} onChange={(event) => updateProgress(topic.id, { uatCustomer: event.target.value })} style={{ ...progressFieldStyle, textAlign: 'right' }} /></td>
@@ -439,18 +439,18 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
           <table style={{ width: '100%', minWidth: 0, borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
             <colgroup>
               {category === 'migrate-data' ? <>
-                <col style={{ width: '4%' }} /><col style={{ width: '16%' }} />
+                <col style={{ width: '4%' }} /><col style={{ width: '13%' }} />
                 <col style={{ width: '7%' }} /><col style={{ width: '4%' }} />
-                <col style={{ width: '9%' }} /><col style={{ width: '11%' }} />
-                <col style={{ width: '7%' }} /><col style={{ width: '6%' }} /><col style={{ width: '5%' }} />
-                <col style={{ width: '7%' }} /><col style={{ width: '6%' }} /><col style={{ width: '5%' }} />
-                <col style={{ width: '13%' }} />
+                <col style={{ width: '11%' }} /><col style={{ width: '11%' }} />
+                <col style={{ width: '7%' }} /><col style={{ width: '6%' }} /><col style={{ width: '8%' }} />
+                <col style={{ width: '7%' }} /><col style={{ width: '6%' }} /><col style={{ width: '8%' }} />
+                <col style={{ width: '8%' }} />
               </> : <>
                 <col style={{ width: 64 }} />
                 <col style={{ width: 400 }} />
                 <col style={{ width: 88 }} />
                 <col style={{ width: 72 }} />
-                <col style={{ width: 130 }} />
+                <col style={{ width: 160 }} />
                 <col style={{ width: 160 }} />
                 {!requiresWorkSystem && <col style={{ width: 130 }} />}
                 <col />
@@ -470,7 +470,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
                   <th rowSpan={2} style={headerStyle}>Notes</th>
                 </tr>
                 <tr>
-                  {['Customer', 'HMC', 'HMC-CUSTOMER', 'Customer', 'HMC', 'HMC-CUSTOMER'].map((label, index) => <th key={`${label}-${index}`} style={{ ...headerStyle, textAlign: index % 3 === 2 ? 'right' : 'left' }}>{label}</th>)}
+                  {['Customer', 'HMC', 'Diff', 'Customer', 'HMC', 'Diff'].map((label, index) => <th key={`${label}-${index}`} style={{ ...headerStyle, textAlign: index % 3 === 2 ? 'right' : 'left' }}>{label}</th>)}
                 </tr>
               </> : <tr>
                 <th style={headerStyle}>No.</th>

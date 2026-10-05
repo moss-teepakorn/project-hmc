@@ -55,7 +55,8 @@ export const Btn: React.FC<{
 export const Input: React.FC<{
   value: string | number; onChange: (v: string) => void;
   placeholder?: string; type?: string; style?: React.CSSProperties; autoFocus?: boolean; list?: string;
-}> = ({ value, onChange, placeholder = '', type = 'text', style, autoFocus, list }) => {
+  disabled?: boolean; 'aria-label'?: string;
+}> = ({ value, onChange, placeholder = '', type = 'text', style, autoFocus, list, disabled = false, 'aria-label': ariaLabel }) => {
   const [draft, setDraft] = useState(type === 'date' ? (value ? isoToDmy(String(value)) : '') : String(value ?? ''));
   const [focused, setFocused] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -94,7 +95,7 @@ export const Input: React.FC<{
   };
 
   const openNativePicker = () => {
-    if (dateInputRef.current) {
+    if (!disabled && dateInputRef.current) {
       dateInputRef.current.showPicker?.();
       dateInputRef.current.focus();
     }
@@ -103,19 +104,19 @@ export const Input: React.FC<{
   if (type === 'date') {
     return (
       <div style={{ position: 'relative', width: '100%', ...style }}>
-        <input autoFocus={autoFocus} type="text" value={draft} placeholder={placeholder} list={list}
+        <input autoFocus={autoFocus} aria-label={ariaLabel} type="text" value={draft} placeholder={placeholder} list={list} disabled={disabled}
           onChange={e => handleDateChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={handleDateBlur}
           onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
           style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, padding: '8px 12px', border: `1.5px solid ${focused ? C.primary : C.border}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box', color: C.text, background: C.white, paddingRight: 40 }}
         />
-        <input ref={dateInputRef} type="date" value={value ? String(value) : ''}
+        <input ref={dateInputRef} type="date" value={value ? String(value) : ''} disabled={disabled}
           onChange={e => handleNativeDateChange(e.target.value)}
           style={{ position: 'absolute', right: 0, top: 0, width: 36, height: '100%', opacity: 0, border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, margin: 0 }}
         />
         <div onClick={openNativePicker}
-          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.text3, cursor: 'pointer', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.text3, cursor: disabled ? 'not-allowed' : 'pointer', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Calendar size={16} />
         </div>
       </div>
@@ -123,7 +124,7 @@ export const Input: React.FC<{
   }
 
   return (
-    <input autoFocus={autoFocus} type={type} value={value ?? ''} placeholder={placeholder} list={list}
+    <input autoFocus={autoFocus} aria-label={ariaLabel} type={type} value={value ?? ''} placeholder={placeholder} list={list} disabled={disabled}
       onChange={e => onChange(e.target.value)}
       style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, padding: '8px 12px', border: `1.5px solid ${C.border}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box', color: C.text, background: C.white, colorScheme: type === 'date' ? 'light' : undefined, ...style }}
       onFocus={e => (e.target.style.borderColor = C.primary)}
