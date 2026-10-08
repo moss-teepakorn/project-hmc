@@ -912,6 +912,10 @@ export const taskApi = {
       const row = objToRow({
         ...srcTask,
         projectId: targetProjectId,
+        startDate: null,
+        endDate: null,
+        actualFinish: null,
+        percentComplete: 0,
         parentId: srcTask.parentId ? (idMap.get(srcTask.parentId) || srcTask.parentId) : emptyRelationValue,
         relatedTask: emptyRelationValue,
         relatedTaskType: srcTask.relatedTaskType || 'FS',

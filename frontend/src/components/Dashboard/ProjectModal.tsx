@@ -37,7 +37,7 @@ function normalizeDescription(raw: string): string {
 }
 
 export default function ProjectModal({ project, onClose }: Props) {
-  const { createProject, updateProject, projects, masterCodes } = useStore();
+  const { createProject, updateProject, fetchTasks, projects, masterCodes } = useStore();
   const [saving, setSaving] = useState(false);
   const [copyFromProjectId, setCopyFromProjectId] = useState('');
   const [copyScope, setCopyScope] = useState<'all' | 'main'>('all');
@@ -94,8 +94,13 @@ export default function ProjectModal({ project, onClose }: Props) {
       else {
         const created = await createProject(form);
         if (copyFromProjectId) {
-          await taskApi.copyFromProject(copyFromProjectId, created.id, copyScope);
-          toast.success(copyScope === 'main' ? 'Project created with copied main tasks' : 'Project created with copied tasks');
+          const copied = await taskApi.copyFromProject(copyFromProjectId, created.id, copyScope);
+          await fetchTasks();
+          if (copied.data.length) {
+            toast.success(copyScope === 'main' ? `Project created with ${copied.data.length} main tasks` : `Project created with ${copied.data.length} tasks`);
+          } else {
+            toast('Project created, but the selected source has no tasks to copy');
+          }
         } else {
           toast.success('Project created');
         }

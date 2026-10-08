@@ -156,7 +156,20 @@ export const useStore = create<Store>((set, get) => ({
     set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
     try {
       await projectApi.remove(id);
-      set(s => ({ projects: s.projects.filter(p => p.id !== id), activeProject: null }));
+      set(s => ({
+        projects: s.projects.filter(p => p.id !== id),
+        activeProject: s.activeProject?.id === id ? null : s.activeProject,
+        tasks: s.tasks.filter(item => item.projectId !== id),
+        members: s.members.filter(item => item.projectId !== id),
+        milestones: s.milestones.filter(item => item.projectId !== id),
+        efforts: s.efforts.filter(item => item.projectId !== id),
+        changeRequests: s.changeRequests.filter(item => item.projectId !== id),
+        issues: s.issues.filter(item => item.projectId !== id),
+        risks: s.risks.filter(item => item.projectId !== id),
+        activities: s.activities.filter(item => item.projectId !== id),
+        projectEnvironments: s.projectEnvironments.filter(item => item.projectId !== id),
+        projectProgressSnapshots: s.projectProgressSnapshots.filter(item => item.projectId !== id),
+      }));
     } finally {
       set((s: any) => {
         const next = Math.max(0, (s._pendingMutationCount || 1) - 1);

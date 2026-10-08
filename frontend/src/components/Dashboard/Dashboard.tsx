@@ -8,7 +8,7 @@ import { useStore } from '../../store';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
-import { Card, Btn, Badge, ProgressBar, ConfirmModal, C, MILESTONE_STATUS, TH, TD } from '../Common';
+import { Card, Btn, Badge, ProgressBar, Modal, C, MILESTONE_STATUS, TH, TD } from '../Common';
 import { fmtDate, fmtMoney, compareWbs, computeBaselineProgress, getHalfMonthSnapshotDates } from '../../utils';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
@@ -16,6 +16,13 @@ import ProjectModal from './ProjectModal';
 const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care'];
 const STATUS_ACCENT_PALETTE = ['#B45309', '#0F766E', '#C2410C', '#2563EB', '#15803D', '#BE185D', '#6D28D9', '#4D7C0F', '#0369A1', '#A21CAF', '#B91C1C', '#475569'];
 const DASHBOARD_VIEW_STATE_KEY = 'dashboard-view-state';
+
+function getTodayDeletePassword(): string {
+  const today = new Date();
+  const day = String(today.getDate()).padStart(2, '0');
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  return `${day}${month}${today.getFullYear()}`;
+}
 
 function loadDashboardViewState(): { selectedProjectId: string | null } {
   try {
@@ -51,6 +58,8 @@ export default function Dashboard() {
   const [restoreDone, setRestoreDone] = useState<boolean>(() => !restoreSelectedProjectIdRef.current);
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletingProject, setDeletingProject] = useState(false);
   const [showAdd,    setShowAdd]    = useState(false);
   const [showHypercare, setShowHypercare] = useState(false);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -208,11 +217,34 @@ export default function Dashboard() {
     return roots.length ? Math.round(roots.reduce((s, t) => s + t.percentComplete, 0) / roots.length) : 0;
   };
 
+  const requestDelete = (project: Project) => {
+    setDeletePassword('');
+    setDeleting(project);
+  };
+
+  const cancelDelete = () => {
+    if (deletingProject) return;
+    setDeletePassword('');
+    setDeleting(null);
+  };
+
   const handleDelete = async () => {
     if (!deleting) return;
-    try { await deleteProject(deleting.id); toast.success('Project deleted'); }
-    catch { toast.error('Failed to delete'); }
-    setDeleting(null);
+    if (deletePassword !== getTodayDeletePassword()) {
+      toast.error("Password doesn't match today's date (DDMMYYYY)");
+      return;
+    }
+    setDeletingProject(true);
+    try {
+      await deleteProject(deleting.id);
+      toast.success('Project and all related data deleted');
+      setDeleting(null);
+      setDeletePassword('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete project');
+    } finally {
+      setDeletingProject(false);
+    }
   };
 
   const renderProjectCard = (p: Project, compact = false) => {
@@ -233,14 +265,14 @@ export default function Dashboard() {
           </div>
           <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             <button onClick={e => { e.stopPropagation(); setEditing(p); }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
               onMouseEnter={e => e.currentTarget.style.color = C.primary}
               onMouseLeave={e => e.currentTarget.style.color = C.text3}>
               <Pencil size={11} />
             </button>
-            <button onClick={e => { e.stopPropagation(); setDeleting(p); }}
+            <button onClick={e => { e.stopPropagation(); requestDelete(p); }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
               onMouseEnter={e => e.currentTarget.style.color = C.red}
               onMouseLeave={e => e.currentTarget.style.color = C.text3}>
@@ -350,7 +382,7 @@ export default function Dashboard() {
             ) : selected ? (
               <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onEdit={() => setEditing(selected)} canEdit={permissions.getScreenAccess('summary') === 'full'} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} onOpenWithTab={(tab) => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab } })), 80); }} isMobile={isMobile} />
             ) : permissions.canViewPortfolioOverview ? (
-              <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} onEdit={setEditing} onDelete={setDeleting} canEdit={canEditOverview} isMobile={isMobile} />
+              <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} onEdit={setEditing} onDelete={requestDelete} canEdit={canEditOverview} isMobile={isMobile} />
             ) : (
               <div style={{ padding: isMobile ? '18px 14px' : '28px 32px' }}>
                 <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: '0 0 16px' }}>My Projects</h2>
@@ -373,11 +405,32 @@ export default function Dashboard() {
       {showAdd  && <ProjectModal onClose={() => setShowAdd(false)} />}
       {editing  && <ProjectModal project={editing} onClose={() => setEditing(null)} />}
       {deleting && (
-        <ConfirmModal
-          message={`Delete "${deleting.name}" and all its data?`}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleting(null)}
-        />
+        <Modal title="Delete Project" onClose={cancelDelete} width={440}>
+          <p style={{ margin: '0 0 16px', color: C.text2, fontSize: 13, lineHeight: 1.5 }}>
+            Delete <strong style={{ color: C.text }}>{deleting.name}</strong> and all related database data? This cannot be undone.
+          </p>
+          <label htmlFor="delete-project-password" style={{ display: 'block', marginBottom: 6, color: C.text2, fontSize: 11, fontWeight: 700 }}>
+            Input Password to Delete Project
+          </label>
+          <input
+            id="delete-project-password"
+            autoFocus
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={8}
+            value={deletePassword}
+            onChange={(event) => setDeletePassword(event.currentTarget.value.replace(/\D/g, '').slice(0, 8))}
+            onKeyDown={(event) => { if (event.key === 'Enter' && deletePassword.length === 8) void handleDelete(); }}
+            style={{ width: '100%', boxSizing: 'border-box', border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '9px 12px', fontSize: 14, letterSpacing: 2, outline: 'none' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+            <Btn variant="ghost" onClick={cancelDelete} disabled={deletingProject}>Cancel</Btn>
+            <Btn variant="danger" onClick={handleDelete} disabled={deletingProject || deletePassword.length !== 8}>
+              {deletingProject ? 'Deleting…' : 'Delete Project'}
+            </Btn>
+          </div>
+        </Modal>
       )}
       {showEmailLogs && <EmailLogsModal onClose={() => setShowEmailLogs(false)} />}
     </div>
@@ -442,7 +495,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
             </span>
           </div>
           <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             {canEdit && <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(p); }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
               title="Edit Project"
@@ -556,21 +609,31 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{fmtDate(p.endDate)}</td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{stage}</td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{prog}%</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text, width: 56 }}>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text, width: 72, whiteSpace: 'nowrap' }}>
                       {canEdit && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEdit(p);
-                        }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'inline-flex', alignItems: 'center' }}
-                        title="Edit Project"
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.primary; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}
-                      >
-                        <Pencil size={12} />
-                      </button>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'inline-flex', alignItems: 'center' }}
+                            title="Edit Project"
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.primary; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Delete ${p.name}`}
+                            onClick={(e) => { e.stopPropagation(); onDelete(p); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'inline-flex', alignItems: 'center' }}
+                            title="Delete Project"
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.red; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -617,10 +680,10 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
                         <td style={{ padding: '11px 14px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap' }}>{fmtDate(project.endDate)}</td>
                         <td style={{ padding: '11px 14px', fontSize: 12, color: progress >= 100 ? C.green : C.amber, fontWeight: 700 }}>{progress}%</td>
                         <td style={{ padding: '8px 12px', width: 72, whiteSpace: 'nowrap' }}>
-                          {canEdit && <>
+                          {canEdit && <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
                             <button type="button" aria-label={`Edit ${project.name}`} onClick={(event) => { event.stopPropagation(); onEdit(project); }} style={{ border: 0, background: 'transparent', color: C.text3, padding: 5, cursor: 'pointer' }}><Pencil size={14} /></button>
                             <button type="button" aria-label={`Delete ${project.name}`} onClick={(event) => { event.stopPropagation(); onDelete(project); }} style={{ border: 0, background: 'transparent', color: C.text3, padding: 5, cursor: 'pointer' }}><Trash2 size={14} /></button>
-                          </>}
+                          </div>}
                         </td>
                       </tr>
                     );
