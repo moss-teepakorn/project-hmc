@@ -20,9 +20,14 @@ export async function checkProjectPermission(projectId: string, action: 'read' |
   if (role === 'admin') return true;
   const isMember = await isProjectMember(projectId, userId, email);
   if (screenId && screenPermissions) {
+    const inheritsLessonAccess = screenId === 'lessons'
+      && !Array.isArray(screenPermissions)
+      && !Object.prototype.hasOwnProperty.call(screenPermissions, screenId);
     const access = Array.isArray(screenPermissions)
       ? screenPermissions.includes(screenId) ? 'full' : 'hidden'
-      : screenPermissions[screenId] || 'hidden';
+      : inheritsLessonAccess
+        ? role === 'client' ? 'read' : 'full'
+        : screenPermissions[screenId] || 'hidden';
     if (access === 'hidden') return false;
     if (action === 'read') return projectAccessScope === 'all' || isMember;
     return access === 'full' && (projectAccessScope === 'all' || isMember);
@@ -141,7 +146,7 @@ import { compareWbs } from '../utils';
 
 import { supabase } from './supabase';
 import { parseISO, isValid } from 'date-fns';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem, Activity, Note } from '../types';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem, Activity, Note, ProjectLessonLearned } from '../types';
 import type { ProjectChecklistCategoryId, ProjectChecklistProgress, ProjectChecklistProgressEntry, ProjectChecklistTopic } from '../utils/projectChecklist';
 
 const TASK_DEPENDENCY_TYPES = new Set(['FS', 'SS', 'FF', 'SF']);
@@ -2029,6 +2034,82 @@ export const activityApi = {
     if (!ok) throw new Error('FORBIDDEN');
 
     const { error } = await supabase.from('activities').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+};
+
+// ── Lessons Learned ────────────────────────────────────────────────────────
+
+export const projectLessonsApi = {
+  getByProject: async (projectId: string): Promise<{ data: ProjectLessonLearned[] }> => {
+    const canRead = await checkProjectPermission(projectId, 'read', 'lessons');
+    if (!canRead) throw new Error('FORBIDDEN');
+    const { data, error } = await supabase
+      .from('project_lessons_learned')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('occurred_at', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<ProjectLessonLearned>(data || []) };
+  },
+
+  create: async (lesson: Partial<ProjectLessonLearned>): Promise<{ data: ProjectLessonLearned }> => {
+    const projectId = String(lesson.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const canWrite = await checkProjectPermission(projectId, 'write', 'lessons');
+    if (!canWrite) throw new Error('FORBIDDEN');
+    const { userId } = await getCurrentUserRoleAndId();
+    const row = objToRow({ ...lesson, createdBy: userId || null } as Record<string, unknown>);
+    delete row.id;
+    delete row.created_at;
+    delete row.updated_at;
+    row.due_date = row.due_date || null;
+    const { data, error } = await supabase.from('project_lessons_learned').insert(row).select().single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<ProjectLessonLearned>(data) };
+  },
+
+  update: async (id: string, lesson: Partial<ProjectLessonLearned>): Promise<{ data: ProjectLessonLearned }> => {
+    const { data: existing, error: lookupError } = await supabase
+      .from('project_lessons_learned')
+      .select('project_id')
+      .eq('id', id)
+      .maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || lesson.projectId || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const canWrite = await checkProjectPermission(projectId, 'write', 'lessons');
+    if (!canWrite) throw new Error('FORBIDDEN');
+    const row = objToRow(lesson as Record<string, unknown>);
+    delete row.id;
+    delete row.project_id;
+    delete row.created_by;
+    delete row.created_at;
+    delete row.updated_at;
+    if (row.due_date === '') row.due_date = null;
+    const { data, error } = await supabase
+      .from('project_lessons_learned')
+      .update(row)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<ProjectLessonLearned>(data) };
+  },
+
+  remove: async (id: string): Promise<void> => {
+    const { data: existing, error: lookupError } = await supabase
+      .from('project_lessons_learned')
+      .select('project_id')
+      .eq('id', id)
+      .maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    const projectId = String(existing?.project_id || '');
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const canWrite = await checkProjectPermission(projectId, 'write', 'lessons');
+    if (!canWrite) throw new Error('FORBIDDEN');
+    const { error } = await supabase.from('project_lessons_learned').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 };

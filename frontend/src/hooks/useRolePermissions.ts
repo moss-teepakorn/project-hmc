@@ -18,6 +18,9 @@ export function useRolePermissions(): RolePermissions & {
   const isAdmin = role === 'admin';
   const getScreenAccess = (screenId: string): ScreenAccessLevel => {
     if (isAdmin) return 'full';
+    if (screenId === 'lessons' && customScreens && !Array.isArray(customScreens) && !Object.prototype.hasOwnProperty.call(customScreens, screenId)) {
+      return isRoleTabVisible(screenId, role) ? 'full' : 'hidden';
+    }
     if (Array.isArray(customScreens)) return new Set(customScreens).has(screenId) ? 'full' : 'hidden';
     if (customScreens) return customScreens[screenId] || 'hidden';
     if (screenId === 'portfolio-overview') return permissions.canViewPortfolioOverview ? 'full' : 'hidden';

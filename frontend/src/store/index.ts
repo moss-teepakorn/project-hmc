@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, Activity, Note } from '../types';
-import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi, projectProgressApi, masterCodeApi, activityApi, noteApi } from '../services/api';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, Activity, Note, ProjectLessonLearned } from '../types';
+import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi, projectProgressApi, masterCodeApi, activityApi, noteApi, projectLessonsApi } from '../services/api';
 
 interface Store {
   _pendingMutationCount: number;
@@ -15,6 +15,7 @@ interface Store {
   issues: Issue[];
   risks: Risk[];
   activities: Activity[];
+  projectLessonsLearned: ProjectLessonLearned[];
   notes: Note[];
   projectEnvironments: ProjectEnvironment[];
   projectProgressSnapshots: ProjectProgressSnapshot[];
@@ -74,6 +75,11 @@ interface Store {
   updateActivity:  (id: string, a: Partial<Activity>) => Promise<void>;
   deleteActivity:  (id: string) => Promise<void>;
 
+  fetchProjectLessonsLearned: (pid: string) => Promise<boolean>;
+  createProjectLessonLearned: (lesson: Partial<ProjectLessonLearned>) => Promise<void>;
+  updateProjectLessonLearned: (id: string, lesson: Partial<ProjectLessonLearned>) => Promise<void>;
+  deleteProjectLessonLearned: (id: string) => Promise<void>;
+
   fetchNotes: () => Promise<void>;
   createNote: (note: Partial<Note>) => Promise<Note>;
   updateNote: (id: string, note: Partial<Note>) => Promise<Note>;
@@ -94,7 +100,7 @@ export const useStore = create<Store>((set, get) => ({
   _pendingMutationCount: 0,
   projects: [], projectsLoading: false, activeProject: null,
   tasks: [], members: [], milestones: [], efforts: [],
-  changeRequests: [], issues: [], risks: [], activities: [], projectEnvironments: [], projectProgressSnapshots: [], masterCodes: [],
+  changeRequests: [], issues: [], risks: [], activities: [], projectLessonsLearned: [], projectEnvironments: [], projectProgressSnapshots: [], masterCodes: [],
   notes: [],
   dataLoading: false, error: null,
 
@@ -167,6 +173,7 @@ export const useStore = create<Store>((set, get) => ({
         issues: s.issues.filter(item => item.projectId !== id),
         risks: s.risks.filter(item => item.projectId !== id),
         activities: s.activities.filter(item => item.projectId !== id),
+        projectLessonsLearned: s.projectLessonsLearned.filter(item => item.projectId !== id),
         projectEnvironments: s.projectEnvironments.filter(item => item.projectId !== id),
         projectProgressSnapshots: s.projectProgressSnapshots.filter(item => item.projectId !== id),
       }));
@@ -177,7 +184,7 @@ export const useStore = create<Store>((set, get) => ({
       });
     }
   },
-  setActiveProject: (p) => set({ activeProject: p, tasks: [], members: [], milestones: [], efforts: [], changeRequests: [], issues: [], risks: [], activities: [], projectEnvironments: [] }),
+  setActiveProject: (p) => set({ activeProject: p, tasks: [], members: [], milestones: [], efforts: [], changeRequests: [], issues: [], risks: [], activities: [], projectLessonsLearned: [], projectEnvironments: [] }),
 
   // ── Notes ──────────────────────────────────────────────────────────────────
   fetchNotes: async () => {
@@ -547,6 +554,53 @@ export const useStore = create<Store>((set, get) => ({
     try {
       await activityApi.remove(id);
       set((s) => ({ activities: s.activities.filter((x) => x.id !== id) }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+
+  // ── Lessons Learned ──────────────────────────────────────────────────────
+  fetchProjectLessonsLearned: async (pid) => {
+    try {
+      set({ projectLessonsLearned: (await projectLessonsApi.getByProject(pid)).data, error: null });
+      return true;
+    } catch (e) {
+      set({ error: (e as Error).message });
+      return false;
+    }
+  },
+  createProjectLessonLearned: async (lesson) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      const res = await projectLessonsApi.create(lesson);
+      set((s) => ({ projectLessonsLearned: [res.data, ...s.projectLessonsLearned] }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  updateProjectLessonLearned: async (id, lesson) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      const res = await projectLessonsApi.update(id, lesson);
+      set((s) => ({ projectLessonsLearned: s.projectLessonsLearned.map((item) => item.id === id ? res.data : item) }));
+    } finally {
+      set((s: any) => {
+        const next = Math.max(0, (s._pendingMutationCount || 1) - 1);
+        return { _pendingMutationCount: next, dataLoading: next > 0 };
+      });
+    }
+  },
+  deleteProjectLessonLearned: async (id) => {
+    set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));
+    try {
+      await projectLessonsApi.remove(id);
+      set((s) => ({ projectLessonsLearned: s.projectLessonsLearned.filter((item) => item.id !== id) }));
     } finally {
       set((s: any) => {
         const next = Math.max(0, (s._pendingMutationCount || 1) - 1);

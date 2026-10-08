@@ -26,6 +26,7 @@ export const USER_SCREEN_OPTIONS = [
   { id: 'ms', label: 'Milestones' },
   { id: 'effort', label: 'Effort' },
   { id: 'checklists', label: 'Checklist' },
+  { id: 'lessons', label: 'Lessons Learned' },
   { id: 'cr', label: 'Change Request' },
   { id: 'issues', label: 'Issues' },
   { id: 'risks', label: 'Risks' },
@@ -38,23 +39,23 @@ export const USER_SCREEN_IDS = USER_SCREEN_OPTIONS.map((screen) => screen.id);
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'checklists', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'checklists', 'lessons', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
     maskFinancialAmounts: false,
     canViewPortfolioOverview: true,
   },
   pm: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'checklists', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'checklists', 'lessons', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
     maskFinancialAmounts: true,
     canViewPortfolioOverview: true,
   },
   member: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'checklists', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'effort', 'checklists', 'lessons', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
     // Note: 'ms' (Milestone) is excluded
     maskFinancialAmounts: true,
     canViewPortfolioOverview: true,
   },
   client: {
-    visibleProjectTabs: ['tasks', 'summary', 'members', 'checklists', 'cr', 'issues', 'risks', 'activities', 'env'],
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'checklists', 'lessons', 'cr', 'issues', 'risks', 'activities', 'env'],
     // Note: 'ms' (Milestone), 'effort', 'report' are excluded
     maskFinancialAmounts: true,
     canViewPortfolioOverview: false,

@@ -17,6 +17,7 @@ import RiskRegisterTab   from '../RiskRegister/RiskRegisterTab';
 import ActivitiesTab     from '../Activities/ActivitiesTab';
 import ProjectEnvironmentTab from './ProjectEnvironmentTab';
 import ExecutiveOnePage  from './ExecutiveOnePage';
+import LessonsLearnedTab from './LessonsLearnedTab';
 import { useStore }      from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
@@ -701,6 +702,7 @@ export default function ProjectDetail({ project }: Props) {
     { id: 'ms',       label: 'Milestones', icon: '🏁', count: milestones.length },
     { id: 'effort',   label: 'Effort',     icon: '⚡', count: efforts.length },
     { id: 'checklists', label: 'Checklist', icon: '☑️' },
+    { id: 'lessons', label: 'Lessons Learned', icon: '💡' },
     { id: 'cr',       label: 'Change Req', icon: '📝', count: changeRequests.length },
     { id: 'issues',   label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
     { id: 'risks',    label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
@@ -828,6 +830,7 @@ export default function ProjectDetail({ project }: Props) {
             </div>
           </div>
         )}
+        {activeTab === 'lessons' && <div style={{ height: '100%', overflow: 'hidden' }}><LessonsLearnedTab key={project.id} project={project} /></div>}
         {activeTab === 'cr'      && <div style={{ height: '100%', overflowY: 'auto' }}><ChangeRequestTab  projectId={project.id} /></div>}
         {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
         {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} extraActions={copyButton('risks')} /></div>}

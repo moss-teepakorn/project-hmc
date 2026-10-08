@@ -171,9 +171,9 @@ export const ProgressBar: React.FC<{ value: number; color?: string; height?: num
   </div>
 );
 
-export const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; width?: number; height?: number | string; contentStyle?: React.CSSProperties }> = ({ title, onClose, children, width = 540, height, contentStyle }) => (
+export const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; width?: number; height?: number | string; contentStyle?: React.CSSProperties; closeOnBackdrop?: boolean }> = ({ title, onClose, children, width = 540, height, contentStyle, closeOnBackdrop = true }) => (
   <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-    <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
+    <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }} onClick={closeOnBackdrop ? onClose : undefined} />
     <div style={{ position: 'relative', display: height ? 'flex' : undefined, flexDirection: height ? 'column' : undefined, background: C.white, borderRadius: 16, width, height, maxWidth: 'calc(100vw - 32px)', maxHeight: '92vh', overflowY: height ? 'hidden' : 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: 'Poppins, sans-serif' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, background: C.white, zIndex: 1, flexShrink: 0 }}>
         <span style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{title}</span>

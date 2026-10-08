@@ -130,7 +130,7 @@ export interface TaskTemplate {
   id: string;
   templateNo: number;
   name: string;
-  createdBy: string;
+  createdBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -207,6 +207,28 @@ export interface Activity {
   channel: 'Online' | 'Onsite' | 'Email' | 'MS Teams' | 'Line' | 'Other';
   title: string;
   description: string;
+}
+
+export interface ProjectLessonLearned {
+  id: string;
+  projectId: string;
+  title: string;
+  category: 'success' | 'challenge' | 'process' | 'technical' | 'communication' | 'vendor';
+  phase: string;
+  occurredAt: string;
+  context: string;
+  impact: string;
+  rootCause: string;
+  lesson: string;
+  recommendation: string;
+  followUp: string;
+  owner: string;
+  dueDate: string | null;
+  status: 'Open' | 'In Progress' | 'Done';
+  referenceUrl: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ViewMode = 'table' | 'split' | 'gantt' | 'kanban';
