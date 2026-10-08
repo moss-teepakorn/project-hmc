@@ -25,6 +25,7 @@ const TABLE_BOTTOM_SPACER_ROWS = 4;
 type TaskColumnId =
   | 'wbs'
   | 'taskName'
+  | 'predecessors'
   | 'startDate'
   | 'endDate'
   | 'actualFinish'
@@ -38,6 +39,7 @@ const COLS: Array<{ id: TaskColumnId; label: string; w: number; canHide: boolean
   { id: 'wbs',             label: 'WBS',           w: 52,  canHide: false },
   { id: 'taskName',        label: 'Task Name',     w: 420, canHide: false },
   { id: 'duration',        label: 'Days',          w: 72,  canHide: true },
+  { id: 'predecessors',    label: 'Predecessors',  w: 125, canHide: true },
   { id: 'startDate',       label: 'Start',         w: 130, canHide: true },
   { id: 'endDate',         label: 'Finish',        w: 130, canHide: true },
   { id: 'actualFinish',    label: 'Actual Finish', w: 130, canHide: true },
@@ -46,7 +48,7 @@ const COLS: Array<{ id: TaskColumnId; label: string; w: number; canHide: boolean
   { id: 'resource',        label: 'Resource',      w: 160, canHide: true },
   { id: 'actions',         label: '',              w: 66,  canHide: true },
 ];
-const MIN_COLUMN_WIDTHS = [44, 220, 56, 110, 110, 110, 64, 72, 96, 50];
+const MIN_COLUMN_WIDTHS = [44, 220, 56, 92, 110, 110, 110, 64, 72, 96, 50];
 const DEFAULT_COLUMN_VISIBILITY: Record<TaskColumnId, boolean> = COLS.reduce((acc, col) => {
   acc[col.id] = true;
   return acc;
@@ -66,12 +68,76 @@ const PHASE_OPTIONS = [
 
 const TASK_STATUS_OPTIONS = ['Todo', 'In Progress', 'Block/Delay', 'Done'] as const;
 const TASK_DEPENDENCY_OPTIONS = ['FS', 'SS', 'FF', 'SF'] as const;
+type TaskDependencyType = (typeof TASK_DEPENDENCY_OPTIONS)[number];
 
-function toDependencyType(value: unknown): 'FS' | 'SS' | 'FF' | 'SF' {
+type ParsedPredecessor = {
+  wbs: string;
+  type: TaskDependencyType;
+  lagDays: number;
+};
+
+function toDependencyType(value: unknown): TaskDependencyType {
   const normalized = String(value || 'FS').trim().toUpperCase();
   return (TASK_DEPENDENCY_OPTIONS as readonly string[]).includes(normalized)
-    ? (normalized as 'FS' | 'SS' | 'FF' | 'SF')
+    ? (normalized as TaskDependencyType)
     : 'FS';
+}
+
+function parsePredecessorInput(value: string): ParsedPredecessor | null {
+  const match = String(value || '').trim().match(/^(.+?)(?:\s*(FS|SS|FF|SF))?(?:\s*([+-])\s*(\d+)\s*d?)?$/i);
+  if (!match) return null;
+  const wbs = match[1].trim();
+  if (!wbs) return null;
+  const magnitude = Number(match[4] || 0);
+  if (!Number.isSafeInteger(magnitude)) return null;
+  const lagDays = match[3] === '-' ? -magnitude : magnitude;
+  return { wbs, type: toDependencyType(match[2]), lagDays };
+}
+
+function formatPredecessorInput(task: Pick<Task, 'relatedTask' | 'relatedTaskType' | 'relatedTaskLagDays'>, tasks: Task[]): string {
+  if (!task.relatedTask) return '';
+  const predecessor = tasks.find((item) => item.id === task.relatedTask);
+  if (!predecessor) return '';
+  const type = toDependencyType(task.relatedTaskType);
+  const lagDays = Math.trunc(Number(task.relatedTaskLagDays || 0));
+  return `${predecessor.wbs || ''}${type === 'FS' ? '' : type}${lagDays ? `${lagDays > 0 ? '+' : ''}${lagDays}d` : ''}`;
+}
+
+function getDependencyStartDate(
+  predecessorStart: Date,
+  predecessorEnd: Date,
+  dependencyType: TaskDependencyType,
+  lagDays: number,
+  durationDays: number,
+): Date {
+  if (dependencyType === 'SS') {
+    return nextWorkingOnOrAfter(addWorkingDays(predecessorStart, lagDays));
+  }
+  if (dependencyType === 'FF') {
+    const constrainedFinish = addWorkingDays(predecessorEnd, lagDays);
+    return nextWorkingOnOrAfter(addWorkingDays(constrainedFinish, -(durationDays - 1)));
+  }
+  if (dependencyType === 'SF') {
+    const constrainedFinish = addWorkingDays(predecessorStart, lagDays);
+    return nextWorkingOnOrAfter(addWorkingDays(constrainedFinish, -(durationDays - 1)));
+  }
+  return nextWorkingOnOrAfter(addWorkingDays(predecessorEnd, 1 + lagDays));
+}
+
+function calculateDependencyDateRange(
+  predecessor: Pick<Task, 'startDate' | 'endDate' | 'duration'>,
+  dependencyType: TaskDependencyType,
+  lagDays: number,
+  durationDays: number,
+): { startDate: string; endDate: string } | null {
+  const predecessorStart = parseIsoDateSafe(predecessor.startDate);
+  const predecessorDuration = Math.max(1, Math.trunc(Number(predecessor.duration || 0)) || calcDuration(predecessor.startDate, predecessor.endDate) || 1);
+  const predecessorEnd = parseIsoDateSafe(predecessor.endDate)
+    || (predecessorStart ? parseIsoDateSafe(calculateEndDateFromWorkingDays(toIso(predecessorStart), predecessorDuration)) : null);
+  if (!predecessorStart || !predecessorEnd) return null;
+  const scheduledStart = getDependencyStartDate(predecessorStart, predecessorEnd, dependencyType, lagDays, Math.max(1, durationDays));
+  const startDate = toIso(scheduledStart);
+  return { startDate, endDate: calculateEndDateFromWorkingDays(startDate, durationDays) };
 }
 
 type TaskStatus = (typeof TASK_STATUS_OPTIONS)[number];
@@ -741,22 +807,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       const predecessor = getScheduledAnchor(task.relatedTask);
       if (!predecessor) return null;
 
-      const depType = String(task.relatedTaskType || 'FS').toUpperCase();
       const lag = Math.trunc(Number(task.relatedTaskLagDays || 0));
-
-      if (depType === 'SS') {
-        return nextWorkingOnOrAfter(addWorkingDays(predecessor.start, lag));
-      }
-      if (depType === 'FF') {
-        const constrainedFinish = addWorkingDays(predecessor.end, lag);
-        return nextWorkingOnOrAfter(addWorkingDays(constrainedFinish, -(durationDays - 1)));
-      }
-      if (depType === 'SF') {
-        const constrainedFinish = addWorkingDays(predecessor.start, lag);
-        return nextWorkingOnOrAfter(addWorkingDays(constrainedFinish, -(durationDays - 1)));
-      }
-
-      return nextWorkingOnOrAfter(addWorkingDays(predecessor.end, 1 + lag));
+      return getDependencyStartDate(predecessor.start, predecessor.end, toDependencyType(task.relatedTaskType), lag, durationDays);
     };
 
     let pending = [...leafTasks];
@@ -1342,9 +1394,79 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     }
     const currentTask = projectTasks.find((task) => task.id === id);
     if (!currentTask) return;
-    const endDate = calculateEndDateFromWorkingDays(String(currentTask.startDate || ''), duration);
-    try { await updateTask(id, { duration, endDate }); }
+    const predecessor = currentTask.relatedTask ? projectTasks.find((task) => task.id === currentTask.relatedTask) : undefined;
+    const dependencyDates = predecessor && duration > 0
+      ? calculateDependencyDateRange(predecessor, toDependencyType(currentTask.relatedTaskType), Number(currentTask.relatedTaskLagDays || 0), duration)
+      : null;
+    const startDate = dependencyDates?.startDate || String(currentTask.startDate || '');
+    const endDate = dependencyDates?.endDate || calculateEndDateFromWorkingDays(startDate, duration);
+    try { await updateTask(id, { duration, startDate, endDate }); }
     catch { toast.error('Failed to save'); }
+  }, [projectTasks, updateTask]);
+
+  const handleUpdatePredecessor = useCallback(async (task: TaskRow, value: string) => {
+    const raw = String(value || '').trim();
+    const clearDependency = !raw;
+    const parsed = clearDependency ? null : parsePredecessorInput(raw);
+    if (!clearDependency && !parsed) {
+      toast.error('รูปแบบ Predecessors ไม่ถูกต้อง เช่น 2, 1FS+2d, 3SS+1d');
+      return;
+    }
+
+    if (clearDependency) {
+      const updates = { relatedTask: '', relatedTaskType: 'FS' as const, relatedTaskLagDays: 0 };
+      if (isNewTaskInsert(task)) {
+        setNewTaskInsert((current) => current?.id === task.id ? { ...current, ...updates } : current);
+      } else {
+        try { await updateTask(task.id, updates); }
+        catch { toast.error('Failed to save predecessor'); }
+      }
+      return;
+    }
+
+    const matches = projectTasks.filter((item) => String(item.wbs || '').trim() === parsed!.wbs);
+    if (matches.length !== 1) {
+      toast.error(matches.length ? `WBS ${parsed!.wbs} is not unique` : `ไม่พบ Task WBS ${parsed!.wbs}`);
+      return;
+    }
+    const predecessor = matches[0];
+    if (predecessor.id === task.id) {
+      toast.error('Task cannot depend on itself');
+      return;
+    }
+
+    const taskById = new Map(projectTasks.map((item) => [item.id, item]));
+    const visited = new Set<string>();
+    let current: Task | undefined = predecessor;
+    while (current) {
+      if (current.id === task.id || visited.has(current.id)) {
+        toast.error('Dependency would create a cycle');
+        return;
+      }
+      visited.add(current.id);
+      current = current.relatedTask ? taskById.get(current.relatedTask) : undefined;
+    }
+
+    const durationDays = Math.max(1, Math.trunc(Number(task.duration || 0)) || calcDuration(task.startDate, task.endDate) || 1);
+    const dependencyDates = calculateDependencyDateRange(predecessor, parsed!.type, parsed!.lagDays, durationDays);
+    if (!dependencyDates) {
+      toast.error('Predecessor must have a valid Start and Finish date');
+      return;
+    }
+
+    const updates = {
+      relatedTask: predecessor.id,
+      relatedTaskType: parsed!.type,
+      relatedTaskLagDays: parsed!.lagDays,
+      ...dependencyDates,
+    };
+
+    if (isNewTaskInsert(task)) {
+      setNewTaskInsert((currentTask) => currentTask?.id === task.id ? { ...currentTask, ...updates } : currentTask);
+    } else {
+      try { await updateTask(task.id, updates); }
+      catch { toast.error('Failed to save predecessor'); }
+    }
   }, [projectTasks, updateTask]);
 
   const handlePct = useCallback(async (id: string, pct: number) => {
@@ -2213,6 +2335,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: C.text2 }}>
                     <span>{task.resource || 'No owner'}</span>
                     <span>{task.startDate ? isoToDmy(task.startDate) : 'TBD'} — {task.endDate ? isoToDmy(task.endDate) : 'TBD'}</span>
+                    <span>Predecessor: {formatPredecessorInput(task, projectTasks) || '—'}</span>
                     <span>{Number(task.effortManday || 0).toFixed(3)} MD</span>
                   </div>
                 ) : (
@@ -2234,6 +2357,12 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                   <div><strong style={{ color: C.text, fontWeight: 600 }}>Finish:</strong> {task.endDate ? isoToDmy(task.endDate) : '—'}</div>
                   <div><strong style={{ color: C.text, fontWeight: 600 }}>Actual:</strong> {task.actualFinish ? isoToDmy(task.actualFinish) : '—'}</div>
                   <div><strong style={{ color: C.text, fontWeight: 600 }}>Days:</strong> {task.duration}d</div>
+                  <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <strong style={{ color: C.text, fontWeight: 600, flexShrink: 0 }}>Predecessor:</strong>
+                    <div style={{ minWidth: 140, flex: 1 }}>
+                      <EditableCell value={formatPredecessorInput(task, projectTasks)} placeholder="e.g. 1FS+2d" onSave={(value) => handleUpdatePredecessor(task, value)} />
+                    </div>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 11, color: C.text2 }}>
@@ -2408,10 +2537,15 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                               return;
                             }
                             if (isNew) {
+                              const predecessor = newRow.relatedTask ? projectTasks.find((task) => task.id === newRow.relatedTask) : undefined;
+                              const dependencyDates = predecessor && duration > 0
+                                ? calculateDependencyDateRange(predecessor, toDependencyType(newRow.relatedTaskType), Number(newRow.relatedTaskLagDays || 0), duration)
+                                : null;
                               setNewTaskInsert((prev) => prev ? {
                                 ...prev,
                                 duration,
-                                endDate: calculateEndDateFromWorkingDays(prev.startDate, duration),
+                                startDate: dependencyDates?.startDate || prev.startDate,
+                                endDate: dependencyDates?.endDate || calculateEndDateFromWorkingDays(prev.startDate, duration),
                               } : prev);
                             } else {
                               handleUpdateDuration(rowTask.id, value);
@@ -2420,8 +2554,17 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                         />
                       </div>
                     )}
-                    {isColumnVisible('startDate') && (
+                    {isColumnVisible('predecessors') && (
                       <div style={{ width:renderedColumnWidths[3], minWidth:renderedColumnWidths[3], padding:'0 6px', flexShrink:0 }}>
+                        <EditableCell
+                          value={formatPredecessorInput(task, projectTasks)}
+                          placeholder="e.g. 1FS+2d"
+                          onSave={(value) => handleUpdatePredecessor(task, value)}
+                        />
+                      </div>
+                    )}
+                    {isColumnVisible('startDate') && (
+                      <div style={{ width:renderedColumnWidths[4], minWidth:renderedColumnWidths[4], padding:'0 6px', flexShrink:0 }}>
                         <EditableCell
                           type="date"
                           value={isNew ? toDisplayDmy(newRow.startDate) : isoToDmy(rowTask.startDate)}
@@ -2443,7 +2586,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('endDate') && (
-                      <div style={{ width:renderedColumnWidths[4], minWidth:renderedColumnWidths[4], padding:'0 6px', flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[5], minWidth:renderedColumnWidths[5], padding:'0 6px', flexShrink:0 }}>
                         <EditableCell
                           type="date"
                           value={isNew ? toDisplayDmy(newRow.endDate) : isoToDmy(rowTask.endDate)}
@@ -2465,7 +2608,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('actualFinish') && (
-                      <div style={{ width:renderedColumnWidths[5], minWidth:renderedColumnWidths[5], padding:'0 6px', flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[6], minWidth:renderedColumnWidths[6], padding:'0 6px', flexShrink:0 }}>
                         <EditableCell
                           type="date"
                           value={isNew ? toDisplayDmy(newRow.actualFinish) : rowTask.actualFinish ? isoToDmy(rowTask.actualFinish) : ''}
@@ -2480,7 +2623,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('percentComplete') && (
-                      <div style={{ width:renderedColumnWidths[6], minWidth:renderedColumnWidths[6], padding:'0 6px', flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[7], minWidth:renderedColumnWidths[7], padding:'0 6px', flexShrink:0 }}>
                         {isNew ? (
                           <PctCell value={newRow.percentComplete} isParent={false} onSave={(n) => setNewTaskInsert((prev) => prev ? { ...prev, percentComplete: n } : prev)} />
                         ) : (
@@ -2489,7 +2632,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('effortManday') && (
-                      <div style={{ width:renderedColumnWidths[7], minWidth:renderedColumnWidths[7], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[8], minWidth:renderedColumnWidths[8], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>
                         {isNew ? (
                           <EditableCell
                             value={String(newRow.effortManday || 0)}
@@ -2516,7 +2659,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('resource') && (
-                      <div style={{ width:renderedColumnWidths[8], minWidth:renderedColumnWidths[8], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[9], minWidth:renderedColumnWidths[9], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
                         {!isNew && rowTask.resource && <Avatar name={rowTask.resource} size={20} />}
                         <EditableCell
                           value={isNew ? newRow.resource : rowTask.resource}
@@ -2529,7 +2672,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('actions') && (
-                      <div style={{ width:renderedColumnWidths[9], minWidth:renderedColumnWidths[9], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
+                      <div style={{ width:renderedColumnWidths[10], minWidth:renderedColumnWidths[10], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
                         {isNew ? (
                           <>
                             <button onClick={e => { e.stopPropagation(); saveNewTask(); }}
