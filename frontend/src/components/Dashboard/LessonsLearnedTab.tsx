@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BookOpen, Check, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { BookOpen, Check, Download, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import jsPDF from 'jspdf';
 import { Btn, Card, C, ConfirmModal, FormRow, Input, Modal, Select, Textarea } from '../Common';
 import { fmtDate, todayISO } from '../../utils';
 import { useStore } from '../../store';
@@ -86,12 +87,211 @@ export default function LessonsLearnedTab({ project }: { project: Project }) {
 
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return [...lessons]
+    return lessons
+      .filter((item) => item.projectId === project.id)
       .filter((item) => !categoryFilter || item.category === categoryFilter)
       .filter((item) => !statusFilter || item.status === statusFilter)
       .filter((item) => !term || [item.title, item.context, item.lesson, item.recommendation, item.owner].some((value) => String(value || '').toLowerCase().includes(term)))
       .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-  }, [categoryFilter, lessons, query, statusFilter]);
+  }, [categoryFilter, lessons, project.id, query, statusFilter]);
+
+  const projectLessons = useMemo(
+    () => lessons.filter((item) => item.projectId === project.id),
+    [lessons, project.id],
+  );
+
+  const exportPDF = async () => {
+    let exportHost: HTMLDivElement | null = null;
+    let exportRoot: HTMLDivElement | null = null;
+    const thaiFontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Regular.ttf';
+    const thaiBoldFontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Bold.ttf';
+    const applyTextFont = (element: HTMLElement, value: string, bold = false) => {
+      element.style.fontFamily = 'Sarabun, sans-serif';
+      element.style.fontWeight = bold ? '700' : '400';
+    };
+
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const loadFont = async (family: string, weight: string, url: string) => {
+        const face = new FontFace(family, `url(${url})`, { weight });
+        await face.load();
+        document.fonts.add(face);
+      };
+      await Promise.all([
+        loadFont('Sarabun', '400', thaiFontUrl),
+        loadFont('Sarabun', '700', thaiBoldFontUrl),
+      ]);
+      await document.fonts.ready;
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - margin * 2;
+      const footerY = pageHeight - 12;
+      const topY = 10;
+      const generatedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      exportHost = document.createElement('div');
+      exportHost.style.cssText = 'position:fixed;inset:0;pointer-events:none;opacity:0;z-index:-1;';
+      exportRoot = document.createElement('div');
+      exportRoot.style.cssText = 'width:794px;background:#fff;color:#1e293b;padding:0;';
+      exportHost.appendChild(exportRoot);
+      document.body.appendChild(exportHost);
+
+      const createText = (text: string, style: Partial<CSSStyleDeclaration> = {}, bold = false) => {
+        const element = document.createElement('div');
+        element.textContent = text;
+        applyTextFont(element, text, bold);
+        Object.assign(element.style, style);
+        return element;
+      };
+
+      const header = document.createElement('div');
+      header.style.cssText = 'padding:14px 22px 16px;background:#1e293b;border-bottom:4px solid #14b8a6;color:#fff;';
+      const headerTop = document.createElement('div');
+      headerTop.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:20px;';
+      headerTop.appendChild(createText('PROJECT LESSONS LEARNED', { color: '#cbd5e1', fontSize: '12px', letterSpacing: '1px' }, true));
+      headerTop.appendChild(createText(`GENERATED ${generatedDate.toUpperCase()}`, { color: '#cbd5e1', fontSize: '11px', textAlign: 'right' }));
+      header.appendChild(headerTop);
+      const projectHeading = `${project.name || 'Project'}${project.code ? `  |  ${project.code}` : ''}`;
+      header.appendChild(createText(projectHeading, { marginTop: '8px', color: '#fff', fontSize: '23px', lineHeight: '1.3' }, true));
+      if (project.client) header.appendChild(createText(project.client, { marginTop: '3px', color: '#cbd5e1', fontSize: '14px' }));
+      exportRoot.appendChild(header);
+
+      const total = projectLessons.length;
+      const openCount = projectLessons.filter((item) => item.followUp.trim() && item.status !== 'Done').length;
+      const doneCount = projectLessons.filter((item) => item.status === 'Done').length;
+      const summary = document.createElement('div');
+      summary.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0 22px;';
+      [
+        { label: 'TOTAL LESSONS', value: total, color: '#0f766e' },
+        { label: 'OPEN FOLLOW-UPS', value: openCount, color: '#b45309' },
+        { label: 'COMPLETED', value: doneCount, color: '#047857' },
+      ].forEach((item) => {
+        const stat = document.createElement('div');
+        stat.style.cssText = 'padding:10px 16px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;';
+        stat.appendChild(createText(item.label, { color: '#64748b', fontSize: '11px' }, true));
+        stat.appendChild(createText(String(item.value), { marginTop: '5px', color: item.color, fontSize: '24px' }, true));
+        summary.appendChild(stat);
+      });
+      exportRoot.appendChild(summary);
+
+      const summaryCanvas = await html2canvas(summary, { scale: 2, backgroundColor: '#fff', logging: false });
+      const headerCanvas = await html2canvas(header, { scale: 2, backgroundColor: '#172534', logging: false });
+      const pageHeaderHeight = (headerCanvas.height * contentWidth) / headerCanvas.width;
+      let y = topY;
+      const addPageHeader = () => {
+        doc.addImage(headerCanvas.toDataURL('image/png'), 'PNG', margin, topY, contentWidth, pageHeaderHeight);
+        y = topY + pageHeaderHeight + 7;
+      };
+      const addPage = () => {
+        doc.addPage();
+        addPageHeader();
+      };
+      addPageHeader();
+
+      const addCanvas = (canvas: HTMLCanvasElement) => {
+        const imageHeight = (canvas.height * contentWidth) / canvas.width;
+        const availableHeight = footerY - 5 - y;
+        if (imageHeight <= availableHeight) {
+          doc.addImage(canvas.toDataURL('image/png'), 'PNG', margin, y, contentWidth, imageHeight);
+          y += imageHeight + 5;
+          return;
+        }
+        if (y > topY + pageHeaderHeight + 8) addPage();
+        const maxSliceHeight = Math.max(1, Math.floor(((footerY - 5 - y) * canvas.width) / contentWidth));
+        let sourceY = 0;
+        while (sourceY < canvas.height) {
+          const sliceHeight = Math.min(maxSliceHeight, canvas.height - sourceY);
+          const slice = document.createElement('canvas');
+          slice.width = canvas.width;
+          slice.height = sliceHeight;
+          const context = slice.getContext('2d');
+          if (!context) throw new Error('Unable to render PDF page');
+          context.drawImage(canvas, 0, sourceY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+          const drawnHeight = (sliceHeight * contentWidth) / canvas.width;
+          doc.addImage(slice.toDataURL('image/png'), 'PNG', margin, y, contentWidth, drawnHeight);
+          sourceY += sliceHeight;
+          if (sourceY < canvas.height) addPage();
+          else y += drawnHeight + 5;
+        }
+      };
+
+      addCanvas(summaryCanvas);
+      if (!total) {
+        const empty = createText('No lessons have been recorded for this project.', { padding: '20px', color: '#64748b', fontSize: '14px' });
+        exportRoot.replaceChildren(empty);
+        addCanvas(await html2canvas(empty, { scale: 2, backgroundColor: '#fff', logging: false }));
+      }
+
+      for (const [index, item] of projectLessons.entries()) {
+        const card = document.createElement('article');
+        card.style.cssText = 'margin:0 0 12px;border:1px solid #dbe4e8;border-radius:6px;overflow:hidden;background:#fff;';
+        const cardHeading = document.createElement('div');
+        cardHeading.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;background:#1e293b;';
+        cardHeading.appendChild(createText(`${String(index + 1).padStart(2, '0')}  ${item.title || 'Untitled lesson'}`, { color: '#fff', fontSize: '16px', lineHeight: '1.45', overflowWrap: 'anywhere', flex: '1' }, true));
+        cardHeading.appendChild(createText(String(item.status || 'Open').toUpperCase(), { flexShrink: '0', color: '#99f6e4', fontSize: '11px' }, true));
+        card.appendChild(cardHeading);
+        const metadata = `${item.category}  |  ${item.phase}  |  ${fmtDate(item.occurredAt)}`;
+        card.appendChild(createText(metadata, { padding: '8px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontSize: '12px' }));
+        const fieldList = document.createElement('div');
+        fieldList.style.cssText = 'padding:13px 16px 2px;';
+
+        const fields = [
+          ['Event and context', item.context], ['Impact / outcome', item.impact],
+          ['Root cause', item.rootCause], ['Lesson learned', item.lesson],
+          ['Recommendation', item.recommendation], ['Follow-up action', item.followUp],
+        ].filter(([, value]) => String(value || '').trim());
+        fields.forEach(([label, value]) => {
+          const field = document.createElement('section');
+          field.style.cssText = 'margin:0 0 10px;';
+          field.appendChild(createText(String(label).toUpperCase(), {
+            boxSizing: 'border-box',
+            minHeight: '27px',
+            marginBottom: '5px',
+            padding: '4px 9px',
+            borderLeft: '3px solid #0f766e',
+            background: '#ecfeff',
+            color: '#115e59',
+            fontSize: '12px',
+            lineHeight: '19px',
+          }, true));
+          field.appendChild(createText(String(value), { color: '#334155', fontSize: '13px', lineHeight: '1.55', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }));
+          fieldList.appendChild(field);
+        });
+        const actionDetails = [item.owner && `Owner: ${item.owner}`, item.dueDate && `Due: ${fmtDate(item.dueDate)}`, item.referenceUrl && `Reference: ${item.referenceUrl}`]
+          .filter(Boolean).join('  |  ');
+        if (actionDetails) fieldList.appendChild(createText(actionDetails, { padding: '9px 0 10px', borderTop: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', lineHeight: '1.5', overflowWrap: 'anywhere' }));
+        card.appendChild(fieldList);
+        exportRoot.replaceChildren(card);
+        addCanvas(await html2canvas(card, { scale: 2, backgroundColor: '#fff', logging: false }));
+      }
+
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        const footer = document.createElement('div');
+        footer.style.cssText = 'box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;width:794px;height:42px;padding:0 12px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;line-height:20px;';
+        footer.appendChild(createText('Project Lessons Learned', { lineHeight: '20px' }));
+        footer.appendChild(createText(`Page ${page} of ${pageCount}`, { textAlign: 'right', lineHeight: '20px' }));
+        exportRoot.replaceChildren(footer);
+        const footerCanvas = await html2canvas(footer, { scale: 2, backgroundColor: '#fff', logging: false });
+        const footerHeight = (footerCanvas.height * contentWidth) / footerCanvas.width;
+        doc.addImage(footerCanvas.toDataURL('image/png'), 'PNG', margin, footerY - footerHeight, contentWidth, footerHeight);
+      }
+
+      const customerAbbreviation = String(project.customerAbbreviation || project.code || 'Project')
+        .trim()
+        .replace(/[\\/:*?"<>|]/g, '-')
+        .replace(/\s+/g, ' ');
+      doc.save(`${customerAbbreviation} Lessons Learned.pdf`);
+      toast.success('Lessons Learned PDF exported');
+    } catch {
+      toast.error('Could not create PDF. Check your connection and try again.');
+    } finally {
+      exportHost?.remove();
+    }
+  };
 
   const openNew = () => {
     setEditingId(null);
@@ -143,8 +343,8 @@ export default function LessonsLearnedTab({ project }: { project: Project }) {
     }
   };
 
-  const followUps = lessons.filter((item) => item.followUp.trim() && item.status !== 'Done').length;
-  const done = lessons.filter((item) => item.status === 'Done').length;
+  const followUps = projectLessons.filter((item) => item.followUp.trim() && item.status !== 'Done').length;
+  const done = projectLessons.filter((item) => item.status === 'Done').length;
   const update = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
 
   return (
@@ -154,7 +354,10 @@ export default function LessonsLearnedTab({ project }: { project: Project }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><BookOpen size={18} color={C.primary} /><h2 style={{ margin: 0, color: C.text, fontSize: 18, fontWeight: 800 }}>Lessons Learned</h2></div>
           <p style={{ margin: '5px 0 0', color: C.text3, fontSize: 11 }}>Project lessons and follow-up actions</p>
         </div>
-        {canEdit && <Btn onClick={openNew} small><Plus size={14} /> Add Lesson</Btn>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Btn variant="ghost" onClick={exportPDF} small><Download size={13} /> Export PDF</Btn>
+            {canEdit && <Btn onClick={openNew} small><Plus size={14} /> Add Lesson</Btn>}
+          </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 14 }}>
@@ -212,9 +415,9 @@ export default function LessonsLearnedTab({ project }: { project: Project }) {
           </div>
         </Card>)}
       </div> : <div style={{ display: 'grid', placeItems: 'center', minHeight: 230, padding: 24, border: `1px dashed ${C.border2}`, borderRadius: 6, background: C.white, textAlign: 'center' }}>
-        <div><BookOpen size={22} color={C.text3} /><h3 style={{ margin: '8px 0 4px', color: C.text, fontSize: 14 }}>{lessons.length ? 'No matching lessons' : 'No lessons recorded yet'}</h3>
-          <p style={{ margin: 0, color: C.text3, fontSize: 11 }}>{lessons.length ? 'Adjust filters to see more results.' : 'Add the first lesson for this project.'}</p>
-          {!lessons.length && canEdit && <Btn onClick={openNew} small style={{ marginTop: 14 }}><Plus size={13} /> Add Lesson</Btn>}
+        <div><BookOpen size={22} color={C.text3} /><h3 style={{ margin: '8px 0 4px', color: C.text, fontSize: 14 }}>{projectLessons.length ? 'No matching lessons' : 'No lessons recorded yet'}</h3>
+          <p style={{ margin: 0, color: C.text3, fontSize: 11 }}>{projectLessons.length ? 'Adjust filters to see more results.' : 'Add the first lesson for this project.'}</p>
+          {!projectLessons.length && canEdit && <Btn onClick={openNew} small style={{ marginTop: 14 }}><Plus size={13} /> Add Lesson</Btn>}
         </div>
       </div>}
 
