@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { projectChecklistApi } from '../../services/api';
-import { Edit3, Plus, Save, Trash2, X } from 'lucide-react';
+import { Edit3, Plus, Trash2, X } from 'lucide-react';
 import { Modal, Input, Btn, C, Select } from '../Common';
 import type { MasterCode } from '../../types';
 import {
@@ -23,6 +23,8 @@ const TYPE_LABELS: Record<string, string> = {
 function ChecklistTopicsManager({ category, workSystems }: { category: ProjectChecklistCategoryId; workSystems: string[] }) {
   const [topics, setTopics] = useState<ProjectChecklistTopic[]>([]);
   const [savedSnapshot, setSavedSnapshot] = useState('');
+  const saveRevision = useRef(0);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const [editing, setEditing] = useState<Record<string, ProjectChecklistTopic>>({});
   const [newStage, setNewStage] = useState<ProjectChecklistStageId>('planning');
   const [newWorkSystem, setNewWorkSystem] = useState('');
@@ -54,7 +56,6 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
     setNewWorkSystem((current) => workSystems.includes(current) ? current : workSystems[0] || '');
   }, [needsWorkSystem, workSystems]);
 
-  const hasUnsavedChanges = JSON.stringify(topics) !== savedSnapshot;
   const workSystemOrderMap = new Map(workSystems.map((system, index) => [system.trim().toLocaleLowerCase(), index]));
   const categoryTopics = topics
     .filter((topic) => topic.category === category)
@@ -116,7 +117,7 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
     delete next[id];
     return next;
   });
-  const saveEdit = (id: string) => {
+  const saveEdit = useCallback((id: string) => {
     const draft = editing[id];
     if (!draft) return;
     if (!draft.title.trim()) {
@@ -133,30 +134,45 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
       return;
     }
     setTopics((currentTopics) => currentTopics.map((topic) => topic.id === id ? { ...draft, title: draft.title.trim(), orderNo } : topic));
-    cancelEdit(id);
-  };
+    setEditing((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }, [editing, needsWorkSystem]);
 
-  const saveTopics = async () => {
-    const normalizedTopics = topics
-      .map((topic) => ({ ...topic, title: topic.title.trim(), orderNo: Number(topic.orderNo) }))
-      .filter((topic) => topic.title);
-    if (!normalizedTopics.length) {
-      toast.error('Add at least one checklist topic');
-      return;
-    }
-    setSavingTopics(true);
-    try {
-      const savedTopics = await projectChecklistApi.replaceTopics(normalizedTopics);
-      setTopics(savedTopics);
-      setSavedSnapshot(JSON.stringify(savedTopics));
-      window.dispatchEvent(new Event('checklist-topics-updated'));
-      toast.success('Checklist topics saved');
-    } catch {
-      toast.error('Could not save checklist topics');
-    } finally {
-      setSavingTopics(false);
-    }
-  };
+  useEffect(() => {
+    const timers = Object.entries(editing).flatMap(([id, draft]) => {
+      const topic = topics.find((item) => item.id === id);
+      if (!topic || JSON.stringify(topic) === JSON.stringify(draft)) return [];
+      return [window.setTimeout(() => saveEdit(id), 600)];
+    });
+    return () => timers.forEach(window.clearTimeout);
+  }, [editing, topics, saveEdit]);
+
+  useEffect(() => {
+    if (topicsLoading || JSON.stringify(topics) === savedSnapshot) return;
+    const revision = ++saveRevision.current;
+    const snapshot = topics.map((topic) => ({ ...topic, title: topic.title.trim(), orderNo: Number(topic.orderNo) }));
+    const timeout = window.setTimeout(() => {
+      saveQueue.current = saveQueue.current.catch(() => undefined).then(async () => {
+        if (revision !== saveRevision.current) return;
+        setSavingTopics(true);
+        try {
+          const savedTopics = await projectChecklistApi.replaceTopics(snapshot);
+          if (revision !== saveRevision.current) return;
+          setTopics(savedTopics);
+          setSavedSnapshot(JSON.stringify(savedTopics));
+          window.dispatchEvent(new Event('checklist-topics-updated'));
+        } catch {
+          if (revision === saveRevision.current) toast.error('Could not save checklist topics');
+        } finally {
+          if (revision === saveRevision.current) setSavingTopics(false);
+        }
+      });
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [topics, savedSnapshot, topicsLoading]);
 
   return (
     <div>
@@ -165,7 +181,7 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
           <h3 style={{ margin: 0, fontSize: 15, color: C.text }}>{PROJECT_CHECKLIST_CATEGORIES.find((item) => item.id === category)?.label} Checklist Topics</h3>
           <p style={{ margin: '5px 0 0', color: C.text3, fontSize: 12 }}>Configure checklist topics and systems.</p>
         </div>
-        <Btn onClick={saveTopics} disabled={topicsLoading || savingTopics || !hasUnsavedChanges} small><Save size={14} /> {savingTopics ? 'Saving…' : 'Save Topics'}</Btn>
+        {savingTopics && <span role="status" style={{ color: C.text3, fontSize: 11 }}>Saving…</span>}
       </div>
 
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', marginBottom: 14, fontSize: 10, width: '100%', minWidth: 0 }}>
@@ -209,10 +225,7 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
                   </td>
                   <td style={{ padding: '4px 5px', verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
                     {draft ? (
-                      <>
-                        <button type="button" aria-label={`Save ${topic.title || 'checklist topic'}`} onClick={() => saveEdit(topic.id)} style={{ ...rowActionStyle, background: C.primary, color: C.white }}><Save size={14} /></button>
-                        <button type="button" aria-label={`Cancel ${topic.title || 'checklist topic'}`} onClick={() => cancelEdit(topic.id)} style={{ ...rowActionStyle, marginLeft: 5 }}><X size={14} /></button>
-                      </>
+                      <span title="Changes save automatically" style={{ color: C.text3, fontSize: 9 }}>Auto</span>
                     ) : (
                       <>
                         <button type="button" aria-label={`Edit ${topic.title}`} onClick={() => startEdit(topic)} style={{ ...rowActionStyle, marginRight: 5 }}><Edit3 size={14} /></button>
@@ -263,6 +276,8 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
     sortOrder: 100,
     active: true,
   });
+  const [addingCode, setAddingCode] = useState(false);
+  const addingCodeRef = useRef(false);
   const ROW_HEIGHT = 36;
   const SMALL_INPUT_STYLE: React.CSSProperties = { fontSize: 10, padding: '4px 8px', lineHeight: 1.3 };
   const ICON_BUTTON_STYLE: React.CSSProperties = { width: 28, height: 28, borderRadius: 8, border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: C.bg2, color: C.text2 };
@@ -335,13 +350,7 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
   );
 
   const startEdit = (code: MasterCode) => setEditing((prev) => ({ ...prev, [code.id]: code }));
-  const cancelEdit = (id: string) => setEditing((prev) => {
-    const next = { ...prev };
-    delete next[id];
-    return next;
-  });
-
-  const saveEdit = async (id: string) => {
+  const saveEdit = useCallback(async (id: string) => {
     const updated = editing[id];
     if (!updated) return;
     if (!updated.codeKey.trim() || !updated.codeValue.trim()) {
@@ -356,33 +365,58 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
         sortOrder: Number(updated.sortOrder) || 100,
         active: updated.active,
       });
-      cancelEdit(id);
-      toast.success('Lookup value saved');
+      setEditing((prev) => {
+        if (JSON.stringify(prev[id]) !== JSON.stringify(updated)) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     } catch (error) {
       toast.error((error as Error).message || 'Unable to save lookup value');
     }
-  };
+  }, [editing, updateMasterCode]);
 
-  const handleAdd = async () => {
-    if (!newCode.codeKey?.trim() || !newCode.codeValue?.trim()) {
-      toast.error('Code key and value are required');
-      return;
-    }
+  useEffect(() => {
+    const timers = Object.entries(editing).flatMap(([id, draft]) => {
+      const original = masterCodes.find((code) => code.id === id);
+      if (!original || JSON.stringify(original) === JSON.stringify(draft)) return [];
+      return [window.setTimeout(() => { void saveEdit(id); }, 600)];
+    });
+    return () => timers.forEach(window.clearTimeout);
+  }, [editing, masterCodes, saveEdit]);
+
+  const handleAdd = useCallback(async () => {
+    if (addingCodeRef.current || !newCode.codeKey?.trim() || !newCode.codeValue?.trim()) return;
+    const codeSnapshot = { ...newCode, codeType: activeType };
+    addingCodeRef.current = true;
+    setAddingCode(true);
     try {
       await createMasterCode({
-        codeType: activeType,
-        codeKey: newCode.codeKey.trim(),
-        codeValue: newCode.codeValue.trim(),
-        label: newCode.label?.trim() || newCode.codeValue?.trim() || '',
-        sortOrder: Number(newCode.sortOrder) || 100,
-        active: newCode.active ?? true,
+        ...codeSnapshot,
+        codeKey: codeSnapshot.codeKey!.trim(),
+        codeValue: codeSnapshot.codeValue!.trim(),
+        label: codeSnapshot.label?.trim() || codeSnapshot.codeValue!.trim(),
+        sortOrder: Number(codeSnapshot.sortOrder) || 100,
+        textColor: codeSnapshot.textColor || '#0F172A',
+        bgColor: codeSnapshot.bgColor || '#EEF2FF',
+        active: codeSnapshot.active ?? true,
       });
-      setNewCode((prev) => ({ ...prev, codeKey: '', codeValue: '', label: '', sortOrder: prev.sortOrder, active: true }));
-      toast.success('Lookup value added');
+      setNewCode((prev) => prev.codeKey === codeSnapshot.codeKey && prev.codeValue === codeSnapshot.codeValue
+        ? { ...prev, codeKey: '', codeValue: '', label: '', sortOrder: prev.sortOrder, active: true }
+        : prev);
     } catch (error) {
       toast.error((error as Error).message || 'Unable to add lookup value');
+    } finally {
+      addingCodeRef.current = false;
+      setAddingCode(false);
     }
-  };
+  }, [activeType, createMasterCode, newCode]);
+
+  useEffect(() => {
+    if (addingCode || !newCode.codeKey?.trim() || !newCode.codeValue?.trim()) return;
+    const timeout = window.setTimeout(() => { void handleAdd(); }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [addingCode, handleAdd, newCode]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -478,89 +512,36 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
               return (
                 <tr key={code.id} style={{ borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 10, height: ROW_HEIGHT }}>
                   <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
-                    {draft ? (
-                      <Input value={draft.codeKey} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], codeKey: v } }))} style={SMALL_INPUT_STYLE} />
-                    ) : (
-                      <span style={{ color: C.text }}>{code.codeKey}</span>
-                    )}
+                    {draft ? <Input value={draft.codeKey} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], codeKey: v } }))} style={SMALL_INPUT_STYLE} /> : <span style={{ color: C.text }}>{code.codeKey}</span>}
                   </td>
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                    {draft ? (
-                      <Input value={draft.codeValue} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], codeValue: v } }))} style={SMALL_INPUT_STYLE} />
-                    ) : (
-                      <span style={{ color: C.text }}>{code.codeValue}</span>
-                    )}
+                    {draft ? <Input value={draft.codeValue} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], codeValue: v } }))} style={SMALL_INPUT_STYLE} /> : <span style={{ color: C.text }}>{code.codeValue}</span>}
                   </td>
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                    {draft ? (
-                      <Input value={draft.label} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], label: v } }))} style={SMALL_INPUT_STYLE} />
-                    ) : (
-                      <span style={{ color: C.text }}>{code.label}</span>
-                    )}
+                    {draft ? <Input value={draft.label} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], label: v } }))} style={SMALL_INPUT_STYLE} /> : <span style={{ color: C.text }}>{code.label}</span>}
                   </td>
                   <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
-                    {draft ? (
-                      <Input type="color" value={draft.textColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], textColor: v } }))} style={{ width: 28, padding: 2, height: 26 }} />
-                    ) : (
-                      <span style={{ width: 18, height: 18, display: 'inline-block', borderRadius: 4, background: code.textColor, border: '1px solid #CBD5E1' }} />
-                    )}
+                    {draft ? <Input type="color" value={draft.textColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], textColor: v } }))} style={{ width: 28, padding: 2, height: 26 }} /> : <span style={{ width: 18, height: 18, display: 'inline-block', borderRadius: 4, background: code.textColor, border: '1px solid #CBD5E1' }} />}
                   </td>
                   <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
-                    {draft ? (
-                      <Input type="color" value={draft.bgColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], bgColor: v } }))} style={{ width: 28, padding: 2, height: 26 }} />
-                    ) : (
-                      <span style={{ width: 18, height: 18, display: 'inline-block', borderRadius: 4, background: code.bgColor, border: '1px solid #CBD5E1' }} />
-                    )}
+                    {draft ? <Input type="color" value={draft.bgColor} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], bgColor: v } }))} style={{ width: 28, padding: 2, height: 26 }} /> : <span style={{ width: 18, height: 18, display: 'inline-block', borderRadius: 4, background: code.bgColor, border: '1px solid #CBD5E1' }} />}
                   </td>
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                    {draft ? (
-                      <Input value={String(draft.sortOrder)} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], sortOrder: Number(v) || 0 } }))} style={SMALL_INPUT_STYLE} />
-                    ) : (
-                      <span style={{ color: C.text }}>{code.sortOrder}</span>
-                    )}
+                    {draft ? <Input value={String(draft.sortOrder)} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], sortOrder: Number(v) || 0 } }))} style={SMALL_INPUT_STYLE} /> : <span style={{ color: C.text }}>{code.sortOrder}</span>}
                   </td>
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle', textAlign: 'center' }}>
-                    {draft ? (
-                      <input type="checkbox" checked={draft.active} onChange={(e) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], active: e.target.checked } }))} />
-                    ) : (
-                      <span>{code.active ? 'Yes' : 'No'}</span>
-                    )}
+                    {draft ? <input type="checkbox" checked={draft.active} onChange={(e) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], active: e.target.checked } }))} /> : <span>{code.active ? 'Yes' : 'No'}</span>}
                   </td>
                   <td style={{ padding: '4px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
-                    {draft ? (
-                      <>
-                        <button type="button" onClick={() => saveEdit(code.id)}
-                          style={{ ...ICON_BUTTON_STYLE, background: C.primary, color: '#fff', width: 28, height: 28, padding: 0 }}>
-                          <Edit3 size={14} />
-                        </button>
-                        <button type="button" onClick={() => cancelEdit(code.id)}
-                          style={{ ...ICON_BUTTON_STYLE, marginLeft: 6, padding: 0 }}>
-                          <Trash2 size={14} />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button type="button" onClick={() => startEdit(code)}
-                          style={{ ...ICON_BUTTON_STYLE, marginRight: 6, padding: 0 }}>
-                          <Edit3 size={14} />
-                        </button>
-                        <button type="button" onClick={() => handleDelete(code.id)}
-                          style={{ ...ICON_BUTTON_STYLE, background: C.redBg, color: C.red, padding: 0 }}>
-                          <Trash2 size={14} />
-                        </button>
-                      </>
-                    )}
+                    {draft ? <span title="Changes save automatically" style={{ color: C.text3, fontSize: 9 }}>Auto</span> : <>
+                      <button type="button" onClick={() => startEdit(code)} style={{ ...ICON_BUTTON_STYLE, marginRight: 6, padding: 0 }}><Edit3 size={14} /></button>
+                      <button type="button" onClick={() => handleDelete(code.id)} style={{ ...ICON_BUTTON_STYLE, background: C.redBg, color: C.red, padding: 0 }}><Trash2 size={14} /></button>
+                    </>}
                   </td>
                 </tr>
               );
             })}
-            {codes.length === 0 && (
-              <tr>
-                <td colSpan={8} style={{ padding: 16, textAlign: 'center', color: C.text3, background: C.bg2 }}>
-                  No values found for this lookup type.
-                </td>
-              </tr>
-            )}
+            {codes.length === 0 && <tr><td colSpan={8} style={{ padding: 16, textAlign: 'center', color: C.text3, background: C.bg2 }}>No values found for this lookup type.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -580,7 +561,7 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <input type="checkbox" checked={newCode.active ?? true} onChange={(e) => setNewCode((prev) => ({ ...prev, active: e.target.checked }))} />
           </div>
-          <Btn onClick={handleAdd} style={{ width: '100%' }}>Save</Btn>
+          <div role="status" style={{ color: C.text3, fontSize: 10, textAlign: 'center' }}>{addingCode ? 'Adding…' : 'Auto Save'}</div>
         </div>
       </div>
           </>}

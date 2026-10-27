@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Copy, FolderOpen, Layers, Plus, Save, Trash2 } from 'lucide-react';
+import { Copy, FolderOpen, Layers, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { taskApi, taskTemplateApi } from '../../services/api';
@@ -29,6 +29,8 @@ export default function TaskTemplateModal({ onClose }: Props) {
   const [activeView, setActiveView] = useState<'copy' | 'templates'>('copy');
   const [loading, setLoading] = useState(false);
   const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [savingTemplateName, setSavingTemplateName] = useState(false);
+  const [savingItems, setSavingItems] = useState(false);
 
   const [sourceMode, setSourceMode] = useState<CopySourceMode>('project');
   const [sourceProjectId, setSourceProjectId] = useState('');
@@ -38,7 +40,14 @@ export default function TaskTemplateModal({ onClose }: Props) {
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [templateNameDraft, setTemplateNameDraft] = useState('');
+  const [templateNameDraftId, setTemplateNameDraftId] = useState('');
   const [itemsDraft, setItemsDraft] = useState<TaskTemplateItem[]>([]);
+  const [itemsSavedSnapshot, setItemsSavedSnapshot] = useState('');
+  const [itemsDraftId, setItemsDraftId] = useState('');
+  const nameSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const itemsSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const nameSaveRevision = useRef(0);
+  const itemsSaveRevision = useRef(0);
 
   const [createName, setCreateName] = useState('');
   const [createSourceProjectId, setCreateSourceProjectId] = useState('');
@@ -92,6 +101,10 @@ export default function TaskTemplateModal({ onClose }: Props) {
   const loadTemplateItems = async (templateId: string) => {
     if (!templateId) {
       setItemsDraft([]);
+      setItemsSavedSnapshot('[]');
+      setItemsDraftId('');
+      setTemplateNameDraft('');
+      setTemplateNameDraftId('');
       return;
     }
     try {
@@ -101,7 +114,11 @@ export default function TaskTemplateModal({ onClose }: Props) {
       ]);
       const found = templateRes.data.find((t) => t.id === templateId);
       setTemplateNameDraft(found?.name || '');
-      setItemsDraft(itemRes.data.slice().sort((a, b) => compareWbs(a.wbs || '', b.wbs || '')));
+      setTemplateNameDraftId(templateId);
+      const sortedItems = itemRes.data.slice().sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''));
+      setItemsDraft(sortedItems);
+      setItemsSavedSnapshot(JSON.stringify(sortedItems));
+      setItemsDraftId(templateId);
       setTemplates(templateRes.data);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to load template items');
@@ -188,53 +205,61 @@ export default function TaskTemplateModal({ onClose }: Props) {
     }
   };
 
-  const handleSaveTemplateName = async () => {
-    if (!isAdmin) return;
-    if (!selectedTemplateId || !templateNameDraft.trim()) {
-      toast.error('Template name is required');
-      return;
-    }
-    setLoading(true);
-    try {
-      await taskTemplateApi.updateTemplate(selectedTemplateId, { name: templateNameDraft.trim() });
-      await loadTemplates();
-      toast.success('Template name updated');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to update template');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
-  const handleSaveItems = async () => {
-    if (!isAdmin) return;
-    if (!selectedTemplateId) {
-      toast.error('Please select template');
-      return;
-    }
-    setLoading(true);
-    try {
-      const sortedItems = [...itemsDraft].sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''));
-      await taskTemplateApi.replaceItems(
-        selectedTemplateId,
-        sortedItems.map((item, index) => ({
-          wbs: item.wbs,
-          parentWbs: item.parentWbs,
-          level: Number(item.level || 0),
-          sortOrder: (index + 1) * 10,
-          taskName: item.taskName,
-          duration: Number(item.duration || 0),
-          effortManday: Number(item.effortManday || 0),
-        })),
-      );
-      toast.success('Template items updated');
-      await loadTemplateItems(selectedTemplateId);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to save template');
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (!isAdmin || !selectedTemplate || templateNameDraftId !== selectedTemplateId || !templateNameDraft.trim() || templateNameDraft.trim() === selectedTemplate.name) return;
+    const revision = ++nameSaveRevision.current;
+    const timeout = window.setTimeout(() => {
+      nameSaveQueue.current = nameSaveQueue.current.catch(() => undefined).then(async () => {
+        if (revision !== nameSaveRevision.current) return;
+        setSavingTemplateName(true);
+        try {
+          const saved = await taskTemplateApi.updateTemplate(selectedTemplateId, { name: templateNameDraft.trim() });
+          if (revision === nameSaveRevision.current) {
+            setTemplates((current) => current.map((template) => template.id === selectedTemplateId ? saved.data : template));
+          }
+        } catch (error) {
+          if (revision === nameSaveRevision.current) toast.error(error instanceof Error ? error.message : 'Failed to save template name');
+        } finally {
+          if (revision === nameSaveRevision.current) setSavingTemplateName(false);
+        }
+      });
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [isAdmin, selectedTemplate, selectedTemplateId, templateNameDraft, templateNameDraftId]);
+
+  useEffect(() => {
+    if (!isAdmin || !selectedTemplateId || itemsDraftId !== selectedTemplateId || templatesLoading || JSON.stringify(itemsDraft) === itemsSavedSnapshot) return;
+    const revision = ++itemsSaveRevision.current;
+    const timeout = window.setTimeout(() => {
+      itemsSaveQueue.current = itemsSaveQueue.current.catch(() => undefined).then(async () => {
+        if (revision !== itemsSaveRevision.current) return;
+        setSavingItems(true);
+        try {
+          const sortedItems = [...itemsDraft].sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''));
+          await taskTemplateApi.replaceItems(
+            selectedTemplateId,
+            sortedItems.map((item, index) => ({
+              wbs: item.wbs,
+              parentWbs: item.parentWbs,
+              level: Number(item.level || 0),
+              sortOrder: (index + 1) * 10,
+              taskName: item.taskName,
+              duration: Number(item.duration || 0),
+              effortManday: Number(item.effortManday || 0),
+            })),
+          );
+          if (revision === itemsSaveRevision.current) setItemsSavedSnapshot(JSON.stringify(itemsDraft));
+        } catch (error) {
+          if (revision === itemsSaveRevision.current) toast.error(error instanceof Error ? error.message : 'Failed to save template items');
+        } finally {
+          if (revision === itemsSaveRevision.current) setSavingItems(false);
+        }
+      });
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [isAdmin, itemsDraft, itemsDraftId, itemsSavedSnapshot, selectedTemplateId, templatesLoading]);
 
   const handleDeleteTemplate = async () => {
     if (!isAdmin) return;
@@ -292,8 +317,6 @@ export default function TaskTemplateModal({ onClose }: Props) {
   const removeItem = (index: number) => {
     setItemsDraft((prev) => prev.filter((_, i) => i !== index));
   };
-
-  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
   const cellInput: React.CSSProperties = {
     width: '100%', height: '100%', border: 'none', outline: 'none',
@@ -440,9 +463,7 @@ export default function TaskTemplateModal({ onClose }: Props) {
                     <div style={{ flex: 1, minWidth: 160 }}>
                       <Input value={templateNameDraft} onChange={setTemplateNameDraft} placeholder="Template name" />
                     </div>
-                    <Btn small onClick={handleSaveTemplateName} disabled={!isAdmin || loading || !templateNameDraft.trim()}>
-                      <Save size={13} /> Save Name
-                    </Btn>
+                    {savingTemplateName && <span role="status" style={{ color: C.text3, fontSize: 10 }}>Saving…</span>}
                     <Btn small variant="danger" onClick={handleDeleteTemplate} disabled={!isAdmin || loading}>
                       <Trash2 size={13} />
                     </Btn>
@@ -507,14 +528,12 @@ export default function TaskTemplateModal({ onClose }: Props) {
                     </div>
                   </div>
 
-                  {/* Add row + Save */}
+                  {/* Add row */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 2 }}>
                     <Btn small variant="ghost" onClick={addItem} disabled={!isAdmin}>
                       <Plus size={13} /> Add Row
                     </Btn>
-                    <Btn small onClick={handleSaveItems} disabled={!isAdmin || loading}>
-                      <Save size={13} /> Save Items
-                    </Btn>
+                    {savingItems && <span role="status" style={{ color: C.text3, fontSize: 10 }}>Saving…</span>}
                   </div>
                 </>
               )}
