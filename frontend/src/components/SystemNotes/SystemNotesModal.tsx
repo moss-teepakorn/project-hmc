@@ -76,7 +76,7 @@ export default function SystemNotesModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title="System Notes" onClose={onClose} width={1450}>
+    <Modal title="System Notes" onClose={onClose} width={1450} closeOnBackdrop={false}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, color: C.text2 }}>Admin-only records for system-level announcements and internal notes.</div>
         <Btn small onClick={openCreate}><Plus size={14} /> Add Note</Btn>
@@ -168,7 +168,7 @@ function NoteModal({
   const up = (key: keyof Note, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <Modal title={form.id ? 'Edit Note' : 'Add Note'} onClose={onClose} width={920}>
+    <Modal title={form.id ? 'Edit Note' : 'Add Note'} onClose={onClose} width={920} closeOnBackdrop={false}>
       <FormRow label="Title" required>
         <Input autoFocus value={form.title ?? ''} onChange={(v) => up('title', v)} placeholder="Topic" />
       </FormRow>

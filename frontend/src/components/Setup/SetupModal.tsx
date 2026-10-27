@@ -438,7 +438,7 @@ export default function SetupModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title="Admin Setup" onClose={onClose} width={1100} height="min(760px, 88vh)" contentStyle={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <Modal title="Admin Setup" onClose={onClose} width={1100} height="min(760px, 88vh)" closeOnBackdrop={false} contentStyle={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '190px minmax(0, 1fr)', gridTemplateRows: isMobile ? 'auto minmax(0, 1fr)' : 'minmax(0, 1fr)', gap: 18, height: '100%', minHeight: 0, overflow: 'hidden' }}>
         <nav aria-label="Setup sections" style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', flexWrap: isMobile ? 'wrap' : 'nowrap', alignItems: 'stretch', gap: 4, paddingRight: isMobile ? 0 : 14, borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none', paddingBottom: isMobile ? 12 : 0 }}>
           <button type="button" aria-current={!checklistSetupOpen ? 'page' : undefined} onClick={() => setChecklistSetupOpen(false)}

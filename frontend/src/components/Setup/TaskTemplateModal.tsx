@@ -325,7 +325,7 @@ export default function TaskTemplateModal({ onClose }: Props) {
   };
 
   return (
-    <Modal title="Task Copy & WBS Template" onClose={onClose} width={980}>
+    <Modal title="Task Copy & WBS Template" onClose={onClose} width={980} closeOnBackdrop={false}>
       <div style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Btn small variant={activeView === 'copy' ? 'primary' : 'ghost'} onClick={() => setActiveView('copy')}>
