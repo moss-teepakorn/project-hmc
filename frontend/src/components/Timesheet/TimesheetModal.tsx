@@ -216,7 +216,7 @@ export default function TimesheetModal({ onClose }: Props) {
         </div>
       )}
 
-      <section aria-label="Monthly calendar" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+      <section aria-label="Monthly calendar" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', flex: '0 0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', background: C.bg }}>
           {WEEKDAYS.map((day) => (
             <div key={day} style={{ textAlign: 'center', padding: '9px 4px', fontSize: 11, fontWeight: 700, color: C.text2 }}>{day}</div>
@@ -225,7 +225,7 @@ export default function TimesheetModal({ onClose }: Props) {
         {loading ? (
           <div style={{ padding: 36, textAlign: 'center', color: C.text2 }}>กำลังโหลด Timesheet...</div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gridAutoRows: 'minmax(112px, auto)' }}>
             {calendarDays.map((day, index) => {
               if (!day) return <div key={`blank-${index}`} style={{ minHeight: 112, borderTop: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`, background: C.bg }} />;
               const date = toIsoDate(month.getFullYear(), month.getMonth(), day);
