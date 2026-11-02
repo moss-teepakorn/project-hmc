@@ -7,8 +7,9 @@ import { C } from '../Common';
 import SetupModal from '../Setup/SetupModal';
 import ManageUsersModal from '../Users/ManageUsersModal';
 import SystemNotesModal from '../SystemNotes/SystemNotesModal';
+import TimesheetModal from '../Timesheet/TimesheetModal';
 import TaskTemplateModal from '../Setup/TaskTemplateModal';
-import { Bell, Home, LogOut, Moon, Sun, Copy, Users, Settings, StickyNote } from 'lucide-react';
+import { Bell, Home, LogOut, Moon, Sun, Copy, Users, Settings, StickyNote, Clock3 } from 'lucide-react';
 
 const F = 'Poppins, sans-serif';
 
@@ -21,6 +22,7 @@ export default function Navbar() {
   const [setupOpen, setSetupOpen] = React.useState(false);
   const [manageUsersOpen, setManageUsersOpen] = React.useState(false);
   const [notesOpen, setNotesOpen] = React.useState(false);
+  const [timesheetOpen, setTimesheetOpen] = React.useState(false);
   const [taskTemplateOpen, setTaskTemplateOpen] = React.useState(false);
   const [setupLoading, setSetupLoading] = React.useState(false);
   const [notesLoading, setNotesLoading] = React.useState(false);
@@ -241,6 +243,20 @@ export default function Navbar() {
           </>
         )}
 
+        {configured && user && (
+          <button
+            onClick={() => setTimesheetOpen(true)}
+            title="Open personal timesheet"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap',
+              padding: '8px 12px', borderRadius: 10, border: `1px solid ${isDark ? C.border2 : C.border}`,
+              background: isDark ? '#1E293B' : C.white, color: textColor, cursor: 'pointer', fontSize: 12,
+            }}
+          >
+            <Clock3 size={14} /> {!isMobile && 'Timesheet'}
+          </button>
+        )}
+
         <button
           onClick={() => setTaskTemplateOpen(true)}
           title={activeProject ? 'Task Copy & WBS Template' : 'Open a project first'}
@@ -380,6 +396,7 @@ export default function Navbar() {
       {setupOpen && <SetupModal onClose={() => setSetupOpen(false)} />}
       {manageUsersOpen && <ManageUsersModal onClose={() => setManageUsersOpen(false)} />}
       {notesOpen && <SystemNotesModal onClose={() => setNotesOpen(false)} />}
+      {timesheetOpen && <TimesheetModal onClose={() => setTimesheetOpen(false)} />}
       {taskTemplateOpen && <TaskTemplateModal onClose={() => setTaskTemplateOpen(false)} />}
     </nav>
   );

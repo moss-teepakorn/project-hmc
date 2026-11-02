@@ -63,6 +63,17 @@ export interface Note {
   updatedAt: string;
 }
 
+export interface TimesheetEntry {
+  id: string;
+  userId: string;
+  workDate: string;
+  projectKey: string;
+  description: string;
+  hours: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Task {
   id: string;
   projectId: string;

@@ -9,6 +9,8 @@
 - `migrations/` database migrations ของ Project HMC
 - `docs/supabase-schema.sql` schema reference
 
+หน้าจอ Timesheet ต้อง apply migration `migrations/2026-11-02-create-personal-timesheets.sql` กับ Supabase ก่อนใช้งาน โดยข้อมูลจะถูกจำกัดให้อ่านและแก้ไขได้เฉพาะเจ้าของรายการผ่าน Row Level Security
+
 ## เริ่มต้นใช้งาน
 
 ```bash

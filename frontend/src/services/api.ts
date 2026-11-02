@@ -146,7 +146,7 @@ import { compareWbs } from '../utils';
 
 import { supabase } from './supabase';
 import { parseISO, isValid } from 'date-fns';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem, Activity, Note, ProjectLessonLearned } from '../types';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem, Activity, Note, TimesheetEntry, ProjectLessonLearned } from '../types';
 import type { ProjectChecklistCategoryId, ProjectChecklistProgress, ProjectChecklistProgressEntry, ProjectChecklistTopic } from '../utils/projectChecklist';
 
 const TASK_DEPENDENCY_TYPES = new Set(['FS', 'SS', 'FF', 'SF']);
@@ -445,6 +445,86 @@ export const noteApi = {
     const user = await getCurrentUserRoleAndId();
     if (user.role !== 'admin') throw new Error('FORBIDDEN');
     const { error } = await supabase.from('notes').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+};
+
+// ── Personal Timesheets ─────────────────────────────────────────────────────
+
+type TimesheetInput = Pick<TimesheetEntry, 'workDate' | 'projectKey' | 'description' | 'hours'>;
+
+function validateTimesheetInput(entry: TimesheetInput): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.workDate)) throw new Error('INVALID_WORK_DATE');
+  if (!entry.projectKey.trim()) throw new Error('PROJECT_REQUIRED');
+  if (!entry.description.trim()) throw new Error('DESCRIPTION_REQUIRED');
+  if (!Number.isFinite(entry.hours) || entry.hours <= 0 || entry.hours > 24) {
+    throw new Error('INVALID_HOURS');
+  }
+}
+
+export const timesheetApi = {
+  getByDateRange: async (startDate: string, endDate: string): Promise<{ data: TimesheetEntry[] }> => {
+    const { userId } = await getCurrentUserRoleAndId();
+    if (!userId) throw new Error('UNAUTHENTICATED');
+    const { data, error } = await supabase
+      .from('timesheet_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('work_date', startDate)
+      .lte('work_date', endDate)
+      .order('work_date', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(error.message);
+    return { data: rowsToObjs<TimesheetEntry>(data || []) };
+  },
+
+  create: async (entry: TimesheetInput): Promise<{ data: TimesheetEntry }> => {
+    validateTimesheetInput(entry);
+    const { userId } = await getCurrentUserRoleAndId();
+    if (!userId) throw new Error('UNAUTHENTICATED');
+    const { data, error } = await supabase
+      .from('timesheet_entries')
+      .insert({
+        user_id: userId,
+        work_date: entry.workDate,
+        project_key: entry.projectKey.trim(),
+        description: entry.description.trim(),
+        hours: entry.hours,
+      })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<TimesheetEntry>(data) };
+  },
+
+  update: async (id: string, entry: TimesheetInput): Promise<{ data: TimesheetEntry }> => {
+    validateTimesheetInput(entry);
+    const { userId } = await getCurrentUserRoleAndId();
+    if (!userId) throw new Error('UNAUTHENTICATED');
+    const { data, error } = await supabase
+      .from('timesheet_entries')
+      .update({
+        work_date: entry.workDate,
+        project_key: entry.projectKey.trim(),
+        description: entry.description.trim(),
+        hours: entry.hours,
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return { data: rowToObj<TimesheetEntry>(data) };
+  },
+
+  remove: async (id: string): Promise<void> => {
+    const { userId } = await getCurrentUserRoleAndId();
+    if (!userId) throw new Error('UNAUTHENTICATED');
+    const { error } = await supabase
+      .from('timesheet_entries')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId);
     if (error) throw new Error(error.message);
   },
 };
