@@ -2648,14 +2648,16 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                     )}
                     {isColumnVisible('scheduleStatus') && (
                       <div style={{ width:renderedColumnWidths[8], minWidth:renderedColumnWidths[8], padding:'0 6px', flexShrink:0 }}>
-                        {isNew || !rowTask.endDate ? (
+                        {isNew ? (
                           <span style={{ color:C.text3 }}>—</span>
                         ) : (() => {
-                          const isDelayed = rowTask.endDate < todayIsoDate;
+                          const isDone = Number(rowTask.percentComplete) >= 100;
+                          const status = isDone ? 'Done' : rowTask.endDate ? rowTask.endDate < todayIsoDate ? 'Delay' : 'Ontrack' : '';
+                          const isDelayed = status === 'Delay';
                           return (
-                            <span style={{ display:'inline-flex', alignItems:'center', padding:'3px 7px', borderRadius:5, background:isDelayed ? C.redBg : C.greenBg, color:isDelayed ? C.red : C.green, fontSize:10, fontWeight:700 }}>
-                              {isDelayed ? 'Delay' : 'Ontrack'}
-                            </span>
+                            status
+                              ? <span style={{ display:'inline-flex', alignItems:'center', padding:'3px 7px', borderRadius:5, background:isDelayed ? C.redBg : C.greenBg, color:isDelayed ? C.red : C.green, fontSize:10, fontWeight:700 }}>{status}</span>
+                              : <span style={{ color:C.text3 }}>—</span>
                           );
                         })()}
                       </div>
