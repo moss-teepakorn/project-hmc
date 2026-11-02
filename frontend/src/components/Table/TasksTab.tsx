@@ -31,6 +31,7 @@ type TaskColumnId =
   | 'actualFinish'
   | 'duration'
   | 'percentComplete'
+  | 'scheduleStatus'
   | 'effortManday'
   | 'resource'
   | 'actions';
@@ -44,11 +45,12 @@ const COLS: Array<{ id: TaskColumnId; label: string; w: number; canHide: boolean
   { id: 'endDate',         label: 'Finish',        w: 130, canHide: true },
   { id: 'actualFinish',    label: 'Actual Finish', w: 130, canHide: true },
   { id: 'percentComplete', label: '% Done',        w: 90,  canHide: true },
+  { id: 'scheduleStatus',  label: 'Status',        w: 100, canHide: true },
   { id: 'effortManday',    label: 'Effort (MD)',   w: 90,  canHide: true },
   { id: 'resource',        label: 'Resource',      w: 160, canHide: true },
   { id: 'actions',         label: '',              w: 66,  canHide: true },
 ];
-const MIN_COLUMN_WIDTHS = [44, 220, 56, 92, 110, 110, 110, 64, 72, 96, 50];
+const MIN_COLUMN_WIDTHS = [44, 220, 56, 92, 110, 110, 110, 64, 76, 72, 96, 50];
 const DEFAULT_COLUMN_VISIBILITY: Record<TaskColumnId, boolean> = COLS.reduce((acc, col) => {
   acc[col.id] = true;
   return acc;
@@ -245,6 +247,13 @@ function parseIsoDateSafe(value?: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function getLocalIsoDate(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function addWorkingDays(base: Date, deltaDays: number): Date {
   if (deltaDays === 0) return new Date(base);
   const step = deltaDays > 0 ? 1 : -1;
@@ -437,6 +446,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const [addModal, setAddModal] = useState(false);
   const [editModal, setEditModal] = useState<Task | null>(null);
   const [loading, setLoading]   = useState(false);
+  const [todayIsoDate, setTodayIsoDate] = useState(() => getLocalIsoDate());
   const [showExport, setShowExport] = useState(false);
   const [importing, setImporting] = useState(false);
   const [savingBaseline, setSavingBaseline] = useState(false);
@@ -502,6 +512,11 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     setLoading(true);
     fetchTasks(projectId).finally(() => setLoading(false));
   }, [projectId]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setTodayIsoDate(getLocalIsoDate()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const parentIds = new Set(
@@ -2631,8 +2646,22 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                         )}
                       </div>
                     )}
+                    {isColumnVisible('scheduleStatus') && (
+                      <div style={{ width:renderedColumnWidths[8], minWidth:renderedColumnWidths[8], padding:'0 6px', flexShrink:0 }}>
+                        {isNew || !rowTask.endDate ? (
+                          <span style={{ color:C.text3 }}>—</span>
+                        ) : (() => {
+                          const isDelayed = rowTask.endDate < todayIsoDate;
+                          return (
+                            <span style={{ display:'inline-flex', alignItems:'center', padding:'3px 7px', borderRadius:5, background:isDelayed ? C.redBg : C.greenBg, color:isDelayed ? C.red : C.green, fontSize:10, fontWeight:700 }}>
+                              {isDelayed ? 'Delay' : 'Ontrack'}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
                     {isColumnVisible('effortManday') && (
-                      <div style={{ width:renderedColumnWidths[8], minWidth:renderedColumnWidths[8], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[9], minWidth:renderedColumnWidths[9], padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>
                         {isNew ? (
                           <EditableCell
                             value={String(newRow.effortManday || 0)}
@@ -2659,7 +2688,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('resource') && (
-                      <div style={{ width:renderedColumnWidths[9], minWidth:renderedColumnWidths[9], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+                      <div style={{ width:renderedColumnWidths[10], minWidth:renderedColumnWidths[10], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
                         {!isNew && rowTask.resource && <Avatar name={rowTask.resource} size={20} />}
                         <EditableCell
                           value={isNew ? newRow.resource : rowTask.resource}
@@ -2672,7 +2701,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       </div>
                     )}
                     {isColumnVisible('actions') && (
-                      <div style={{ width:renderedColumnWidths[10], minWidth:renderedColumnWidths[10], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
+                      <div style={{ width:renderedColumnWidths[11], minWidth:renderedColumnWidths[11], padding:'0 5px', flexShrink:0, display:'flex', gap:4, justifyContent:'center' }}>
                         {isNew ? (
                           <>
                             <button onClick={e => { e.stopPropagation(); saveNewTask(); }}
