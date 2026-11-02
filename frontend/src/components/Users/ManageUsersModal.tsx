@@ -214,7 +214,7 @@ export default function ManageUsersModal({ onClose }: { onClose: () => void }) {
   };
 
   const sendInvitation = async () => {
-    const email = inviteEmail.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase();
+    const email = inviteEmail.normalize('NFC').replace(/\p{Cf}/gu, '').trim().toLowerCase();
     if (!inviteName.trim() || !email) {
       toast.error('Enter the user name and email');
       return;

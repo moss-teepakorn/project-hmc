@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   if (caller?.role !== 'admin' || caller.is_active === false) return res.status(403).json({ error: 'FORBIDDEN' });
 
   if (req.method === 'POST') {
-    const email = String(req.body?.email || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase();
+    const email = String(req.body?.email || '').normalize('NFC').replace(/\p{Cf}/gu, '').trim().toLowerCase();
     const fullName = String(req.body?.fullName || '').trim();
     const role = req.body?.role;
     if (!email || !fullName || !['admin', 'member', 'client'].includes(role)) return res.status(400).json({ error: 'INVALID_INVITE_DETAILS' });
