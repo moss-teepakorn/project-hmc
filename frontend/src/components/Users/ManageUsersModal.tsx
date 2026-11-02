@@ -214,9 +214,13 @@ export default function ManageUsersModal({ onClose }: { onClose: () => void }) {
   };
 
   const sendInvitation = async () => {
-    const email = inviteEmail.trim().toLowerCase();
+    const email = inviteEmail.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase();
     if (!inviteName.trim() || !email) {
       toast.error('Enter the user name and email');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Enter a valid email address');
       return;
     }
     setInviting(true);
